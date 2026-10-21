@@ -119,8 +119,24 @@ export function JudgeView({ event }: { event: EventDoc }) {
           </ul>
         ) : (
           <EmptyState
-            title={filter === "pending" ? "Nada pendiente" : "Sin proyectos"}
-            text={filter === "pending" ? "Ya calificaste todas las entregas disponibles." : "Aún no hay proyectos registrados."}
+            title={
+              !projects.data.length
+                ? "Aún no hay proyectos"
+                : filter === "pending" && !tasks.length
+                  ? "Aún no hay entregas"
+                  : filter === "pending"
+                    ? "Nada pendiente"
+                    : "Sin resultados"
+            }
+            text={
+              !projects.data.length
+                ? "Cuando los equipos se registren aparecerán aquí."
+                : filter === "pending" && !tasks.length
+                  ? "Los equipos todavía no suben su prototipo ni su producto final. Puedes revisar los proyectos en «Todos»."
+                  : filter === "pending"
+                    ? "Ya calificaste todas las entregas disponibles."
+                    : "Prueba con otra búsqueda."
+            }
           />
         )}
       </section>

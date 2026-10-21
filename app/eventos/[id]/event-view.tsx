@@ -10,7 +10,7 @@ import { useAccess } from "@/lib/access";
 import { useAuth } from "@/lib/auth";
 import { eventRef } from "@/lib/data";
 import { useDocument } from "@/lib/hooks";
-import type { EventDoc, EventRole } from "@/lib/types";
+import { PHASE_LABEL, PHASES, type EventDoc, type EventRole } from "@/lib/types";
 import { formatDate, normalizeEmail, rolesInEvent } from "@/lib/utils";
 import { JudgeView } from "./judge-view";
 import { OrganizerView } from "./organizer-view";
@@ -102,20 +102,76 @@ function EventHeader({ event, role, viaAdmin }: { event: EventDoc; role: EventRo
           </p>
         )}
       </div>
-      <div className="flex flex-col justify-between gap-6 rounded-3xl bg-lime p-6 sm:p-8">
-        <div>
-          <p className="font-mono text-[11px] text-ink/70">Código del evento</p>
-          <p className="mt-1 font-mono text-4xl font-bold tracking-[0.2em]">{event.code}</p>
-          <p className="mt-2 font-mono text-[11px] text-ink/70">
-            Etapas: {[event.phases.prototype && "Prototipo", event.phases.final && "Producto final"].filter(Boolean).join(" + ")}
-            {" · "}Equipos de hasta {event.maxTeamSize}
-          </p>
+      {role === "organizer" ? (
+        // Solo el organizador necesita el código para invitar equipos
+        <div className="flex flex-col justify-between gap-6 rounded-3xl bg-lime p-6 sm:p-8">
+          <div>
+            <p className="font-mono text-[11px] text-ink/70">Código para los equipos</p>
+            <p className="mt-1 font-mono text-4xl font-bold tracking-[0.2em]">{event.code}</p>
+            <p className="mt-2 font-mono text-[11px] text-ink/70">
+              Etapas: {phaseNames(event)} · Equipos de hasta {event.maxTeamSize}
+            </p>
+          </div>
+          <Button variant="dark" onClick={share} className="self-start">
+            {copied ? <Check className="size-4" /> : <Share2 className="size-4" />}
+            {copied ? "Copiado" : "Compartir"}
+          </Button>
         </div>
-        <Button variant="dark" onClick={share} className="self-start">
-          {copied ? <Check className="size-4" /> : <Share2 className="size-4" />}
-          {copied ? "Copiado" : "Compartir"}
-        </Button>
-      </div>
+      ) : (
+        <StatusCard event={event} role={role} />
+      )}
     </section>
+  );
+}
+
+function phaseNames(event: EventDoc) {
+  return [event.phases.prototype && "Prototipo", event.phases.final && "Producto final"].filter(Boolean).join(" + ");
+}
+
+/** Estado del evento desde el punto de vista del juez o del alumno. */
+function StatusCard({ event, role }: { event: EventDoc; role: EventRole }) {
+  const rows: { label: string; open: boolean; on: string; off: string }[] =
+    role === "judge"
+      ? [
+          { label: "Evaluación", open: event.judgingOpen, on: "Abierta, ya puedes calificar", off: "Aún no abre" },
+          ...PHASES.filter((p) => event.phases[p]).map((p) => ({
+            label: PHASE_LABEL[p],
+            open: event.submissions[p],
+            on: "Los equipos están entregando",
+            off: "Entregas cerradas",
+          })),
+          { label: "Resultados", open: event.resultsPublished, on: "Publicados", off: "Sin publicar" },
+        ]
+      : [
+          { label: "Registro", open: event.registrationOpen, on: "Abierto", off: "Cerrado" },
+          ...PHASES.filter((p) => event.phases[p]).map((p) => ({
+            label: `Entrega de ${PHASE_LABEL[p].toLowerCase()}`,
+            open: event.submissions[p],
+            on: "Abierta",
+            off: "Cerrada",
+          })),
+          { label: "Resultados", open: event.resultsPublished, on: "Publicados", off: "Pendientes" },
+        ];
+
+  return (
+    <div className="rounded-3xl bg-lime p-6 sm:p-8">
+      <p className="font-mono text-[11px] text-ink/70">{role === "judge" ? "Tu evaluación" : "Etapas del evento"}</p>
+      <ul className="mt-3 divide-y divide-ink/10">
+        {rows.map((r) => (
+          <li key={r.label} className="flex items-center justify-between gap-3 py-2.5">
+            <span className="text-sm font-medium">{r.label}</span>
+            <span className="flex items-center gap-1.5 text-right font-mono text-[11px]">
+              <span className={r.open ? "size-2 rounded-full bg-coal" : "size-2 rounded-full border border-coal/40"} aria-hidden />
+              {r.open ? r.on : r.off}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 font-mono text-[10px] text-ink/60">
+        {role === "judge"
+          ? `Rúbrica de ${event.criteria.length} criterio${event.criteria.length === 1 ? "" : "s"} · calificas de 0 a 10`
+          : `Equipos de hasta ${event.maxTeamSize} integrantes`}
+      </p>
+    </div>
   );
 }
