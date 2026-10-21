@@ -81,3 +81,18 @@ lib/
   similarity.ts  Huellas y comparación anti-plagio
 tests/           Pruebas de firestore.rules
 ```
+
+## Cuentas demo por rol
+
+`node scripts/demo-roles.mjs crear` crea en `code-94fbe` una cuenta por rol, el evento «DEMO · Expo de Proyectos» (código `DEMO26`) y un proyecto con similitud alta contra un evento histórico. `node scripts/demo-roles.mjs borrar` elimina todo eso. Usa la sesión del Firebase CLI; la contraseña es `CodeDemo2026!` (o la de `DEMO_PASSWORD`).
+
+| Rol | Correo |
+| --- | --- |
+| Admin | demo.admin@example.com |
+| Organizador (crea eventos) | demo.organizador@example.com |
+| Coorganizador del evento | demo.coorganizador@example.com |
+| Juez | demo.juez@example.com |
+| Alumno líder | demo.alumno@example.com |
+| Integrante | demo.integrante@example.com |
+| Alumno sin proyecto | demo.nuevo@example.com |
+| Suspendido | demo.suspendido@example.com |
