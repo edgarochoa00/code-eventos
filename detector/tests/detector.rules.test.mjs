@@ -30,6 +30,8 @@ before(async () => {
     projectId: "demo-code",
     firestore: { rules: readFileSync(RULES, "utf8"), host: "127.0.0.1", port: 8085 },
   });
+  // Cada archivo empieza con el emulador vacío (se corren uno tras otro)
+  await env.clearFirestore();
   superDb = ctx("super", SUPER);
   admin = ctx("adm", "adm@tec.mx");
   admin2 = ctx("adm2", "adm2@tec.mx");

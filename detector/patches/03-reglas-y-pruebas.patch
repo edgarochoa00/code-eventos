@@ -224,7 +224,7 @@ index 2b0e88e..5cea7ed 100644
    }
  }
 diff --git a/tests/firestore.rules.test.mjs b/tests/firestore.rules.test.mjs
-index 9d05bbf..8900b51 100644
+index 9d05bbf..f8fc1a5 100644
 --- a/tests/firestore.rules.test.mjs
 +++ b/tests/firestore.rules.test.mjs
 @@ -6,11 +6,11 @@ import { after, before, describe, test } from "node:test";
@@ -249,7 +249,16 @@ index 9d05bbf..8900b51 100644
  
  let superDb, org, admin, judge, stu, mate, outsider, blocked, fakeJudge;
  
-@@ -158,29 +160,29 @@ describe("cuenta suspendida", () => {
+@@ -65,6 +67,8 @@ before(async () => {
+     projectId: "demo-code",
+     firestore: { rules: readFileSync("firestore.rules", "utf8"), host: "127.0.0.1", port: 8085 },
+   });
++  // Cada archivo empieza con el emulador vacío (se corren uno tras otro)
++  await env.clearFirestore();
+   superDb = ctx("super", SUPER);
+   org = ctx("org", "org@tec.mx");
+   admin = ctx("adm", "adm@tec.mx");
+@@ -158,29 +162,29 @@ describe("cuenta suspendida", () => {
  
  describe("proyectos", () => {
    test("alumno registra su proyecto", async () => {
@@ -284,7 +293,7 @@ index 9d05bbf..8900b51 100644
      );
    });
  
-@@ -249,28 +251,10 @@ describe("evaluaciones", () => {
+@@ -249,28 +253,10 @@ describe("evaluaciones", () => {
    });
  });
  

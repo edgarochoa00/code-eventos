@@ -87,7 +87,8 @@ En `tests/detector.rules.test.mjs` no hay nada que cambiar: lee `firestore.rules
 mkdir -p docs
 git mv detector/README.md docs/detector.md
 git rm -r -q detector/patches detector/rules detector/ACTIVAR.md detector/tsconfig.json
-rm -rf detector    # debe quedar vacía; si queda algo, revisa antes de borrar
+find detector -type f   # no debe listar ningún archivo (solo quedan carpetas vacías)
+rm -rf detector
 ```
 
 Actualiza `AGENTS.md`: cambia la sección «Detector de originalidad (en desarrollo, NO activo)» por «Detector de originalidad: activo, documentación en docs/detector.md». En `README.md`, reemplaza la sección «Originalidad» por un resumen de `docs/detector.md`.
@@ -98,7 +99,7 @@ Actualiza `AGENTS.md`: cambia la sección «Detector de originalidad (en desarro
 npm run build                # debe compilar sin errores
 npx tsc --noEmit && npx eslint .
 npm run test:detector        # 12 pruebas
-npm run test:rules           # 22 + 29 pruebas
+npm run test:rules           # 22 + 29 pruebas, una tras otra
 ```
 
 ## 6. Prueba de punta a punta (emulador, nunca producción)
