@@ -1,36 +1,83 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# C.O.D.E · Evaluación de proyectos escolares
 
-## Getting Started
+Web app pensada primero para celular para organizar eventos de proyectos. Los equipos registran su proyecto y suben su prototipo y su producto final, los jueces califican con una rúbrica y el organizador publica los resultados. Incluye detección de similitud contra todos los proyectos históricos, modo claro y oscuro, y un panel de superadmin.
 
-First, run the development server:
+Stack: Next.js 16 (App Router) · React 19 · Tailwind 4 · Firebase (Auth + Firestore) · proyecto `code-94fbe`.
+
+## Arranque
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev            # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Las variables están en `.env.local` (plantilla en `.env.example`). En Vercel se configuran como variables de entorno del proyecto.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Script | Para qué |
+| --- | --- |
+| `npm run test:rules` | Prueba `firestore.rules` en el emulador (necesita Java) |
+| `npm run emulators` + `npm run dev:emulators` | App local contra Auth/Firestore simulados, sin tocar datos reales |
+| `npm run deploy:rules` | Publica reglas e índices en `code-94fbe` |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Storage es opcional y requiere el plan Blaze. Si lo activas, corre `firebase deploy --only storage` y pon `NEXT_PUBLIC_ENABLE_STORAGE=true`. Sin Storage solo se guarda la huella SHA-256 de cada archivo, y los equipos comparten sus archivos con enlaces.
 
-## Learn More
+## Permisos
 
-To learn more about Next.js, take a look at the following resources:
+### En la plataforma (Administración → `/admin`)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Permiso | Quién | Qué puede hacer |
+| --- | --- | --- |
+| Superadmin | `edgarochoa0173@gmail.com` (fijo en `lib/types.ts` y `firestore.rules`) | Todo. Es el único que da o quita permisos y suspende cuentas |
+| Admin | Lo asigna el superadmin | Administra todos los eventos, jueces y organizadores, y ve a todos los usuarios |
+| Organizador | Lo asigna el superadmin | Puede crear sus propios eventos |
+| Usuario | Todos los demás | Registra proyectos y califica si lo agregan como juez |
+| Suspendido | Lo asigna el superadmin | No puede usar la app |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Los permisos se guardan en `staff/{correo}` y funcionan aunque la persona todavía no tenga cuenta: se aplican cuando se registre con ese correo.
 
-## Deploy on Vercel
+### En cada evento
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Rol | Cómo se obtiene | Qué puede hacer |
+| --- | --- | --- |
+| Organizador | Crea el evento, lo agregan en «Jueces → Organizadores» o es admin | Abre y cierra etapas, invita jueces, edita la rúbrica, ve calificaciones y originalidad, publica resultados |
+| Juez | Su correo está en la lista de jueces | Califica de 0 a 10 por criterio con comentario |
+| Alumno | Entra con el código o un compañero lo agrega | Registra su proyecto, entrega prototipo y producto final mientras la etapa esté abierta, ve su resultado |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Originalidad (`lib/similarity.ts`)
+
+Cada proyecto guarda una huella permanente en `fingerprints/{projectId}` y se compara contra todo el historial con cuatro señales:
+
+- **Frases y vocabulario**: MinHash sobre el texto (detecta copias aunque cambie el nombre).
+- **Enlaces**: mismo repositorio, video o Drive. Se guarda solo el hash, nunca la URL.
+- **Archivos**: mismo SHA-256, es decir, una copia exacta.
+
+Niveles: alto ≥ 75 %, medio ≥ 45 %, bajo ≥ 25 %. Si un proyecto tiene menos de 25 palabras útiles y no tiene enlaces ni archivos, aparece como «Sin datos aún» en lugar de «Original».
+
+Quién ve el análisis (se configura en Evento → Ajustes → Originalidad):
+
+- **Organizadores**: siempre.
+- **Jueces**: siempre, o solo cuando se abre la evaluación.
+- **Equipos**: nunca (predeterminado), al publicar resultados o desde una fecha. Solo ven su propio porcentaje y el motivo, nunca el nombre de los otros proyectos.
+
+## Modo oscuro
+
+El botón de luna/sol del encabezado cambia el tema y la elección se guarda en el navegador. La primera vez se usa el tema del sistema. Los colores son variables CSS en `app/globals.css` (`ink`, `paper`, `surface`, `night`, `coal`, `lime`), así que el diseño no cambia: solo los valores.
+
+## Estructura
+
+```
+app/
+  page.tsx                      Portada
+  login/                        Entrar / crear cuenta / Google
+  panel/                        Mis proyectos, para evaluar, organizo, unirse con código
+  admin/                        Superadmin: usuarios, permisos, jueces y eventos
+  eventos/nuevo/                Crear evento (organizador, admin o superadmin)
+  eventos/[id]/                 Vista según rol (organizador, juez, alumno)
+  eventos/[id]/proyectos/[pid]/ Detalle, entregas, evaluar, originalidad, resultados
+components/                     UI, formularios, tema
+lib/
+  access.tsx     Permiso global del usuario
+  data.ts        Lecturas y escrituras de Firestore, resultados
+  similarity.ts  Huellas y comparación anti-plagio
+tests/           Pruebas de firestore.rules
+```

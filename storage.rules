@@ -1,0 +1,31 @@
+rules_version = '2';
+
+// Solo aplica si activas Firebase Storage (plan Blaze) y NEXT_PUBLIC_ENABLE_STORAGE=true
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /events/{eid}/projects/{pid}/{phase}/{file} {
+      function verified() {
+        return request.auth != null && request.auth.token.email_verified == true;
+      }
+      function project() {
+        return firestore.get(/databases/(default)/documents/events/$(eid)/projects/$(pid)).data;
+      }
+      function event() {
+        return firestore.get(/databases/(default)/documents/events/$(eid)).data;
+      }
+      function canSee() {
+        return verified() && (
+          request.auth.token.email.lower() in project().memberEmails
+          || request.auth.token.email.lower() in event().organizerEmails
+          || request.auth.token.email.lower() in event().judgeEmails
+        );
+      }
+
+      allow read: if canSee();
+      allow write: if verified()
+        && phase in ['prototype', 'final']
+        && request.auth.token.email.lower() in project().memberEmails
+        && (request.resource == null || request.resource.size < 200 * 1024 * 1024);
+    }
+  }
+}
