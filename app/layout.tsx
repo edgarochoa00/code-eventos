@@ -10,7 +10,7 @@ const ubuntu = Ubuntu({ variable: "--font-ubuntu", subsets: ["latin", "latin-ext
 export const metadata: Metadata = {
   title: "C.O.D.E · Evaluación de proyectos",
   description:
-    "Organiza eventos escolares de proyectos: equipos, entregas de prototipo y producto final, evaluación de jueces y detección de plagio.",
+    "Organiza eventos escolares de proyectos: equipos, entregas de prototipo y producto final, evaluación de jueces y resultados.",
   appleWebApp: { capable: true, title: "C.O.D.E", statusBarStyle: "default" },
 };
 

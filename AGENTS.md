@@ -16,4 +16,4 @@ El detector nuevo (anclas con fecha, casos con revisión humana y confirmación 
 - Cuando lo pida, sigue `detector/ACTIVAR.md` paso a paso, empezando por el paso 0: confirmar las decisiones de `detector/lib/policy.ts` con el usuario.
 - Qué hace y por qué: `detector/README.md`.
 - Para comprobar que sigue funcionando sin activarlo: `npm run detector:test`.
-- Si cambias `lib/types.ts`, `lib/data.ts`, `components/project-form.tsx`, `app/eventos/[id]/organizer-view.tsx`, `app/eventos/[id]/proyectos/[pid]/project-view.tsx` o `firestore.rules`, los parches de `detector/patches/` pueden dejar de aplicarse. Avísale al usuario; ACTIVAR.md explica cómo aplicarlos a mano.
+- Si cambias `lib/types.ts`, `lib/data.ts`, `components/project-form.tsx`, `app/eventos/[id]/organizer-view.tsx`, `app/eventos/[id]/proyectos/[pid]/project-view.tsx`, `firestore.rules` o `tests/firestore.rules.test.mjs`, los parches de `detector/patches/` pueden dejar de aplicarse (compruébalo con `git apply --check detector/patches/*.patch`). Avísale al usuario; ACTIVAR.md explica cómo aplicarlos a mano.

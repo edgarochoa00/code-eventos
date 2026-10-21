@@ -1,19 +1,19 @@
 import {
+  Activity,
   ArrowDown,
   ArrowUpRight,
   Bell,
   CheckCircle2,
   ClipboardCheck,
-  FileSearch,
   Gavel,
   GraduationCap,
   Rocket,
-  ScanSearch,
   Trophy,
   Upload,
   Users,
 } from "lucide-react";
 import Link from "next/link";
+import { LegalLinks } from "@/components/legal-links";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -25,7 +25,7 @@ export default function Landing() {
         <nav className="hidden items-center gap-10 font-mono text-xs md:flex" aria-label="Secciones">
           <a href="#como-funciona" className="hover:underline">Cómo funciona</a>
           <a href="#roles" className="hover:underline">Roles</a>
-          <a href="#originalidad" className="hover:underline">Originalidad</a>
+          <a href="#dia-del-evento" className="hover:underline">Día del evento</a>
         </nav>
         <div className="flex items-center gap-1">
           <ThemeToggle />
@@ -47,8 +47,7 @@ export default function Landing() {
               sin papeles
             </h1>
             <p className="mt-6 max-w-sm font-mono text-xs leading-relaxed text-ink/70 sm:text-sm">
-              Equipos, entregas de prototipo y producto final, calificación de jueces y detección de plagio en un solo
-              lugar.
+              Registro de equipos, entregas de prototipo y producto final, y calificación de jueces en un solo lugar.
             </p>
             <Link
               href="/panel"
@@ -73,7 +72,7 @@ export default function Landing() {
         <div className="relative min-h-[540px] overflow-hidden rounded-[2rem] bg-lime">
           {/* Tarjeta flotante */}
           <div className="absolute left-5 top-6 z-20 w-56 rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-md sm:left-8 sm:top-8">
-            <p className="font-mono text-[10px] text-ink/60">Equipo EcoRiego</p>
+            <p className="font-mono text-[10px] text-ink/60">Proyecto A</p>
             <p className="mt-1 font-display text-2xl font-bold">92.5 pts</p>
             <p className="mt-1 flex items-center gap-1 font-mono text-[10px] text-ink/70">
               <CheckCircle2 className="size-3" /> Producto final entregado
@@ -141,7 +140,7 @@ export default function Landing() {
             tone="white"
             icon={<ClipboardCheck className="size-5" />}
             title="Organizadores"
-            items={["Abre y cierra registro, entregas y evaluación", "Invita jueces por correo", "Edita la rúbrica y sus pesos", "Ve avance y alertas de plagio"]}
+            items={["Abre y cierra registro, entregas y evaluación", "Invita jueces por correo", "Edita la rúbrica y sus pesos", "Ve el avance de entregas y evaluaciones"]}
           />
           <RoleCard
             tone="lime"
@@ -158,45 +157,50 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Originalidad */}
-      <section id="originalidad" className="mx-auto max-w-7xl scroll-mt-8 px-4 py-20 sm:px-8">
+      {/* Día del evento */}
+      <section id="dia-del-evento" className="mx-auto max-w-7xl scroll-mt-8 px-4 py-20 sm:px-8">
         <div className="grid gap-8 overflow-hidden rounded-[2rem] bg-night p-7 text-white sm:p-12 lg:grid-cols-[repeat(2,minmax(0,1fr))]">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full bg-lime px-3 py-1 font-mono text-[11px] text-ink">
-              <ScanSearch className="size-3.5" /> Anti-plagio
+              <Activity className="size-3.5" /> En tiempo real
             </span>
-            <h2 className="mt-5 font-display text-3xl font-bold leading-tight sm:text-4xl">
-              Cambiar el nombre no cambia el proyecto
-            </h2>
+            <h2 className="mt-5 font-display text-3xl font-bold leading-tight sm:text-4xl">Sigue el día del evento en vivo</h2>
             <p className="mt-4 max-w-md font-mono text-xs leading-relaxed text-white/70">
-              Cada proyecto deja una huella que se guarda para siempre. Cuando un equipo registra o entrega algo, lo
-              comparamos con todo el historial: frases, vocabulario, enlaces de repositorio y archivos idénticos. Los
-              jueces y organizadores ven el porcentaje y contra qué proyecto coincide.
+              Mientras los equipos entregan y los jueces califican desde su celular, tu panel se actualiza solo. Cuando
+              todo esté listo, publicas los resultados y cada equipo ve su lugar, su puntaje por criterio y los
+              comentarios de los jueces.
             </p>
           </div>
-          <div className="space-y-3 self-center">
-            {[
-              { name: "AquaSense", meta: "Expo 2024 · 2 años atrás", pct: 87, why: "Mismo repositorio y 81% de frases" },
-              { name: "Riego Inteligente", meta: "Expo 2025", pct: 46, why: "52% de vocabulario en común" },
-              { name: "HuertoApp", meta: "Este evento", pct: 18, why: "Sin coincidencias relevantes" },
-            ].map((m) => (
-              <div key={m.name} className="flex items-center gap-4 rounded-2xl bg-white/5 p-4">
-                <div
-                  className={`grid size-14 shrink-0 place-items-center rounded-xl font-mono text-sm font-bold ${
-                    m.pct >= 75 ? "bg-red-500" : m.pct >= 45 ? "bg-amber-400 text-coal" : "bg-lime text-coal"
-                  }`}
-                >
-                  {m.pct}%
+          <div className="self-center">
+            <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">Ejemplo · panel del organizador</p>
+            <div className="space-y-3">
+              {[
+                { icon: Upload, value: "18/20", label: "Productos finales entregados", note: "Se actualiza en cuanto un equipo entrega", pct: 90 },
+                { icon: Gavel, value: "42/60", label: "Evaluaciones de jueces", note: "Cada juez ve lo que le falta por calificar", pct: 70 },
+                { icon: Trophy, value: "1º", label: "Proyecto A · 92.5 pts", note: "Resultados publicados con comentarios" },
+              ].map(({ icon: Icon, value, label, note, pct }) => (
+                <div key={label} className="flex items-center gap-4 rounded-2xl bg-white/5 p-4">
+                  <div
+                    className={`grid size-14 shrink-0 place-items-center rounded-xl font-mono text-sm font-bold tabular-nums ${
+                      pct === undefined ? "bg-lime text-coal" : "bg-white/10"
+                    }`}
+                  >
+                    {value}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="flex items-center gap-1.5 font-display font-bold">
+                      <Icon className="size-4 shrink-0" aria-hidden /> {label}
+                    </p>
+                    <p className="mt-0.5 font-mono text-[10px] text-white/50">{note}</p>
+                    {pct !== undefined && (
+                      <div className="mt-2 h-1.5 rounded-full bg-white/10">
+                        <div className="h-full rounded-full bg-lime" style={{ width: `${pct}%` }} />
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="font-display font-bold">{m.name}</p>
-                  <p className="font-mono text-[10px] text-white/50">{m.meta}</p>
-                  <p className="mt-1 flex items-center gap-1 font-mono text-[11px] text-white/80">
-                    <FileSearch className="size-3" /> {m.why}
-                  </p>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
 
@@ -211,8 +215,9 @@ export default function Landing() {
         </div>
       </section>
 
-      <footer className="border-t border-ink/5 py-8 text-center font-mono text-[11px] text-ink/50">
-        C.O.D.E · Evaluación de proyectos escolares
+      <footer className="border-t border-ink/5 px-4 pb-[max(2rem,calc(env(safe-area-inset-bottom)+1.25rem))] pt-6 text-center">
+        <LegalLinks />
+        <p className="mt-2 font-mono text-[11px] text-ink/50">C.O.D.E · Evaluación de proyectos escolares</p>
       </footer>
     </div>
   );
@@ -281,7 +286,7 @@ function PhoneMock() {
           <div className="mt-4 rounded-2xl bg-white/5 p-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium">EcoRiego</p>
+                <p className="text-xs font-medium">Proyecto A</p>
                 <p className="font-mono text-[9px] text-white/50">PRODUCTO FINAL</p>
               </div>
               <span className="rounded-full bg-lime px-2 py-0.5 font-mono text-[9px] text-ink">Evaluado</span>
@@ -302,7 +307,7 @@ function PhoneMock() {
           </div>
           <div className="mt-3 flex items-center justify-between rounded-2xl bg-white/5 p-3">
             <div>
-              <p className="text-xs font-medium">AgroVision</p>
+              <p className="text-xs font-medium">Proyecto B</p>
               <p className="font-mono text-[9px] text-white/50">PROTOTIPO</p>
             </div>
             <span className="rounded-full bg-white/10 px-2 py-0.5 font-mono text-[9px]">Pendiente</span>

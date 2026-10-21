@@ -15,9 +15,9 @@ import { homedir } from "node:os";
 const PROJECT = "code-94fbe";
 const PASSWORD = process.env.DEMO_PASSWORD ?? "CodeDemo2026!";
 const EVENT_ID = "demo-expo";
-const PROJECT_ID = "demo-huerto";
+const PROJECT_ID = "demo-proyecto";
 const OLD_EVENT_ID = "demo-expo-2024";
-const OLD_PROJECT_ID = "demo-huerto-2024";
+const OLD_PROJECT_ID = "demo-proyecto-2024";
 
 const ACCOUNTS = [
   { key: "admin", email: "demo.admin@example.com", name: "Demo Admin", staff: "admin" },
@@ -151,7 +151,7 @@ async function crear() {
   await setDoc(`events/${OLD_EVENT_ID}`, {
     ...baseEvent,
     name: "DEMO · Expo 2024 (histórico)",
-    description: "Evento histórico de demostración para la detección de plagio.",
+    description: "Evento histórico de demostración para la revisión de originalidad.",
     code: "DEMO24",
     organizerEmails: [em.organizador],
     judgeEmails: [],
@@ -164,22 +164,23 @@ async function crear() {
     createdAt: new Date("2024-10-01"),
   });
 
-  // Texto deliberadamente parecido entre ambos proyectos para mostrar la alerta de originalidad
+  // Texto inventado y deliberadamente parecido entre ambos proyectos para mostrar la alerta de originalidad
   const content = {
-    summary: "DEMO: huerto escolar que se riega solo con sensores de humedad y una bomba controlada por ESP32.",
+    summary: "DEMO: medidor de ruido para salones que avisa con luces cuando el volumen es demasiado alto.",
     problem:
-      "DEMO: las plantas del huerto demostrativo se marchitan los fines de semana porque nadie las riega y cuando se riegan se usa demasiada agua sin medir la tierra.",
+      "DEMO: en el salón de demostración el ruido no deja escuchar al maestro y nadie nota cuándo el volumen pasa de lo tolerable durante el trabajo en equipo.",
     solution:
-      "DEMO: un ESP32 lee sensores capacitivos de humedad, enciende una bomba peristáltica solo cuando la tierra está seca y manda avisos a un tablero web de demostración.",
+      "DEMO: un ESP32 lee un micrófono cada segundo, enciende una tira de luces cuando el ruido pasa el límite y guarda un registro en un tablero web de demostración.",
     technologies: ["ESP32", "Firebase"],
     category: "Hardware / IoT",
   };
-  const link = "https://github.com/code-demo/huerto-demo";
+  // example.com es un dominio reservado: el enlace no apunta a ningún repositorio real
+  const link = "https://example.com/code-demo/proyecto-demo";
 
   const oldProject = {
     id: OLD_PROJECT_ID,
     eventId: OLD_EVENT_ID,
-    title: "DEMO · HuertoBot 2024",
+    title: "DEMO · Proyecto histórico 2024",
     ...content,
     leaderId: "demo-exalumno",
     leaderEmail: "demo.exalumno@example.com",
@@ -193,7 +194,7 @@ async function crear() {
   const project = {
     id: PROJECT_ID,
     eventId: EVENT_ID,
-    title: "DEMO · Huerto Inteligente",
+    title: "DEMO · Proyecto de ejemplo",
     ...content,
     leaderId: uid.alumno,
     leaderEmail: em.alumno,
@@ -203,7 +204,7 @@ async function crear() {
     ],
     memberEmails: [em.alumno, em.integrante],
     prototype: {
-      description: "DEMO: prototipo con dos sensores y una bomba controlada por ESP32.",
+      description: "DEMO: prototipo con un micrófono y una tira de luces controlados por ESP32.",
       links: [{ label: "Repositorio", url: `${link}.git` }],
       files: [],
       submittedAt: new Date(),
@@ -223,7 +224,7 @@ async function crear() {
     await setDoc(`fingerprints/${id}`, await fingerprint(p, eventName, year));
   }
   console.log("  evento  DEMO · Expo de Proyectos (código DEMO26) y DEMO · Expo 2024 (histórico)");
-  console.log("  proyecto DEMO · Huerto Inteligente (alumno + integrante, prototipo entregado)");
+  console.log("  proyecto DEMO · Proyecto de ejemplo (alumno + integrante, prototipo entregado)");
   console.log(`\nContraseña de todas las cuentas demo: ${PASSWORD}`);
 }
 

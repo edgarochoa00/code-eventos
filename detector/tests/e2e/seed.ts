@@ -33,19 +33,20 @@ async function createUser(p: (typeof PEOPLE)[number]) {
   return j.localId;
 }
 
+// Textos y nombres inventados para las pruebas (no corresponden a proyectos reales)
 const ORIGINAL = {
-  summary: "Sistema de riego inteligente para huertos escolares usando sensores de humedad del suelo.",
+  summary: "Medidor de ruido para salones de clase que avisa con luces cuando el volumen es demasiado alto.",
   problem:
-    "Los huertos de la escuela se secan porque nadie los riega en vacaciones y además se desperdicia mucha agua al regar de más sin medir la humedad.",
+    "En los salones grandes el ruido no deja escuchar al maestro y nadie se da cuenta de cuándo el volumen pasa de lo tolerable durante las actividades en equipo.",
   solution:
-    "Un Arduino con sensores de humedad del suelo activa una bomba de agua solo cuando la tierra está seca y envía alertas a una aplicación móvil con el historial de riego.",
+    "Un micrófono conectado a una placa Arduino mide el nivel de ruido cada segundo, enciende una tira de luces de colores cuando pasa el límite y guarda un registro que el maestro consulta desde el celular.",
 };
-const COMPOSTA = {
-  summary: "Compostero automático que mide temperatura y humedad para acelerar la descomposición de residuos orgánicos.",
+const BEA_2024 = {
+  summary: "Dispensador automático de gel que cuenta los usos y avisa cuando se está terminando.",
   problem:
-    "La cafetería tira kilos de residuos orgánicos cada semana y el compost manual tarda meses porque nadie controla la temperatura ni la ventilación.",
+    "En los baños y laboratorios el gel se acaba sin que nadie lo note y pasan días antes de que alguien vuelva a llenar el dispensador.",
   solution:
-    "Un tambor giratorio con sensores de temperatura y un ventilador controlado por ESP32 mantiene las condiciones ideales y avisa cuándo voltear la mezcla.",
+    "Un sensor infrarrojo activa el dispensador sin tocarlo, un contador registra cada uso y un ESP32 manda un aviso al personal de limpieza cuando queda poco.",
 };
 const CRITERIA = [
   { id: "innovacion", name: "Innovación", description: "Qué tan original y novedosa es la propuesta.", weight: 50 },
@@ -121,16 +122,16 @@ async function main() {
       endDate: "2024-11-12",
     });
     const historical = [
-      project("old_aqua", "e2024", "AquaSense", ORIGINAL, ["exalumno@tec.mx"], {}, ["https://github.com/equipo-agua/aquasense"], t2024),
-      project("old_bea", "e2024", "Composta Inteligente", COMPOSTA, ["bea@tec.mx"], {}, [], t2024),
+      project("old_alfa", "e2024", "Proyecto Alfa", ORIGINAL, ["exalumno@tec.mx"], {}, ["https://github.com/equipo-alfa/proyecto-alfa"], t2024),
+      project("old_bea", "e2024", "Proyecto Gamma", BEA_2024, ["bea@tec.mx"], {}, [], t2024),
       project(
         "old_tpl",
         "e2024",
-        "Agenda Escolar",
+        "Proyecto Delta",
         {
-          summary: "Agenda digital para organizar tareas y exámenes de todas las materias del semestre.",
-          problem: "Los alumnos olvidan entregas porque cada maestro publica tareas en un lugar distinto.",
-          solution: "Una aplicación que junta las tareas de todas las plataformas y manda recordatorios un día antes.",
+          summary: "Tablero digital para la cafetería que muestra el menú del día y los precios actualizados.",
+          problem: "Los alumnos hacen fila sin saber qué hay de comer y los precios escritos a mano casi nunca están al día.",
+          solution: "Una pantalla conectada a una página web donde la cafetería actualiza el menú, los precios y los platillos agotados.",
         },
         ["otro@tec.mx"],
         {},
@@ -161,19 +162,19 @@ async function main() {
     // Evento actual
     await event("e1", "Expo Proyectos 2026", uid.profe, "profe@tec.mx", { judgeEmails: ["juez@tec.mx"] });
     const current = [
-      // 1) Copia: mismo texto y mismo repositorio que AquaSense 2024 → debe abrir caso
-      project("p_eco", "e1", "EcoRiego", ORIGINAL, ["ana@tec.mx", "luis@tec.mx"], {}, ["github.com/equipo-agua/aquasense.git"]),
+      // 1) Copia: mismo texto y mismo repositorio que Proyecto Alfa 2024 → debe abrir caso
+      project("p_beta", "e1", "Proyecto Beta", ORIGINAL, ["ana@tec.mx", "luis@tec.mx"], {}, ["github.com/equipo-alfa/proyecto-alfa.git"]),
       // 2) Continuación: Bea retoma su propio proyecto de 2024 → NO debe abrir caso
-      project("p_bea", "e1", "Composta 2.0", COMPOSTA, ["bea@tec.mx"]),
+      project("p_bea", "e1", "Proyecto Gamma 2.0", BEA_2024, ["bea@tec.mx"]),
       // 3) Plantilla declarada: mismo enlace que otro de 2024, pero declarado → NO debe abrir caso
       project(
         "p_carla",
         "e1",
-        "Bitácora de Laboratorio",
+        "Proyecto Épsilon",
         {
-          summary: "Bitácora digital para registrar prácticas de laboratorio con fotos y mediciones.",
-          problem: "Las bitácoras en papel se pierden y los maestros no pueden revisar las mediciones a tiempo.",
-          solution: "Una app móvil que guarda cada práctica con fotos, mediciones y firma del maestro responsable.",
+          summary: "Mapa interactivo del campus para encontrar salones, oficinas y laboratorios.",
+          problem: "Los alumnos de nuevo ingreso se pierden buscando salones y llegan tarde a sus primeras clases.",
+          solution: "Una app móvil con el plano del campus, búsqueda de salones por nombre y rutas a pie desde la entrada principal.",
         },
         ["carla@tec.mx"],
         { declaration: { continues: "", sources: "Plantilla base: https://github.com/plantillas/expo-starter" } },

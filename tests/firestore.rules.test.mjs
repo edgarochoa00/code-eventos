@@ -44,8 +44,8 @@ const eventFor = (ownerId, ownerEmail) => ({
 });
 const project = {
   eventId: "e1",
-  title: "AquaSense",
-  summary: "Riego",
+  title: "Proyecto Alfa",
+  summary: "Resumen",
   problem: "p",
   solution: "s",
   technologies: [],
@@ -254,7 +254,7 @@ describe("huellas anti-plagio", () => {
     projectId: "p1",
     eventId: "e1",
     eventName: "Expo",
-    title: "AquaSense",
+    title: "Proyecto Alfa",
     year: 2026,
     sigPhrases: [1],
     sigWords: [1],

@@ -3,6 +3,7 @@
 import { ArrowUpRight } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
+import { LegalLinks } from "@/components/legal-links";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button, Field, Input, Tabs, useToast } from "@/components/ui";
@@ -164,6 +165,7 @@ export function LoginForm() {
             </button>
           )}
         </div>
+        <LegalLinks className="mx-auto w-full max-w-sm pb-[env(safe-area-inset-bottom)]" />
       </div>
     </div>
   );

@@ -93,6 +93,8 @@ rm -rf detector
 
 Actualiza `AGENTS.md`: cambia la sección «Detector de originalidad (en desarrollo, NO activo)» por «Detector de originalidad: activo, documentación en docs/detector.md». En `README.md`, reemplaza la sección «Originalidad» por un resumen de `docs/detector.md`.
 
+Actualiza también la información del servicio, porque el detector guarda datos nuevos: en `lib/legal-content.ts`, el aviso de privacidad y los términos deben describir la declaración de originalidad, las versiones con fecha, los casos y quién los revisa. Sube `LEGAL_VERSION` y `LEGAL_UPDATED_LABEL` en `lib/legal.ts` y agrega la versión al inicio de `RELEASES`, con el mismo número en `package.json`.
+
 ## 5. Compilar y probar
 
 ```bash

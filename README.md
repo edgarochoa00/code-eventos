@@ -67,6 +67,13 @@ En `detector/` está listo un detector que no decide si hay plagio: guarda versi
 
 El botón de luna/sol del encabezado cambia el tema y la elección se guarda en el navegador. La primera vez se usa el tema del sistema. Los colores son variables CSS en `app/globals.css` (`ink`, `paper`, `surface`, `night`, `coal`, `lime`), así que el diseño no cambia: solo los valores.
 
+## Información del servicio
+
+Términos (`/terminos`), aviso de privacidad (`/privacidad`), cookies y almacenamiento (`/cookies`) y versiones (`/versiones`) se muestran con `components/legal-page.tsx`. Los textos están en `lib/legal-content.ts` y describen lo que la app hace hoy. La fecha y versión de los documentos, el contacto y el historial de versiones están en `lib/legal.ts`. «Privacidad de mi cuenta» (`/panel/privacidad`) reúne los documentos, permite restablecer el tema y cerrar sesión en el navegador, y lleva al correo para solicitudes de privacidad.
+
+- Si cambia el tratamiento de datos, actualiza el texto y sube `LEGAL_VERSION`.
+- En cada versión de la app agrega una entrada al inicio de `RELEASES` y usa el mismo número en `package.json` (`npm version X.Y.Z --no-git-tag-version`).
+
 ## Estructura
 
 ```
@@ -74,16 +81,20 @@ app/
   page.tsx                      Portada
   login/                        Entrar / crear cuenta / Google
   panel/                        Mis proyectos, para evaluar, organizo, unirse con código
+  panel/privacidad/             Privacidad de mi cuenta
   admin/                        Superadmin: usuarios, permisos, jueces y eventos
   eventos/nuevo/                Crear evento (organizador, admin o superadmin)
   eventos/[id]/                 Vista según rol (organizador, juez, alumno)
   eventos/[id]/proyectos/[pid]/ Detalle, entregas, evaluar, originalidad, resultados
-components/                     UI, formularios, tema
+  terminos/ privacidad/ cookies/ versiones/   Información del servicio
+components/                     UI, formularios, tema, páginas legales
 lib/
-  access.tsx     Permiso global del usuario
-  data.ts        Lecturas y escrituras de Firestore, resultados
-  similarity.ts  Huellas y comparación anti-plagio
-tests/           Pruebas de firestore.rules
+  access.tsx        Permiso global del usuario
+  data.ts           Lecturas y escrituras de Firestore, resultados
+  legal.ts          Versión de la app y de los documentos, contacto
+  legal-content.ts  Textos de términos, privacidad y cookies
+  similarity.ts     Huellas y revisión de originalidad
+tests/              Pruebas de firestore.rules
 ```
 
 ## Cuentas demo por rol

@@ -13,12 +13,13 @@ import type { DetectorProject, IndexEntry, LiveProject } from "@/lib/detector/ty
 const DAY = 86_400_000;
 const BASE = Date.UTC(2026, 9, 1);
 
+// Textos inventados para las pruebas (no corresponden a proyectos reales)
 const ORIGINAL = {
-  summary: "Sistema de riego inteligente para huertos escolares usando sensores de humedad del suelo.",
+  summary: "Medidor de ruido para salones de clase que avisa con luces cuando el volumen es demasiado alto.",
   problem:
-    "Los huertos de la escuela se secan porque nadie los riega en vacaciones y además se desperdicia mucha agua al regar de más sin medir la humedad.",
+    "En los salones grandes el ruido no deja escuchar al maestro y nadie se da cuenta de cuándo el volumen pasa de lo tolerable durante las actividades en equipo.",
   solution:
-    "Un Arduino con sensores de humedad del suelo activa una bomba de agua solo cuando la tierra está seca y envía alertas a una aplicación móvil con el historial de riego.",
+    "Un micrófono conectado a una placa Arduino mide el nivel de ruido cada segundo, enciende una tira de luces de colores cuando pasa el límite y guarda un registro que el maestro consulta desde el celular.",
 };
 
 function project(id: string, over: Partial<DetectorProject> & { links?: string[]; files?: string[] } = {}): DetectorProject {
@@ -27,9 +28,9 @@ function project(id: string, over: Partial<DetectorProject> & { links?: string[]
     id,
     eventId: "e2026",
     title: `Proyecto ${id}`,
-    summary: "Aplicación para reservar libros de la biblioteca del tecnológico con recordatorios.",
-    problem: "Los alumnos hacen filas largas para pedir libros y no saben si están disponibles en la biblioteca.",
-    solution: "Una app web con catálogo en línea, reservas y recordatorios de devolución enviados por correo electrónico.",
+    summary: "Aplicación para apartar las canchas deportivas del tecnológico con recordatorios.",
+    problem: "Los equipos llegan a las canchas y las encuentran ocupadas porque no hay forma de saber quién las apartó antes.",
+    solution: "Una app web con calendario de canchas, apartados por hora y recordatorios enviados por correo electrónico.",
     technologies: ["React"],
     category: "Software",
     leaderId: id,
@@ -74,7 +75,7 @@ async function run(liveProjects: LiveProject[], historical: { entry: IndexEntry;
 describe("evidencia por tipo", () => {
   test("copia renombrada de un proyecto de hace 2 años → texto, abre caso", async () => {
     const old = await indexEntry(project("old", { eventId: "e2024", ...ORIGINAL }), BASE - 730 * DAY);
-    const copy = await live(project("copy", { title: "EcoRiego", ...ORIGINAL }), BASE);
+    const copy = await live(project("copy", { title: "Proyecto Beta", ...ORIGINAL }), BASE);
     const alerts = await run([copy], [old]);
     assert.equal(alerts.length, 1);
     assert.equal(alerts[0].evidence.level, "texto");
@@ -84,7 +85,7 @@ describe("evidencia por tipo", () => {
 
   test("proyectos distintos → sin caso", async () => {
     const old = await indexEntry(project("old", { eventId: "e2024", ...ORIGINAL }), BASE - 365 * DAY);
-    const other = await live(project("biblio"), BASE);
+    const other = await live(project("otro"), BASE);
     assert.equal((await run([other], [old])).length, 0);
   });
 
@@ -92,9 +93,9 @@ describe("evidencia por tipo", () => {
     const old = await indexEntry(project("old", { eventId: "e2024", ...ORIGINAL }), BASE - 365 * DAY);
     const para = await live(
       project("para", {
-        summary: "Riego automático de huertos de escuela con sensores que miden la humedad.",
-        problem: "En vacaciones nadie riega los huertos escolares, se secan y cuando se riega se gasta agua de más.",
-        solution: "Sensores de humedad conectados a un Arduino encienden la bomba cuando el suelo está seco y mandan notificaciones al celular.",
+        summary: "Sensor que detecta cuando hay demasiado ruido en el aula y lo indica con colores.",
+        problem: "Cuando trabajan en equipo los alumnos suben la voz, el profesor deja de oírse y nadie nota que el ruido ya es excesivo.",
+        solution: "Una placa Arduino con micrófono revisa el volumen todo el tiempo, prende luces si se rebasa el máximo y manda los datos a una app.",
       }),
       BASE,
     );
@@ -104,8 +105,8 @@ describe("evidencia por tipo", () => {
   });
 
   test("mismo repositorio (con .git y mayúsculas) → enlace", async () => {
-    const old = await indexEntry(project("old", { eventId: "e2024", ...ORIGINAL, links: ["https://github.com/Equipo/AquaSense"] }), BASE - 365 * DAY);
-    const b = await live(project("b", { links: ["github.com/equipo/aquasense.git"] }), BASE);
+    const old = await indexEntry(project("old", { eventId: "e2024", ...ORIGINAL, links: ["https://github.com/Equipo/Proyecto-Alfa"] }), BASE - 365 * DAY);
+    const b = await live(project("b", { links: ["github.com/equipo/proyecto-alfa.git"] }), BASE);
     const alerts = await run([b], [old]);
     assert.equal(alerts.length, 1);
     assert.equal(alerts[0].evidence.level, "enlace");
@@ -161,7 +162,7 @@ describe("filtros y prioridad", () => {
     const make = (id: string, extra: string, day: number) => live(project(id, { summary: common, problem: extra, solution: extra }), BASE + day * DAY);
     const all = await Promise.all([
       make("p1", "Robot de reciclaje con visión.", 1),
-      make("p2", "Huerto vertical con riego por goteo.", 2),
+      make("p2", "Invernadero escolar con control de temperatura.", 2),
       make("p3", "App para compartir apuntes entre carreras.", 3),
       make("p4", "Estación meteorológica con paneles solares.", 4),
     ]);
@@ -193,7 +194,7 @@ describe("resaltado", () => {
     const ev = compareEvidence(toComparable(b), old.entry, b.signals.shingles, old.shingles, new Set());
     const segments = highlight(text, new Set(ev.matched));
     const marked = segments.filter((s) => s.match).map((s) => s.text).join(" ");
-    assert.ok(marked.includes("bomba de agua"), marked);
+    assert.ok(marked.includes("tira de luces"), marked);
     assert.ok(!marked.includes("panel solar"), marked);
     assert.equal(segments.map((s) => s.text).join(""), text);
   });

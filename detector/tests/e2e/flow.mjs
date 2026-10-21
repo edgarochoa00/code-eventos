@@ -65,7 +65,7 @@ async function step(name, fn) {
 }
 
 const EV = `${BASE}/eventos/e1`;
-const ECO = `${BASE}/eventos/e1/proyectos/p_eco`;
+const BETA = `${BASE}/eventos/e1/proyectos/p_beta`;
 const modal = (p) => p.locator("dialog[open]");
 
 /* 1. Organizador analiza */
@@ -80,15 +80,15 @@ await step("organizador: pestaña Originalidad vacía no afirma «sin plagio»",
 await step("organizador: analizar abre 1 caso (copia) y no abre continuación ni plantilla declarada", async () => {
   await profe.page.getByRole("button", { name: "Analizar ahora" }).click();
   await profe.page.getByText("1 caso(s) nuevo(s)").waitFor({ timeout: 20000 });
-  await profe.page.getByRole("button", { name: /EcoRiego/ }).waitFor();
-  const bea = await profe.page.getByRole("button", { name: /Composta/ }).count();
-  const carla = await profe.page.getByRole("button", { name: /Bitácora/ }).count();
-  if (bea || carla) throw new Error(`casos de más: composta=${bea} bitácora=${carla}`);
+  await profe.page.getByRole("button", { name: /Proyecto Beta/ }).waitFor();
+  const bea = await profe.page.getByRole("button", { name: /Proyecto Gamma/ }).count();
+  const carla = await profe.page.getByRole("button", { name: /Proyecto Épsilon/ }).count();
+  if (bea || carla) throw new Error(`casos de más: gamma=${bea} épsilon=${carla}`);
   await profe.page.getByText("Mismo enlace").first().waitFor();
   await shot(profe, "originalidad-caso");
 });
 await step("organizador: el caso muestra quién fue primero, evidencia y frases resaltadas", async () => {
-  await profe.page.getByRole("button", { name: /EcoRiego/ }).click();
+  await profe.page.getByRole("button", { name: /Proyecto Beta/ }).click();
   const m = modal(profe.page);
   await m.getByText("Quién apareció primero").waitFor();
   await m.getByText(/Apareció primero/).waitFor();
@@ -100,8 +100,8 @@ await step("organizador: el caso muestra quién fue primero, evidencia y frases 
 /* El organizador del evento actual no organizó 2024: no debería ver el nombre del otro proyecto */
 await step("privacidad: el organizador de otro evento no ve el nombre del proyecto de 2024", async () => {
   const m = modal(profe.page);
-  const visible = await m.getByText(/AquaSense/).count();
-  if (visible) throw new Error("ve el nombre AquaSense");
+  const visible = await m.getByText(/Proyecto Alfa/).count();
+  if (visible) throw new Error("ve el nombre Proyecto Alfa");
 });
 
 await step("organizador: pide explicación al equipo", async () => {
@@ -112,16 +112,16 @@ await step("organizador: pide explicación al equipo", async () => {
 /* 2. Equipo responde */
 const ana = await login("ana@tec.mx");
 await step("equipo: ve el aviso con sus frases resaltadas, sin el nombre del otro proyecto", async () => {
-  await ana.page.goto(ECO);
+  await ana.page.goto(BETA);
   await ana.page.getByText("El organizador quiere tu explicación").waitFor({ timeout: 15000 });
   if (!(await ana.page.locator("mark").count())) throw new Error("sin resaltado");
-  if (await ana.page.getByText(/AquaSense/).count()) throw new Error("ve el nombre del otro proyecto");
+  if (await ana.page.getByText(/Proyecto Alfa/).count()) throw new Error("ve el nombre del otro proyecto");
   if (await ana.page.getByRole("tab", { name: "Originalidad" }).count()) throw new Error("ve la pestaña de organizador");
   await shot(ana, "equipo-aviso");
 });
 await step("equipo: envía su explicación", async () => {
   await ana.page.getByLabel("Tu explicación").fill("Nos inspiramos en un proyecto que vimos en la expo de 2024, pero construimos nuestro propio circuito.");
-  await ana.page.getByLabel("Enlace de prueba 1").fill("https://github.com/equipo-eco/ecoriego/commits");
+  await ana.page.getByLabel("Enlace de prueba 1").fill("https://github.com/equipo-beta/proyecto-beta/commits");
   await ana.page.getByRole("button", { name: "Enviar explicación" }).click();
   await ana.page.getByText("Enviaste tu explicación").waitFor({ timeout: 15000 });
 });
@@ -130,7 +130,7 @@ await step("equipo: envía su explicación", async () => {
 await step("organizador: ve la respuesta y propone confirmar con penalización", async () => {
   const m = modal(profe.page);
   await m.getByText(/Respuesta del equipo ·/).waitFor({ timeout: 15000 });
-  await m.getByLabel(/Motivo/).fill("Mismo repositorio que AquaSense 2024 y 85% de las frases idénticas. La explicación no justifica el reuso.");
+  await m.getByLabel(/Motivo/).fill("Mismo repositorio que un proyecto de 2024 y 85% de las frases idénticas. La explicación no justifica el reuso.");
   await m.getByLabel("Consecuencia si se confirma").selectOption("penalizacion");
   await m.getByRole("button", { name: "Proponer confirmación" }).click();
   await profe.page.getByText("Propuesta enviada a un admin.").waitFor();
@@ -145,9 +145,9 @@ await step("admin: confirma la propuesta", async () => {
   await adm.page.goto(EV);
   await adm.page.getByRole("tab", { name: /Originalidad/ }).click();
   await adm.page.getByRole("tab", { name: /Por confirmar/ }).click();
-  await adm.page.getByRole("button", { name: /EcoRiego/ }).click();
+  await adm.page.getByRole("button", { name: /Proyecto Beta/ }).click();
   const m = modal(adm.page);
-  await m.getByText(/AquaSense/).waitFor(); // el admin sí puede ver el proyecto de referencia
+  await m.getByText(/Proyecto Alfa/).waitFor(); // el admin sí puede ver el proyecto de referencia
   await m.getByRole("button", { name: "Confirmar", exact: true }).click();
   await adm.page.getByText("Caso confirmado.").waitFor();
   await m.getByRole("button", { name: "Reabrir caso" }).waitFor();
@@ -157,7 +157,7 @@ await step("admin: confirma la propuesta", async () => {
 /* 5. Juez ve la marca; equipo ve la decisión */
 const juez = await login("juez@tec.mx");
 await step("juez: ve la marca de caso confirmado y no la pestaña Originalidad", async () => {
-  await juez.page.goto(ECO);
+  await juez.page.goto(BETA);
   await juez.page.getByText(/Caso de originalidad confirmado/).waitFor({ timeout: 15000 });
   if (await juez.page.getByRole("tab", { name: "Originalidad" }).count()) throw new Error("ve la pestaña");
   await shot(juez, "juez-marca");
@@ -173,10 +173,10 @@ const dani = await login("dani@tec.mx");
 await step("alumno: el registro incluye la declaración de originalidad y guarda la primera versión", async () => {
   await dani.page.goto(EV);
   await dani.page.getByText("Declaración de originalidad").waitFor();
-  await dani.page.getByLabel("Nombre del proyecto").fill("Semáforo Inteligente");
-  await dani.page.getByLabel("Resumen").fill("Semáforo que cambia según el flujo de alumnos en los pasillos del tecnológico.");
-  await dani.page.getByLabel("Problema que resuelve").fill("En los cambios de clase los pasillos se saturan y hay empujones en las escaleras principales.");
-  await dani.page.getByLabel("Solución propuesta").fill("Cámaras de bajo costo cuentan personas y un semáforo indica qué escalera usar en cada momento.");
+  await dani.page.getByLabel("Nombre del proyecto").fill("Proyecto Zeta");
+  await dani.page.getByLabel("Resumen").fill("Contador de lugares libres en el estacionamiento del tecnológico usando cámaras.");
+  await dani.page.getByLabel("Problema que resuelve").fill("A la hora de entrada los autos dan vueltas buscando lugar y se forman filas en la avenida principal.");
+  await dani.page.getByLabel("Solución propuesta").fill("Cámaras de bajo costo detectan los cajones ocupados y una pantalla en la entrada muestra cuántos lugares quedan.");
   await dani.page.getByLabel("Plantillas, librerías o código de terceros").fill("Usamos OpenCV https://github.com/opencv/opencv");
   await shot(dani, "registro-declaracion");
   await dani.page.getByRole("button", { name: "Registrar proyecto" }).click();
@@ -205,13 +205,13 @@ await step("web: panel de originalidad y caso", async () => {
   await shot(profeWeb, "resumen");
   await profeWeb.page.getByRole("tab", { name: /Originalidad/ }).click();
   await profeWeb.page.getByRole("tab", { name: /Todos/ }).click();
-  await profeWeb.page.getByRole("button", { name: /EcoRiego/ }).click();
+  await profeWeb.page.getByRole("button", { name: /Proyecto Beta/ }).click();
   await modal(profeWeb.page).getByRole("heading", { name: "Historial" }).waitFor();
   await shot(profeWeb, "caso");
 });
 const anaWeb = await login("ana@tec.mx", "web");
 await step("web: aviso del equipo", async () => {
-  await anaWeb.page.goto(ECO);
+  await anaWeb.page.goto(BETA);
   await anaWeb.page.getByText("Resultado: Penalización en puntos").waitFor({ timeout: 15000 });
   await shot(anaWeb, "equipo");
 });

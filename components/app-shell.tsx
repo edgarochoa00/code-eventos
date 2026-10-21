@@ -1,13 +1,14 @@
 "use client";
 
-import { Ban, LogOut, MailCheck, RefreshCw, ShieldCheck } from "lucide-react";
+import { Ban, Lock, LogOut, MailCheck, RefreshCw, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAccess } from "@/lib/access";
 import { useAuth } from "@/lib/auth";
 import { GLOBAL_ROLE_LABEL } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { LegalLinks } from "./legal-links";
 import { Logo } from "./logo";
 import { ThemeToggle } from "./theme-toggle";
 import { Button, Card, Spinner, useToast } from "./ui";
@@ -15,28 +16,47 @@ import { Button, Card, Spinner, useToast } from "./ui";
 /**
  * Envoltura para páginas privadas: exige sesión y correo verificado
  * (los permisos de juez/organizador/integrante dependen del correo).
+ * Con requireVerified={false} solo exige sesión: así cualquier cuenta,
+ * aunque no esté verificada o esté suspendida, llega a «Privacidad de mi cuenta».
  */
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, requireVerified = true }: { children: React.ReactNode; requireVerified?: boolean }) {
   const { user, loading } = useAuth();
   const access = useAccess();
   const router = useRouter();
   const pathname = usePathname();
+  // Si había sesión y se cerró (botón «Cerrar sesión» u otra pestaña), se vuelve a la portada.
+  // Si nunca la hubo, se pide entrar y después se regresa a esta página.
+  const hadSession = useRef(false);
 
   useEffect(() => {
-    if (!loading && !user) router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+    if (user) hadSession.current = true;
+    else if (!loading) router.replace(hadSession.current ? "/" : `/login?next=${encodeURIComponent(pathname)}`);
   }, [loading, user, router, pathname]);
 
   let content: React.ReactNode = children;
-  if (loading || !user || access.loading) content = <Spinner />;
-  else if (!user.emailVerified) content = <VerifyEmail />;
-  else if (access.blocked) content = <Blocked />;
+  if (loading || !user || (requireVerified && access.loading)) content = <Spinner />;
+  else if (requireVerified && !user.emailVerified) content = <VerifyEmail />;
+  else if (requireVerified && access.blocked) content = <Blocked />;
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <Header />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))] pt-4 sm:px-6 sm:pt-6">
-        {content}
-      </main>
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-4 sm:px-6 sm:pt-6">{content}</main>
+      <footer className="border-t border-ink/5 px-4 pb-[max(1.5rem,calc(env(safe-area-inset-bottom)+1rem))] pt-4 sm:px-6">
+        <div className="mx-auto flex max-w-6xl flex-col items-center gap-1 sm:flex-row sm:justify-between sm:gap-4">
+          <Link
+            href="/panel/privacidad"
+            className={cn(
+              "inline-flex min-h-11 items-center gap-1.5 font-mono text-[11px] hover:text-ink sm:min-h-0 sm:py-1",
+              pathname === "/panel/privacidad" ? "text-ink" : "text-ink/60",
+            )}
+            aria-current={pathname === "/panel/privacidad" ? "page" : undefined}
+          >
+            <Lock className="size-3.5" aria-hidden /> Privacidad de mi cuenta
+          </Link>
+          <LegalLinks />
+        </div>
+      </footer>
     </div>
   );
 }

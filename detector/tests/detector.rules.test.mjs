@@ -63,7 +63,7 @@ before(async () => {
     await setDoc(doc(db, "events/e2"), ev("orgb", ["orgb@tec.mx"]));
     await setDoc(doc(db, "events/e1/projects/p1"), {
       eventId: "e1",
-      title: "EcoRiego",
+      title: "Proyecto Beta",
       summary: "s",
       problem: "p",
       solution: "s",
@@ -77,7 +77,7 @@ before(async () => {
     });
     await setDoc(doc(db, "events/e2/projects/old"), {
       eventId: "e2",
-      title: "AquaSense",
+      title: "Proyecto Alfa",
       leaderEmail: "x@tec.mx",
       memberEmails: ["x@tec.mx"],
     });
