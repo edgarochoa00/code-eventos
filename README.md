@@ -59,6 +59,10 @@ Quién ve el análisis (se configura en Evento → Ajustes → Originalidad):
 - **Jueces**: siempre, o solo cuando se abre la evaluación.
 - **Equipos**: nunca (predeterminado), al publicar resultados o desde una fecha. Solo ven su propio porcentaje y el motivo, nunca el nombre de los otros proyectos.
 
+### Detector nuevo (en desarrollo, no activo)
+
+En `detector/` está listo un detector que no decide si hay plagio: guarda versiones con fecha que nadie puede alterar, abre casos con evidencia por tipo y pide revisión humana con dos personas para confirmar. No está conectado a la app. Para activarlo, sigue `detector/ACTIVAR.md`; para probarlo sin activarlo, `npm run detector:test`.
+
 ## Modo oscuro
 
 El botón de luna/sol del encabezado cambia el tema y la elección se guarda en el navegador. La primera vez se usa el tema del sistema. Los colores son variables CSS en `app/globals.css` (`ink`, `paper`, `surface`, `night`, `coal`, `lime`), así que el diseño no cambia: solo los valores.

@@ -1,0 +1,398 @@
+rules_version = '2';
+
+// Reglas de C.O.D.E
+//
+// Permisos globales (colección staff/{correo}, solo los edita el superadmin):
+//   superadmin -> edgarochoa0173@gmail.com (fijo aquí y en lib/types.ts)
+//   admin      -> administra todos los eventos, jueces y ve usuarios
+//   organizer  -> puede crear eventos
+//   blocked    -> cuenta suspendida, no puede leer ni escribir nada
+//
+// Roles por evento (basados en correo verificado):
+//   organizador -> event.organizerEmails (o admin global)
+//   juez        -> event.judgeEmails
+//   integrante  -> project.memberEmails
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- Identidad ----------
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Correo verificado: evita que alguien se haga pasar por un juez
+    function authed() {
+      return signedIn()
+        && request.auth.token.email != null
+        && request.auth.token.email_verified == true;
+    }
+
+    function myEmail() {
+      return request.auth.token.email.lower();
+    }
+
+    function isSuperadmin() {
+      return authed() && myEmail() == 'edgarochoa0173@gmail.com';
+    }
+
+    function staffPath() {
+      return /databases/$(database)/documents/staff/$(myEmail());
+    }
+
+    function hasStaffRole(roles) {
+      return authed() && exists(staffPath()) && get(staffPath()).data.role in roles;
+    }
+
+    // Usuario con correo verificado y sin suspensión
+    function verified() {
+      return authed() && (isSuperadmin() || !hasStaffRole(['blocked']));
+    }
+
+    function isAdmin() {
+      return isSuperadmin() || hasStaffRole(['admin']);
+    }
+
+    function canCreateEvents() {
+      return isSuperadmin() || hasStaffRole(['admin', 'organizer']);
+    }
+
+    // ---------- Eventos ----------
+
+    function eventData(eid) {
+      return get(/databases/$(database)/documents/events/$(eid)).data;
+    }
+
+    function isOrganizer(eid) {
+      return verified() && (isAdmin() || myEmail() in eventData(eid).organizerEmails);
+    }
+
+    function isJudge(eid) {
+      return verified() && myEmail() in eventData(eid).judgeEmails;
+    }
+
+    function changed(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(keys);
+    }
+
+    function validEmailList(list, max) {
+      return list is list && list.size() <= max;
+    }
+
+    function validCriteria(list) {
+      return list is list && list.size() >= 1 && list.size() <= 20;
+    }
+
+    // ---------- Detector de originalidad ----------
+    // Señales de una huella: solo números y hashes, nunca texto ni enlaces legibles
+    function validSignals(d) {
+      return d.sigPhrases is list && d.sigPhrases.size() <= 256
+        && d.sigWords is list && d.sigWords.size() <= 256
+        && d.shingles is list && d.shingles.size() <= 6000
+        && d.urls is list && d.urls.size() <= 40
+        && d.files is list && d.files.size() <= 60
+        && d.members is list && d.members.size() <= 20
+        && d.declaredUrls is list && d.declaredUrls.size() <= 20
+        && d.tokenCount is int
+        && d.contentHash is string;
+    }
+
+    // ---------- Permisos globales ----------
+    match /staff/{email} {
+      allow read: if isAdmin() || (authed() && myEmail() == email);
+      allow create, update: if isSuperadmin()
+        && email != 'edgarochoa0173@gmail.com'
+        && request.resource.data.email == email
+        && request.resource.data.role in ['admin', 'organizer', 'blocked'];
+      allow delete: if isSuperadmin();
+    }
+
+    // ---------- Usuarios ----------
+    match /users/{uid} {
+      allow read: if (signedIn() && request.auth.uid == uid) || isAdmin();
+      allow create, update: if signedIn() && request.auth.uid == uid;
+      allow delete: if false;
+    }
+
+    // ---------- Eventos ----------
+    match /events/{eid} {
+      allow read: if signedIn();
+
+      allow create: if canCreateEvents()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.ownerEmail == myEmail()
+        && request.resource.data.organizerEmails == [myEmail()]
+        && request.resource.data.judgeEmails == []
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 100
+        && request.resource.data.code is string
+        && request.resource.data.maxTeamSize is int
+        && request.resource.data.maxTeamSize >= 1
+        && request.resource.data.maxTeamSize <= 15
+        && request.resource.data.resultsPublished == false
+        && validCriteria(request.resource.data.criteria);
+
+      allow update: if isOrganizer(eid)
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.ownerEmail == resource.data.ownerEmail
+        && resource.data.ownerEmail in request.resource.data.organizerEmails
+        && validEmailList(request.resource.data.organizerEmails, 20)
+        && validEmailList(request.resource.data.judgeEmails, 100)
+        && request.resource.data.maxTeamSize is int
+        && request.resource.data.maxTeamSize >= 1
+        && request.resource.data.maxTeamSize <= 15
+        && validCriteria(request.resource.data.criteria);
+
+      allow delete: if isSuperadmin() || (verified() && resource.data.ownerId == request.auth.uid);
+
+      // ---------- Proyectos ----------
+      match /projects/{pid} {
+        function ev() {
+          return eventData(eid);
+        }
+
+        function editingOpen() {
+          return ev().registrationOpen == true
+            || ev().submissions.prototype == true
+            || ev().submissions.final == true;
+        }
+
+        function validTeam(data) {
+          return data.memberEmails is list
+            && data.memberEmails.size() >= 1
+            && data.memberEmails.size() <= ev().maxTeamSize
+            && data.leaderEmail in data.memberEmails;
+        }
+
+        function validInfo(data) {
+          return data.title is string
+            && data.title.size() >= 1
+            && data.title.size() <= 80
+            && data.summary is string
+            && data.summary.size() <= 300
+            && data.problem is string
+            && data.problem.size() <= 3000
+            && data.solution is string
+            && data.solution.size() <= 5000
+            && data.technologies is list
+            && data.technologies.size() <= 15;
+        }
+
+        allow read: if isOrganizer(eid)
+          || isJudge(eid)
+          || (verified() && myEmail() in resource.data.memberEmails);
+
+        allow create: if verified()
+          && ev().registrationOpen == true
+          && request.resource.data.eventId == eid
+          && request.resource.data.leaderId == request.auth.uid
+          && request.resource.data.leaderEmail == myEmail()
+          && validTeam(request.resource.data)
+          && validInfo(request.resource.data)
+          && request.resource.data.prototype == null
+          && request.resource.data.final == null
+          && !('feedback' in request.resource.data)
+          && !('originalityStatus' in request.resource.data)
+          && request.resource.data.createdAt == request.time;
+
+        allow update: if isOrganizer(eid)
+          || (
+            verified()
+            && myEmail() in resource.data.memberEmails
+            && editingOpen()
+            && !changed(['feedback', 'leaderId', 'leaderEmail', 'eventId', 'createdAt', 'originalityStatus'])
+            && validTeam(request.resource.data)
+            && validInfo(request.resource.data)
+            && (!changed(['prototype']) || ev().submissions.prototype == true)
+            && (!changed(['final']) || ev().submissions.final == true)
+          );
+
+        allow delete: if isOrganizer(eid)
+          || (verified() && resource.data.leaderId == request.auth.uid && ev().registrationOpen == true);
+
+        // Anclas: versiones inmutables con hora del servidor
+        match /anchors/{aid} {
+          function anchorProject() {
+            return get(/databases/$(database)/documents/events/$(eid)/projects/$(pid)).data;
+          }
+
+          allow read: if isOrganizer(eid)
+            || (verified() && myEmail() in anchorProject().memberEmails);
+
+          allow create: if verified()
+            && request.resource.data.eventId == eid
+            && request.resource.data.projectId == pid
+            && request.resource.data.createdBy == request.auth.uid
+            && request.resource.data.createdAt == request.time
+            && request.resource.data.kind in ['registro', 'edicion', 'prototype', 'final', 'sello']
+            && validSignals(request.resource.data)
+            && (
+              (request.resource.data.source == 'organizador' && isOrganizer(eid))
+              || (
+                request.resource.data.source == 'equipo'
+                && request.resource.data.kind != 'sello'
+                && myEmail() in anchorProject().memberEmails
+              )
+            );
+
+          allow update, delete: if false;
+        }
+      }
+
+      // ---------- Casos de originalidad ----------
+      match /cases/{cid} {
+        function caseMember(projectId) {
+          return verified()
+            && myEmail() in get(/databases/$(database)/documents/events/$(eid)/projects/$(projectId)).data.memberEmails;
+        }
+
+        // Dos personas: propone un organizador y confirma un admin distinto.
+        // Si la escuela decide que el organizador confirma solo, ver detector/ACTIVAR.md.
+        function canConfirm() {
+          return isAdmin()
+            && resource.data.proposal.by != request.auth.uid
+            && request.resource.data.decision.by == request.auth.uid
+            && request.resource.data.decision.at == request.time;
+        }
+
+        function stamped(field) {
+          return request.resource.data[field].by == request.auth.uid
+            && request.resource.data[field].at == request.time;
+        }
+
+        function validTransition(from, to) {
+          return (from == to && !(from in ['propuesta', 'descartado', 'confirmado']))
+            || (from == 'propuesta' && to == 'propuesta' && !changed(['proposal', 'decision']))
+            || (from in ['por_revisar', 'en_revision'] && to == 'esperando_equipo')
+            || (from in ['por_revisar', 'esperando_equipo'] && to == 'en_revision')
+            || (from in ['por_revisar', 'esperando_equipo', 'en_revision'] && to == 'descartado' && stamped('decision'))
+            || (from in ['por_revisar', 'esperando_equipo', 'en_revision'] && to == 'propuesta' && stamped('proposal'))
+            || (from == 'propuesta' && to == 'en_revision')
+            || (from == 'propuesta' && to == 'confirmado' && canConfirm())
+            || (from in ['descartado', 'confirmado'] && to == 'en_revision' && isAdmin());
+        }
+
+        allow read: if isOrganizer(eid)
+          || (resource.data.teamNotified == true && caseMember(resource.data.projectId));
+
+        allow create: if isOrganizer(eid)
+          && cid == request.resource.data.projectId + '__' + request.resource.data.otherProjectId
+          && request.resource.data.eventId == eid
+          && request.resource.data.status == 'por_revisar'
+          && request.resource.data.teamNotified == false
+          && request.resource.data.teamResponse == null
+          && request.resource.data.proposal == null
+          && request.resource.data.decision == null
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.matchedShingles is list
+          && request.resource.data.matchedShingles.size() <= 800
+          && exists(/databases/$(database)/documents/events/$(eid)/projects/$(request.resource.data.projectId));
+
+        allow update: if (
+            isOrganizer(eid)
+            && !changed(['teamResponse', 'projectId', 'otherProjectId', 'otherEventId', 'eventId', 'createdBy', 'createdAt'])
+            && validTransition(resource.data.status, request.resource.data.status)
+          )
+          || (
+            resource.data.status == 'esperando_equipo'
+            && resource.data.teamNotified == true
+            && caseMember(resource.data.projectId)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['teamResponse', 'status', 'updatedAt'])
+            && request.resource.data.status == 'en_revision'
+            && stamped('teamResponse')
+            && request.resource.data.teamResponse.text is string
+            && request.resource.data.teamResponse.text.size() <= 3000
+            && request.resource.data.teamResponse.links is list
+            && request.resource.data.teamResponse.links.size() <= 8
+          );
+
+        allow delete: if isSuperadmin();
+
+        // Historial inmutable del caso
+        match /log/{lid} {
+          function theCase() {
+            return get(/databases/$(database)/documents/events/$(eid)/cases/$(cid)).data;
+          }
+
+          allow read: if isOrganizer(eid)
+            || (theCase().teamNotified == true && caseMember(theCase().projectId));
+
+          allow create: if verified()
+            && request.resource.data.by == request.auth.uid
+            && request.resource.data.at == request.time
+            && request.resource.data.action is string
+            && request.resource.data.note is string
+            && request.resource.data.note.size() <= 3000
+            && (isOrganizer(eid) || (theCase().teamNotified == true && caseMember(theCase().projectId)));
+
+          allow update, delete: if false;
+        }
+      }
+
+      // ---------- Evaluaciones ----------
+      match /evaluations/{evid} {
+        allow read: if isOrganizer(eid)
+          || (verified() && resource.data.judgeId == request.auth.uid);
+
+        allow create, update: if isJudge(eid)
+          && eventData(eid).judgingOpen == true
+          && request.resource.data.judgeId == request.auth.uid
+          && request.resource.data.judgeEmail == myEmail()
+          && request.resource.data.eventId == eid
+          && request.resource.data.phase in ['prototype', 'final']
+          && evid == request.auth.uid + '_' + request.resource.data.projectId + '_' + request.resource.data.phase
+          && exists(/databases/$(database)/documents/events/$(eid)/projects/$(request.resource.data.projectId))
+          && request.resource.data.scores is map
+          && request.resource.data.total is number
+          && request.resource.data.total >= 0
+          && request.resource.data.total <= 100
+          && request.resource.data.comment is string
+          && request.resource.data.comment.size() <= 2000;
+
+        allow delete: if isOrganizer(eid);
+      }
+    }
+
+    // "Mis proyectos" en todos los eventos, y vista global para admins
+    match /{path=**}/projects/{pid} {
+      allow read: if (verified() && myEmail() in resource.data.memberEmails) || isAdmin();
+    }
+
+    // ---------- Detector: índice compacto por evento (lo escribe solo el sello del organizador) ----------
+    match /originalityIndex/{docId} {
+      allow read: if verified();
+
+      allow create, update: if isOrganizer(request.resource.data.eventId)
+        && (docId == request.resource.data.eventId || docId.matches(request.resource.data.eventId + '__[0-9]+'))
+        && (resource == null || resource.data.eventId == request.resource.data.eventId)
+        && request.resource.data.entries is list
+        && request.resource.data.entries.size() <= 150
+        && request.resource.data.sealedBy == request.auth.uid
+        && request.resource.data.sealedAt == request.time;
+
+      allow delete: if isOrganizer(resource.data.eventId);
+    }
+
+    match /originalityShingles/{pid} {
+      allow read: if verified();
+
+      allow create, update: if isOrganizer(request.resource.data.eventId)
+        && request.resource.data.projectId == pid
+        && (resource == null || resource.data.eventId == request.resource.data.eventId)
+        && exists(/databases/$(database)/documents/events/$(request.resource.data.eventId)/projects/$(pid))
+        && request.resource.data.shingles is list
+        && request.resource.data.shingles.size() <= 6000
+        && request.resource.data.sealedAt == request.time;
+
+      allow delete: if false;
+    }
+
+    // Huellas del detector anterior: ya no se escriben; solo los admins pueden consultarlas
+    match /fingerprints/{pid} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+  }
+}

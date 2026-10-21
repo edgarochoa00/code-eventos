@@ -11,7 +11,8 @@
     "test:rules": "npx -y firebase-tools@15 emulators:exec --project demo-code --only firestore \"node --test tests/firestore.rules.test.mjs\"",
     "emulators": "npx -y firebase-tools@15 emulators:start --project demo-code --only auth,firestore",
     "dev:emulators": "NEXT_PUBLIC_USE_EMULATORS=true next dev -p 3100",
-    "deploy:rules": "npx -y firebase-tools@15 deploy --only firestore:rules,firestore:indexes --project code-94fbe"
+    "deploy:rules": "npx -y firebase-tools@15 deploy --only firestore:rules,firestore:indexes --project code-94fbe",
+    "detector:test": "tsc -p detector/tsconfig.json && npx -y tsx@4.23.15 --tsconfig detector/tsconfig.json --test detector/tests/logic.test.ts && npx -y firebase-tools@15 emulators:exec --project demo-code --only firestore \"RULES=detector/rules/firestore.rules node --test detector/tests/detector.rules.test.mjs\""
   },
   "dependencies": {
     "firebase": "12.19.0",

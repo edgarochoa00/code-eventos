@@ -1,0 +1,643 @@
+diff --git a/app/eventos/[id]/organizer-view.tsx b/app/eventos/[id]/organizer-view.tsx
+index 21b6866..b1ac5ff 100644
+--- a/app/eventos/[id]/organizer-view.tsx
++++ b/app/eventos/[id]/organizer-view.tsx
+@@ -1,26 +1,15 @@
+ "use client";
+ 
+-import {
+-  AlertTriangle,
+-  ArrowUpRight,
+-  EyeOff,
+-  Gavel,
+-  ShieldCheck,
+-  Megaphone,
+-  Plus,
+-  RefreshCw,
+-  ScanSearch,
+-  Trash2,
+-  Trophy,
+-  UserPlus,
+-  Users,
+-} from "lucide-react";
++import { ArrowUpRight, EyeOff, Gavel, Megaphone, Plus, RefreshCw, Trash2, Trophy, UserPlus, Users } from "lucide-react";
+ import Link from "next/link";
+-import { useMemo, useState } from "react";
++import { useState } from "react";
++import { CasesPanel, openCasesCount, projectCase } from "@/components/detector/cases-panel";
++import { DetectorSummaryCard } from "@/components/detector/detector-summary-card";
++import { CaseStatusBadge } from "@/components/detector/evidence-bits";
+ import { EmailListEditor } from "@/components/email-list-editor";
+ import { EventSettingsForm } from "@/components/event-settings-form";
+ import { Leaderboard } from "@/components/leaderboard";
+-import { SimilarityBadge, SubmissionBadges } from "@/components/project-bits";
++import { SubmissionBadges } from "@/components/project-bits";
+ import {
+   Badge,
+   Button,
+@@ -31,13 +20,13 @@ import {
+   Input,
+   Modal,
+   SectionTitle,
+-  Segmented,
+   Spinner,
+   Tabs,
+   Toggle,
+   firestoreErrorMessage,
+   useToast,
+ } from "@/components/ui";
++import { useAuth } from "@/lib/auth";
+ import {
+   computeStandings,
+   evaluationsCol,
+@@ -47,42 +36,20 @@ import {
+   unpublishResults,
+   updateEvent,
+ } from "@/lib/data";
+-import { useCollection, useFingerprints } from "@/lib/hooks";
+-import { analysisState, findMatches, type AnalysisState } from "@/lib/similarity";
+-import {
+-  PHASE_LABEL,
+-  PHASES,
+-  type Criterion,
+-  type EvaluationDoc,
+-  type EventDoc,
+-  type JudgeOriginality,
+-  type OriginalitySettings,
+-  type Phase,
+-  type ProjectDoc,
+-  type TeamOriginality,
+-} from "@/lib/types";
+-import { cn, formatDate, originalitySettings, randomCode, randomId, todayISO } from "@/lib/utils";
++import { useEventCases } from "@/lib/detector/hooks";
++import { sealEvent } from "@/lib/detector/store";
++import type { CaseDoc } from "@/lib/detector/types";
++import { useCollection } from "@/lib/hooks";
++import { PHASE_LABEL, PHASES, type Criterion, type EvaluationDoc, type EventDoc, type Phase, type ProjectDoc } from "@/lib/types";
++import { randomCode, randomId } from "@/lib/utils";
+ 
+-type Tab = "summary" | "projects" | "judges" | "rubric" | "results" | "settings";
++type Tab = "summary" | "projects" | "originality" | "judges" | "rubric" | "results" | "settings";
+ 
+ export function OrganizerView({ event }: { event: EventDoc }) {
+   const [tab, setTab] = useState<Tab>("summary");
+   const projects = useCollection<ProjectDoc>(projectsCol(event.id), `projects:${event.id}`);
+   const evaluations = useCollection<EvaluationDoc>(evaluationsCol(event.id), `evals:${event.id}`);
+-  const fingerprints = useFingerprints(true);
+-
+-  // Solo se compara lo que tiene información suficiente; lo demás se marca "sin datos"
+-  const analysis = useMemo<Analysis>(() => {
+-    const top = new Map<string, Match | undefined>();
+-    const state = new Map<string, AnalysisState>();
+-    for (const p of projects.data) {
+-      const fp = fingerprints.data.find((f) => f.projectId === p.id);
+-      const s = analysisState(fp);
+-      state.set(p.id, s);
+-      top.set(p.id, fp && s === "ready" ? findMatches(fp, fingerprints.data)[0] : undefined);
+-    }
+-    return { top, state, loading: fingerprints.loading, historyCount: fingerprints.data.length };
+-  }, [projects.data, fingerprints.data, fingerprints.loading]);
++  const cases = useEventCases(event.id, true);
+ 
+   if (projects.loading || evaluations.loading) return <Spinner />;
+ 
+@@ -92,6 +59,7 @@ export function OrganizerView({ event }: { event: EventDoc }) {
+         tabs={[
+           { id: "summary", label: "Resumen" },
+           { id: "projects", label: "Proyectos", count: projects.data.length },
++          { id: "originality", label: "Originalidad", count: openCasesCount(cases.data) },
+           { id: "judges", label: "Jueces", count: event.judgeEmails.length },
+           { id: "rubric", label: "Rúbrica" },
+           { id: "results", label: "Resultados" },
+@@ -102,18 +70,11 @@ export function OrganizerView({ event }: { event: EventDoc }) {
+       />
+       {(projects.error || evaluations.error) && <ErrorNote code={projects.error ?? evaluations.error ?? ""} />}
+ 
+-      {tab === "summary" && (
+-        <Summary event={event} projects={projects.data} evaluations={evaluations.data} analysis={analysis} onGo={setTab} />
+-      )}
++      {tab === "summary" && <Summary event={event} projects={projects.data} evaluations={evaluations.data} onGo={setTab} />}
+       {tab === "projects" && (
+-        <ProjectsTab
+-          event={event}
+-          projects={projects.data}
+-          evaluations={evaluations.data}
+-          analysis={analysis}
+-          onReload={fingerprints.reload}
+-        />
++        <ProjectsTab event={event} projects={projects.data} evaluations={evaluations.data} cases={cases.data} />
+       )}
++      {tab === "originality" && <CasesPanel event={event} projects={projects.data} />}
+       {tab === "judges" && <JudgesTab event={event} evaluations={evaluations.data} projects={projects.data} />}
+       {tab === "rubric" && <RubricTab event={event} hasEvaluations={evaluations.data.length > 0} />}
+       {tab === "results" && <ResultsTab event={event} projects={projects.data} evaluations={evaluations.data} />}
+@@ -128,22 +89,26 @@ function Summary({
+   event,
+   projects,
+   evaluations,
+-  analysis,
+   onGo,
+ }: {
+   event: EventDoc;
+   projects: ProjectDoc[];
+   evaluations: EvaluationDoc[];
+-  analysis: Analysis;
+   onGo: (t: Tab) => void;
+ }) {
++  const { user } = useAuth();
+   const toast = useToast();
+   const phases = PHASES.filter((p) => event.phases[p]);
+   const expected = phases.reduce((s, ph) => s + projects.filter((p) => p[ph]).length, 0) * event.judgeEmails.length;
+ 
+-  async function toggle(patch: Partial<EventDoc>) {
++  /** Al cerrar una etapa (o abrir la evaluación) se sella la versión oficial de cada proyecto. */
++  async function toggle(patch: Partial<EventDoc>, seal = false) {
+     try {
+       await updateEvent(event.id, patch);
++      if (seal && user && projects.length) {
++        await sealEvent(event, projects, user);
++        toast("Etapa actualizada y versión oficial sellada.");
++      }
+     } catch (err) {
+       toast(firestoreErrorMessage(err), "error");
+     }
+@@ -158,13 +123,13 @@ function Summary({
+   return (
+     <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[1fr_1.1fr]">
+       <Card>
+-        <SectionTitle title="Etapas" subtitle="Abre y cierra cada etapa cuando quieras. Los cambios son inmediatos." />
++        <SectionTitle title="Etapas" subtitle="Abre y cierra cada etapa cuando quieras. Al cerrarla se sella la versión oficial." />
+         <div className="divide-y divide-ink/5">
+           <Toggle
+             label="Registro de proyectos"
+             description="Los equipos pueden registrarse y editar su información."
+             checked={event.registrationOpen}
+-            onChange={(v) => toggle({ registrationOpen: v })}
++            onChange={(v) => toggle({ registrationOpen: v }, !v)}
+           />
+           {phases.map((ph) => (
+             <Toggle
+@@ -172,14 +137,14 @@ function Summary({
+               label={`Entregas de ${PHASE_LABEL[ph].toLowerCase()}`}
+               description="Los equipos pueden subir o actualizar esta entrega."
+               checked={event.submissions[ph]}
+-              onChange={(v) => toggle({ submissions: { ...event.submissions, [ph]: v } })}
++              onChange={(v) => toggle({ submissions: { ...event.submissions, [ph]: v } }, !v)}
+             />
+           ))}
+           <Toggle
+             label="Evaluación de jueces"
+             description={event.judgeEmails.length ? "Los jueces pueden calificar." : "Primero invita jueces."}
+             checked={event.judgingOpen}
+-            onChange={(v) => toggle({ judgingOpen: v })}
++            onChange={(v) => toggle({ judgingOpen: v }, v)}
+           />
+         </div>
+       </Card>
+@@ -193,7 +158,7 @@ function Summary({
+             </div>
+           ))}
+         </div>
+-        <OriginalityCard event={event} projects={projects} analysis={analysis} onGo={onGo} />
++        <DetectorSummaryCard event={event} projectCount={projects.length} onOpen={() => onGo("originality")} />
+         {!event.judgeEmails.length && (
+           <button onClick={() => onGo("judges")} className="flex w-full items-center gap-4 rounded-3xl bg-lime p-5 text-left">
+             <UserPlus className="size-5" />
+@@ -206,174 +171,20 @@ function Summary({
+   );
+ }
+ 
+-/* ---------- Originalidad ---------- */
+-
+-type Match = ReturnType<typeof findMatches>[number];
+-type Analysis = {
+-  top: Map<string, Match | undefined>;
+-  state: Map<string, AnalysisState>;
+-  loading: boolean;
+-  historyCount: number;
+-};
+-
+-function teamVisibilityText(event: EventDoc) {
+-  const o = originalitySettings(event);
+-  if (o.teams === "results") return "Los equipos lo verán al publicar resultados";
+-  if (o.teams === "date") return o.teamsFrom ? `Los equipos lo verán desde el ${formatDate(o.teamsFrom)}` : "Falta elegir la fecha";
+-  return "Los equipos no lo ven";
+-}
+-
+-function OriginalityCard({
+-  event,
+-  projects,
+-  analysis,
+-  onGo,
+-}: {
+-  event: EventDoc;
+-  projects: ProjectDoc[];
+-  analysis: Analysis;
+-  onGo: (t: Tab) => void;
+-}) {
+-  const ready = projects.filter((p) => analysis.state.get(p.id) === "ready");
+-  const thin = projects.length - ready.length;
+-  const flagged = ready.filter((p) => {
+-    const m = analysis.top.get(p.id);
+-    return m && (m.level === "alto" || m.level === "medio");
+-  });
+-
+-  // Cada estado dice algo verdadero: no se afirma "sin plagio" si aún no hay qué comparar
+-  let tone: "idle" | "ok" | "alert" = "idle";
+-  let title = "Se activa con los primeros proyectos";
+-  let text = "Cuando los equipos registren y describan sus proyectos, aquí verás si alguno se parece a otro de este u otros años.";
+-  if (analysis.loading) {
+-    title = "Analizando…";
+-    text = "Comparando con el historial de proyectos.";
+-  } else if (projects.length && !ready.length) {
+-    title = "Esperando información";
+-    text = `${projects.length} proyecto(s) registrado(s), pero aún con muy poco texto o sin entregas para compararlos con confianza.`;
+-  } else if (flagged.length) {
+-    tone = "alert";
+-    title = `${flagged.length} proyecto(s) para revisar`;
+-    text = `Con similitud media o alta. ${ready.length} analizado(s)${thin ? `, ${thin} con poca información` : ""}.`;
+-  } else if (ready.length) {
+-    tone = "ok";
+-    title = "Sin coincidencias relevantes";
+-    text = `${ready.length} proyecto(s) analizado(s)${thin ? `, ${thin} con poca información todavía` : ""}.`;
+-  }
+-
+-  return (
+-    <div className="rounded-3xl bg-night p-5 text-white">
+-      <button onClick={() => onGo("projects")} className="flex w-full items-start gap-4 text-left">
+-        <span
+-          className={cn(
+-            "grid size-11 shrink-0 place-items-center rounded-2xl",
+-            tone === "alert" ? "bg-amber-400 text-coal" : tone === "ok" ? "bg-lime text-coal" : "bg-white/10 text-white",
+-          )}
+-        >
+-          {tone === "alert" ? <AlertTriangle className="size-5" /> : tone === "ok" ? <ShieldCheck className="size-5" /> : <ScanSearch className="size-5" />}
+-        </span>
+-        <span className="min-w-0 flex-1">
+-          <span className="block font-mono text-[10px] uppercase tracking-wider text-white/50">Originalidad</span>
+-          <span className="mt-0.5 block font-display font-bold">{title}</span>
+-          <span className="mt-1 block font-mono text-[11px] leading-relaxed text-white/60">{text}</span>
+-        </span>
+-        <ArrowUpRight className="size-5 shrink-0" />
+-      </button>
+-      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-3">
+-        <span className="flex items-center gap-1.5 font-mono text-[10px] text-white/60">
+-          <EyeOff className="size-3.5" /> {teamVisibilityText(event)}
+-        </span>
+-        <button onClick={() => onGo("settings")} className="font-mono text-[10px] text-lime underline underline-offset-2">
+-          Cambiar
+-        </button>
+-      </div>
+-    </div>
+-  );
+-}
+-
+-function OriginalitySettingsCard({ event }: { event: EventDoc }) {
+-  const toast = useToast();
+-  const o = originalitySettings(event);
+-
+-  async function save(patch: Partial<OriginalitySettings>) {
+-    try {
+-      await updateEvent(event.id, { originality: { ...o, ...patch } });
+-    } catch (err) {
+-      toast(firestoreErrorMessage(err), "error");
+-    }
+-  }
+-
+-  return (
+-    <Card className="h-fit">
+-      <SectionTitle
+-        title="Originalidad"
+-        subtitle="Tú y los demás organizadores siempre ven el análisis. Decide cuándo lo ven los demás."
+-      />
+-      <div className="space-y-5">
+-        <div className="space-y-2">
+-          <p className="text-sm font-medium">Jueces</p>
+-          <Segmented<JudgeOriginality>
+-            label="Cuándo ven los jueces la originalidad"
+-            value={o.judges}
+-            onChange={(judges) => save({ judges })}
+-            options={[
+-              { id: "always", label: "Siempre" },
+-              { id: "judging", label: "Al abrir la evaluación" },
+-            ]}
+-          />
+-        </div>
+-        <div className="space-y-2">
+-          <p className="text-sm font-medium">Cada equipo (solo su proyecto)</p>
+-          <Segmented<TeamOriginality>
+-            label="Cuándo ve cada equipo su originalidad"
+-            value={o.teams}
+-            onChange={(teams) => save({ teams, teamsFrom: teams === "date" ? o.teamsFrom || todayISO() : o.teamsFrom })}
+-            options={[
+-              { id: "hidden", label: "Nunca" },
+-              { id: "results", label: "Al publicar resultados" },
+-              { id: "date", label: "Desde una fecha" },
+-            ]}
+-          />
+-          {o.teams === "date" && (
+-            <Field label="Fecha" htmlFor="orig-date">
+-              <Input
+-                id="orig-date"
+-                type="date"
+-                value={o.teamsFrom}
+-                onChange={(e) => e.target.value && save({ teamsFrom: e.target.value })}
+-              />
+-            </Field>
+-          )}
+-          <p className="font-mono text-[11px] leading-relaxed text-ink/55">
+-            Los equipos solo ven el porcentaje de su proyecto y el motivo. Nunca ven el nombre de los otros proyectos con
+-            los que coincide.
+-          </p>
+-        </div>
+-      </div>
+-    </Card>
+-  );
+-}
+-
+ /* ---------- Proyectos ---------- */
+ 
+ function ProjectsTab({
+   event,
+   projects,
+   evaluations,
+-  analysis,
+-  onReload,
++  cases,
+ }: {
+   event: EventDoc;
+   projects: ProjectDoc[];
+   evaluations: EvaluationDoc[];
+-  analysis: Analysis;
+-  onReload: () => void;
++  cases: CaseDoc[];
+ }) {
+-  const [sort, setSort] = useState<"name" | "similarity">("similarity");
+-  const { top: topMatch, loading: loadingFp } = analysis;
+-  const sorted = [...projects].sort((a, b) =>
+-    sort === "name" ? a.title.localeCompare(b.title) : (topMatch.get(b.id)?.score ?? 0) - (topMatch.get(a.id)?.score ?? 0),
+-  );
++  const sorted = [...projects].sort((a, b) => a.title.localeCompare(b.title));
+ 
+   if (!projects.length) {
+     return (
+@@ -386,59 +197,39 @@ function ProjectsTab({
+   }
+ 
+   return (
+-    <div className="space-y-4">
+-      <div className="flex flex-wrap items-center justify-between gap-3">
+-        <Tabs
+-          tabs={[
+-            { id: "similarity", label: "Por similitud" },
+-            { id: "name", label: "Por nombre" },
+-          ]}
+-          value={sort}
+-          onChange={setSort}
+-        />
+-        <Button variant="outline" size="sm" onClick={onReload} loading={loadingFp}>
+-          <RefreshCw className="size-3.5" /> Recalcular originalidad
+-        </Button>
+-      </div>
+-      <ul className="space-y-3">
+-        {sorted.map((p) => {
+-          const evs = evaluations.filter((e) => e.projectId === p.id);
+-          const avg = evs.length ? evs.reduce((s, e) => s + e.total, 0) / evs.length : null;
+-          const match = topMatch.get(p.id);
+-          return (
+-            <li key={p.id}>
+-              <Link
+-                href={`/eventos/${event.id}/proyectos/${p.id}`}
+-                className="grid gap-3 rounded-3xl bg-surface p-5 transition hover:-translate-y-0.5 sm:grid-cols-[1fr_auto] sm:items-center"
+-              >
+-                <div className="min-w-0">
+-                  <div className="flex flex-wrap items-center gap-2">
+-                    <h3 className="font-display text-lg font-bold">{p.title}</h3>
+-                    {p.category && <Badge>{p.category}</Badge>}
+-                  </div>
+-                  <p className="mt-0.5 font-mono text-[11px] text-ink/55">
+-                    {p.members.length} integrante(s) · {p.members.map((m) => m.name || m.email).join(", ")}
+-                  </p>
+-                  <div className="mt-3 flex flex-wrap gap-1.5">
+-                    <SubmissionBadges project={p} event={event} />
+-                    {!loadingFp && <SimilarityBadge match={match} state={analysis.state.get(p.id)} />}
+-                  </div>
+-                  {match && (match.level === "alto" || match.level === "medio") && (
+-                    <p className="mt-2 font-mono text-[11px] text-ink/70">
+-                      Se parece a «{match.other.title}» ({match.other.eventName}, {match.other.year})
+-                    </p>
+-                  )}
++    <ul className="space-y-3">
++      {sorted.map((p) => {
++        const evs = evaluations.filter((e) => e.projectId === p.id);
++        const avg = evs.length ? evs.reduce((s, e) => s + e.total, 0) / evs.length : null;
++        const c = projectCase(cases, p.id);
++        return (
++          <li key={p.id}>
++            <Link
++              href={`/eventos/${event.id}/proyectos/${p.id}`}
++              className="grid gap-3 rounded-3xl bg-surface p-5 transition hover:-translate-y-0.5 sm:grid-cols-[1fr_auto] sm:items-center"
++            >
++              <div className="min-w-0">
++                <div className="flex flex-wrap items-center gap-2">
++                  <h3 className="break-words font-display text-lg font-bold">{p.title}</h3>
++                  {p.category && <Badge>{p.category}</Badge>}
+                 </div>
+-                <div className="flex items-center gap-4 sm:flex-col sm:items-end sm:gap-1">
+-                  <p className="font-display text-2xl font-bold tabular-nums">{avg !== null ? avg.toFixed(1) : "—"}</p>
+-                  <p className="font-mono text-[10px] text-ink/50">{evs.length} evaluación(es)</p>
++                <p className="mt-0.5 font-mono text-[11px] text-ink/55">
++                  {p.members.length} integrante(s) · {p.members.map((m) => m.name || m.email).join(", ")}
++                </p>
++                <div className="mt-3 flex flex-wrap gap-1.5">
++                  <SubmissionBadges project={p} event={event} />
++                  {c && <CaseStatusBadge status={c.status} />}
+                 </div>
+-              </Link>
+-            </li>
+-          );
+-        })}
+-      </ul>
+-    </div>
++              </div>
++              <div className="flex items-center gap-4 sm:flex-col sm:items-end sm:gap-1">
++                <p className="font-display text-2xl font-bold tabular-nums">{avg !== null ? avg.toFixed(1) : "—"}</p>
++                <p className="font-mono text-[10px] text-ink/50">{evs.length} evaluación(es)</p>
++              </div>
++            </Link>
++          </li>
++        );
++      })}
++    </ul>
+   );
+ }
+ 
+@@ -573,6 +364,7 @@ function RubricTab({ event, hasEvaluations }: { event: EventDoc; hasEvaluations:
+ /* ---------- Resultados ---------- */
+ 
+ function ResultsTab({ event, projects, evaluations }: { event: EventDoc; projects: ProjectDoc[]; evaluations: EvaluationDoc[] }) {
++  const { user } = useAuth();
+   const toast = useToast();
+   const [confirm, setConfirm] = useState(false);
+   const [busy, setBusy] = useState(false);
+@@ -639,6 +431,8 @@ function ResultsTab({ event, projects, evaluations }: { event: EventDoc; project
+               setBusy(true);
+               try {
+                 await publishResults(event, projects, evaluations);
++                // Sello oficial: lo publicado queda como referencia para eventos futuros
++                if (user) await sealEvent(event, projects, user).catch(() => undefined);
+                 toast("Resultados publicados.");
+                 setConfirm(false);
+               } catch (err) {
+@@ -677,7 +471,6 @@ function SettingsTab({ event }: { event: EventDoc }) {
+         />
+       </Card>
+       <div className="space-y-4">
+-        <OriginalitySettingsCard event={event} />
+         <Card className="h-fit">
+           <SectionTitle title="Código" subtitle="Genera uno nuevo si el actual se compartió donde no debía." />
+           <Field label="Código actual">
+diff --git a/app/eventos/[id]/proyectos/[pid]/project-view.tsx b/app/eventos/[id]/proyectos/[pid]/project-view.tsx
+index fc2cbd7..7add6e8 100644
+--- a/app/eventos/[id]/proyectos/[pid]/project-view.tsx
++++ b/app/eventos/[id]/proyectos/[pid]/project-view.tsx
+@@ -1,11 +1,14 @@
+ "use client";
+ 
+-import { ArrowLeft, Lock, MessageSquareQuote, Pencil, ScanSearch, Trophy, UserRound } from "lucide-react";
++import { ArrowLeft, Lock, MessageSquareQuote, Pencil, Trophy, UserRound } from "lucide-react";
+ import Link from "next/link";
+ import { useParams } from "next/navigation";
+-import { useMemo, useState } from "react";
++import { useState } from "react";
++import { OriginalityFlag } from "@/components/detector/originality-flag";
++import { ProjectOriginality } from "@/components/detector/project-originality";
++import { TeamCaseNotice } from "@/components/detector/team-case-notice";
+ import { EvaluationForm } from "@/components/evaluation-form";
+-import { MatchList, NotEnoughData, SimilarityBadge, SubmissionBadges } from "@/components/project-bits";
++import { SubmissionBadges } from "@/components/project-bits";
+ import { ProjectForm } from "@/components/project-form";
+ import { SubmissionEditor, SubmissionView } from "@/components/submission";
+ import {
+@@ -30,8 +33,7 @@ import {
+   saveSubmission,
+   updateProjectInfo,
+ } from "@/lib/data";
+-import { useCollection, useDocument, useFingerprints } from "@/lib/hooks";
+-import { analysisState, findMatches } from "@/lib/similarity";
++import { useCollection, useDocument } from "@/lib/hooks";
+ import { query, where } from "firebase/firestore";
+ import {
+   PHASE_LABEL,
+@@ -42,7 +44,7 @@ import {
+   type Phase,
+   type ProjectDoc,
+ } from "@/lib/types";
+-import { judgesSeeOriginality, normalizeEmail, rolesInEvent, teamsSeeOriginality } from "@/lib/utils";
++import { normalizeEmail, rolesInEvent } from "@/lib/utils";
+ 
+ type Tab = "info" | Phase | "evaluate" | "originality" | "scores" | "feedback";
+ 
+@@ -95,10 +97,9 @@ function ProjectBody({
+   const phases = PHASES.filter((p) => event.phases[p]);
+   const isOrganizer = roles.includes("organizer");
+   const isJudge = roles.includes("judge");
+-  const canReview = isOrganizer || isJudge;
+-  // Quién ve el análisis de originalidad (lo controla el organizador en Ajustes)
+-  const teamView = !canReview && isMember;
+-  const seeOriginality = isOrganizer || (isJudge && judgesSeeOriginality(event)) || (teamView && teamsSeeOriginality(event));
++  // Detector: los casos solo los revisan organizadores y admins; el equipo ve lo que se le notifica
++  const seeOriginality = isOrganizer;
++  const teamView = !isOrganizer && !isJudge && isMember;
+   const firstPhase = phases.find((p) => project[p]) ?? phases[0];
+   const [tab, setTab] = useState<Tab>(isJudge ? "evaluate" : isMember && !isOrganizer ? (firstPhase ?? "info") : "info");
+   const [editingInfo, setEditingInfo] = useState(false);
+@@ -115,13 +116,6 @@ function ProjectBody({
+       : null;
+   const evaluations = useCollection<EvaluationDoc>(evalQuery, `evals:${event.id}:${project.id}:${isOrganizer}:${isJudge}`);
+ 
+-  const fingerprints = useFingerprints(seeOriginality);
+-  const { matches, state } = useMemo(() => {
+-    const fp = fingerprints.data.find((f) => f.projectId === project.id);
+-    const s = analysisState(fp);
+-    return { state: s, matches: fp && s === "ready" ? findMatches(fp, fingerprints.data) : [] };
+-  }, [fingerprints.data, project.id]);
+-
+   const leader = project.members.find((m) => m.email === project.leaderEmail) ?? { name: "", email: project.leaderEmail };
+   const hasFeedback = event.resultsPublished && project.feedback && Object.keys(project.feedback).length > 0;
+ 
+@@ -144,7 +138,6 @@ function ProjectBody({
+         <div className="flex flex-wrap items-center gap-1.5">
+           {project.category && <Badge tone="dark">{project.category}</Badge>}
+           <SubmissionBadges project={project} event={event} />
+-          {canReview && seeOriginality && !fingerprints.loading && <SimilarityBadge match={matches[0]} state={state} />}
+         </div>
+         <h1 className="mt-4 break-words font-display text-3xl font-bold leading-tight sm:text-4xl">{project.title}</h1>
+         <p className="mt-2 max-w-3xl text-sm leading-relaxed text-ink/75">{project.summary}</p>
+@@ -163,6 +156,9 @@ function ProjectBody({
+         </ul>
+       </section>
+ 
++      {(isJudge || isOrganizer) && <OriginalityFlag project={project} />}
++      {teamView && <TeamCaseNotice event={event} project={project} />}
++
+       <Tabs tabs={tabs} value={tab} onChange={(t) => setTab(t)} />
+ 
+       {tab === "info" && (
+@@ -176,7 +172,8 @@ function ProjectBody({
+               onCancel={() => setEditingInfo(false)}
+               onSubmit={async (input) => {
+                 try {
+-                  await updateProjectInfo(event, project, input);
++                  if (!user) return;
++                  await updateProjectInfo(event, project, input, user);
+                   toast("Proyecto actualizado.");
+                   setEditingInfo(false);
+                 } catch (err) {
+@@ -230,7 +227,8 @@ function ProjectBody({
+                     userEmail={normalizeEmail(user?.email ?? "")}
+                     onCancel={project[phase] ? () => setEditingPhase(null) : undefined}
+                     onSave={async (submission) => {
+-                      await saveSubmission(event, project, phase, submission);
++                      if (!user) return;
++                      await saveSubmission(event, project, phase, submission, user);
+                       toast(`${PHASE_LABEL[phase]} guardado.`);
+                       setEditingPhase(null);
+                     }}
+@@ -299,35 +297,7 @@ function ProjectBody({
+         </Card>
+       )}
+ 
+-      {tab === "originality" && seeOriginality && (
+-        <Card>
+-          <SectionTitle
+-            title="Análisis de originalidad"
+-            subtitle={
+-              teamView
+-                ? "Así se compara tu proyecto con los demás registrados en la plataforma."
+-                : "Comparado contra todos los proyectos registrados en la plataforma, de cualquier evento y año."
+-            }
+-            action={
+-              <Button variant="outline" size="sm" onClick={fingerprints.reload} loading={fingerprints.loading}>
+-                <ScanSearch className="size-3.5" /> Volver a analizar
+-              </Button>
+-            }
+-          />
+-          {fingerprints.loading ? (
+-            <Spinner label="Comparando" />
+-          ) : state !== "ready" ? (
+-            <NotEnoughData state={state} />
+-          ) : (
+-            <MatchList matches={matches.slice(0, 8)} currentEventId={event.id} anonymous={teamView} />
+-          )}
+-          <p className="mt-5 font-mono text-[10px] leading-relaxed text-ink/45">
+-            El porcentaje es una señal, no un veredicto. Combina frases y vocabulario en común, enlaces compartidos
+-            (repositorio, video, Drive) y archivos idénticos.
+-            {teamView ? " Si crees que hay un error, habla con el organizador." : " Revisa el caso antes de tomar una decisión."}
+-          </p>
+-        </Card>
+-      )}
++      {tab === "originality" && seeOriginality && <ProjectOriginality event={event} project={project} />}
+ 
+       {tab === "scores" && isOrganizer && (
+         <Card>

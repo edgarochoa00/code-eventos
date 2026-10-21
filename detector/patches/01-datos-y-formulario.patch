@@ -1,0 +1,123 @@
+diff --git a/components/project-form.tsx b/components/project-form.tsx
+index e671073..51913cb 100644
+--- a/components/project-form.tsx
++++ b/components/project-form.tsx
+@@ -5,6 +5,7 @@ import { useState, type FormEvent } from "react";
+ import type { ProjectInfoInput } from "@/lib/data";
+ import type { Member, ProjectDoc } from "@/lib/types";
+ import { isEmail, normalizeEmail } from "@/lib/utils";
++import { DeclarationFields, EMPTY_DECLARATION } from "./detector/declaration-fields";
+ import { Button, Field, Input, Textarea } from "./ui";
+ 
+ export const CATEGORIES = [
+@@ -42,6 +43,7 @@ export function ProjectForm({
+   const [members, setMembers] = useState<Member[]>(
+     initial ? initial.members.filter((m) => m.email !== leader.email) : [],
+   );
++  const [declaration, setDeclaration] = useState(initial?.declaration ?? EMPTY_DECLARATION);
+   const [errors, setErrors] = useState<Record<string, string>>({});
+   const [busy, setBusy] = useState(false);
+ 
+@@ -80,6 +82,7 @@ export function ProjectForm({
+           .slice(0, 15),
+         category,
+         members: [leader, ...cleanMembers.map((m) => ({ name: m.name.trim(), email: normalizeEmail(m.email) }))],
++        declaration: { continues: declaration.continues.trim(), sources: declaration.sources.trim() },
+       });
+     } finally {
+       setBusy(false);
+@@ -169,6 +172,8 @@ export function ProjectForm({
+         </p>
+       </div>
+ 
++      <DeclarationFields value={declaration} onChange={setDeclaration} />
++
+       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+         {onCancel && (
+           <Button type="button" variant="ghost" onClick={onCancel}>
+diff --git a/lib/data.ts b/lib/data.ts
+index 579ef28..a48b9cf 100644
+--- a/lib/data.ts
++++ b/lib/data.ts
+@@ -16,7 +16,7 @@ import {
+ import { deleteObject, getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage";
+ import type { User } from "firebase/auth";
+ import { db, storage } from "./firebase";
+-import { buildFingerprint } from "./similarity";
++import { writeAnchor } from "./detector/store";
+ import type {
+   Criterion,
+   EvaluationDoc,
+@@ -157,14 +157,9 @@ export function saveCriteria(eventId: string, criteria: Criterion[]) {
+ 
+ export type ProjectInfoInput = Pick<
+   ProjectDoc,
+-  "title" | "summary" | "problem" | "solution" | "technologies" | "category" | "members"
++  "title" | "summary" | "problem" | "solution" | "technologies" | "category" | "members" | "declaration"
+ >;
+ 
+-async function writeFingerprint(project: ProjectDoc, event: EventDoc) {
+-  const fp = await buildFingerprint(project, event.name);
+-  await setDoc(doc(db, "fingerprints", project.id), { ...fp, updatedAt: serverTimestamp() });
+-}
+-
+ export async function createProject(event: EventDoc, input: ProjectInfoInput, user: User) {
+   const leaderEmail = normalizeEmail(user.email ?? "");
+   const members = dedupeMembers([{ name: user.displayName ?? "", email: leaderEmail }, ...input.members]);
+@@ -184,27 +179,28 @@ export async function createProject(event: EventDoc, input: ProjectInfoInput, us
+   };
+   const { id: _id, ...data } = project;
+   void _id;
+-  await setDoc(ref, { ...data, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+-  await writeFingerprint(project, event);
++  await setDoc(ref, { ...data, declaration: input.declaration ?? null, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
++  // Ancla: primera versión con hora del servidor (no bloquea si falla)
++  await writeAnchor(event.id, project, "registro", user);
+   return ref.id;
+ }
+ 
+-export async function updateProjectInfo(event: EventDoc, project: ProjectDoc, input: ProjectInfoInput) {
++export async function updateProjectInfo(event: EventDoc, project: ProjectDoc, input: ProjectInfoInput, user: User) {
+   const members = dedupeMembers(input.members);
+   if (!members.some((m) => m.email === project.leaderEmail)) {
+     members.unshift(project.members.find((m) => m.email === project.leaderEmail) ?? { name: "", email: project.leaderEmail });
+   }
+-  const patch = { ...input, members, memberEmails: members.map((m) => m.email) };
++  const patch = { ...input, declaration: input.declaration ?? null, members, memberEmails: members.map((m) => m.email) };
+   await updateDoc(projectRef(event.id, project.id), { ...patch, updatedAt: serverTimestamp() });
+-  await writeFingerprint({ ...project, ...patch }, event);
++  await writeAnchor(event.id, { ...project, ...patch }, "edicion", user);
+ }
+ 
+-export async function saveSubmission(event: EventDoc, project: ProjectDoc, phase: Phase, submission: Submission) {
++export async function saveSubmission(event: EventDoc, project: ProjectDoc, phase: Phase, submission: Submission, user: User) {
+   await updateDoc(projectRef(event.id, project.id), {
+     [phase]: { ...submission, submittedAt: serverTimestamp() },
+     updatedAt: serverTimestamp(),
+   });
+-  await writeFingerprint({ ...project, [phase]: submission }, event);
++  await writeAnchor(event.id, { ...project, [phase]: submission }, phase, user);
+ }
+ 
+ export async function uploadSubmissionFile(eventId: string, projectId: string, phase: Phase, file: File) {
+diff --git a/lib/types.ts b/lib/types.ts
+index c1126db..45b281b 100644
+--- a/lib/types.ts
++++ b/lib/types.ts
+@@ -1,4 +1,5 @@
+ import type { Timestamp } from "firebase/firestore";
++import type { Declaration, OriginalityStatus } from "./detector/types";
+ 
+ export type Phase = "prototype" | "final";
+ 
+@@ -96,6 +97,10 @@ export type ProjectDoc = {
+   prototype: Submission | null;
+   final: Submission | null;
+   feedback?: Partial<Record<Phase, PhaseFeedback>>;
++  /** Detector de originalidad: lo que el equipo declara al registrar */
++  declaration?: Declaration | null;
++  /** Detector de originalidad: solo existe si un caso se confirmó */
++  originalityStatus?: OriginalityStatus | null;
+   createdAt: Timestamp | null;
+   updatedAt: Timestamp | null;
+ };

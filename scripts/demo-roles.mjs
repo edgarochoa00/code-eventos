@@ -236,14 +236,28 @@ async function borrar() {
   }
   if (ids.length) await api("POST", `${IDT}/accounts:batchDelete`, { localIds: ids, force: true });
 
+  const delAll = async (path) => {
+    const r = await api("GET", `${FS}/${path}?pageSize=300`);
+    for (const d of r.documents ?? []) await api("DELETE", `https://firestore.googleapis.com/v1/${d.name}`);
+    return r.documents ?? [];
+  };
   for (const ev of [EVENT_ID, OLD_EVENT_ID]) {
-    const evals = await api("GET", `${FS}/events/${ev}/evaluations?pageSize=300`);
-    for (const d of evals.documents ?? []) await api("DELETE", `https://firestore.googleapis.com/v1/${d.name}`);
+    await delAll(`events/${ev}/evaluations`);
+    // Detector de originalidad (si está activo): casos con su historial
+    const cases = await api("GET", `${FS}/events/${ev}/cases?pageSize=300`);
+    for (const c of cases.documents ?? []) {
+      await delAll(`events/${ev}/cases/${c.name.split("/").pop()}/log`);
+      await api("DELETE", `https://firestore.googleapis.com/v1/${c.name}`);
+    }
     const projs = await api("GET", `${FS}/events/${ev}/projects?pageSize=300`);
     for (const d of projs.documents ?? []) {
+      const pid = d.name.split("/").pop();
+      await delAll(`events/${ev}/projects/${pid}/anchors`);
       await api("DELETE", `https://firestore.googleapis.com/v1/${d.name}`);
-      await delDoc(`fingerprints/${d.name.split("/").pop()}`);
+      await delDoc(`fingerprints/${pid}`);
+      await delDoc(`originalityShingles/${pid}`);
     }
+    for (let i = 0; i < 5; i++) await delDoc(`originalityIndex/${i === 0 ? ev : `${ev}__${i}`}`);
     await delDoc(`events/${ev}`);
   }
   console.log(`Eliminadas ${ids.length} cuentas demo, sus permisos, eventos, proyectos, evaluaciones y huellas.`);

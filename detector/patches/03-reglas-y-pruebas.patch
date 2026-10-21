@@ -1,0 +1,320 @@
+diff --git a/firestore.rules b/firestore.rules
+index 2b0e88e..5cea7ed 100644
+--- a/firestore.rules
++++ b/firestore.rules
+@@ -83,6 +83,20 @@ service cloud.firestore {
+       return list is list && list.size() >= 1 && list.size() <= 20;
+     }
+ 
++    // ---------- Detector de originalidad ----------
++    // Señales de una huella: solo números y hashes, nunca texto ni enlaces legibles
++    function validSignals(d) {
++      return d.sigPhrases is list && d.sigPhrases.size() <= 256
++        && d.sigWords is list && d.sigWords.size() <= 256
++        && d.shingles is list && d.shingles.size() <= 6000
++        && d.urls is list && d.urls.size() <= 40
++        && d.files is list && d.files.size() <= 60
++        && d.members is list && d.members.size() <= 20
++        && d.declaredUrls is list && d.declaredUrls.size() <= 20
++        && d.tokenCount is int
++        && d.contentHash is string;
++    }
++
+     // ---------- Permisos globales ----------
+     match /staff/{email} {
+       allow read: if isAdmin() || (authed() && myEmail() == email);
+@@ -178,14 +192,16 @@ service cloud.firestore {
+           && validInfo(request.resource.data)
+           && request.resource.data.prototype == null
+           && request.resource.data.final == null
+-          && !('feedback' in request.resource.data);
++          && !('feedback' in request.resource.data)
++          && !('originalityStatus' in request.resource.data)
++          && request.resource.data.createdAt == request.time;
+ 
+         allow update: if isOrganizer(eid)
+           || (
+             verified()
+             && myEmail() in resource.data.memberEmails
+             && editingOpen()
+-            && !changed(['feedback', 'leaderId', 'leaderEmail', 'eventId', 'createdAt'])
++            && !changed(['feedback', 'leaderId', 'leaderEmail', 'eventId', 'createdAt', 'originalityStatus'])
+             && validTeam(request.resource.data)
+             && validInfo(request.resource.data)
+             && (!changed(['prototype']) || ev().submissions.prototype == true)
+@@ -194,6 +210,125 @@ service cloud.firestore {
+ 
+         allow delete: if isOrganizer(eid)
+           || (verified() && resource.data.leaderId == request.auth.uid && ev().registrationOpen == true);
++
++        // Anclas: versiones inmutables con hora del servidor
++        match /anchors/{aid} {
++          function anchorProject() {
++            return get(/databases/$(database)/documents/events/$(eid)/projects/$(pid)).data;
++          }
++
++          allow read: if isOrganizer(eid)
++            || (verified() && myEmail() in anchorProject().memberEmails);
++
++          allow create: if verified()
++            && request.resource.data.eventId == eid
++            && request.resource.data.projectId == pid
++            && request.resource.data.createdBy == request.auth.uid
++            && request.resource.data.createdAt == request.time
++            && request.resource.data.kind in ['registro', 'edicion', 'prototype', 'final', 'sello']
++            && validSignals(request.resource.data)
++            && (
++              (request.resource.data.source == 'organizador' && isOrganizer(eid))
++              || (
++                request.resource.data.source == 'equipo'
++                && request.resource.data.kind != 'sello'
++                && myEmail() in anchorProject().memberEmails
++              )
++            );
++
++          allow update, delete: if false;
++        }
++      }
++
++      // ---------- Casos de originalidad ----------
++      match /cases/{cid} {
++        function caseMember(projectId) {
++          return verified()
++            && myEmail() in get(/databases/$(database)/documents/events/$(eid)/projects/$(projectId)).data.memberEmails;
++        }
++
++        // Dos personas: propone un organizador y confirma un admin distinto.
++        // Si la escuela decide que el organizador confirma solo, ver detector/ACTIVAR.md.
++        function canConfirm() {
++          return isAdmin()
++            && resource.data.proposal.by != request.auth.uid
++            && request.resource.data.decision.by == request.auth.uid
++            && request.resource.data.decision.at == request.time;
++        }
++
++        function stamped(field) {
++          return request.resource.data[field].by == request.auth.uid
++            && request.resource.data[field].at == request.time;
++        }
++
++        function validTransition(from, to) {
++          return (from == to && !(from in ['propuesta', 'descartado', 'confirmado']))
++            || (from == 'propuesta' && to == 'propuesta' && !changed(['proposal', 'decision']))
++            || (from in ['por_revisar', 'en_revision'] && to == 'esperando_equipo')
++            || (from in ['por_revisar', 'esperando_equipo'] && to == 'en_revision')
++            || (from in ['por_revisar', 'esperando_equipo', 'en_revision'] && to == 'descartado' && stamped('decision'))
++            || (from in ['por_revisar', 'esperando_equipo', 'en_revision'] && to == 'propuesta' && stamped('proposal'))
++            || (from == 'propuesta' && to == 'en_revision')
++            || (from == 'propuesta' && to == 'confirmado' && canConfirm())
++            || (from in ['descartado', 'confirmado'] && to == 'en_revision' && isAdmin());
++        }
++
++        allow read: if isOrganizer(eid)
++          || (resource.data.teamNotified == true && caseMember(resource.data.projectId));
++
++        allow create: if isOrganizer(eid)
++          && cid == request.resource.data.projectId + '__' + request.resource.data.otherProjectId
++          && request.resource.data.eventId == eid
++          && request.resource.data.status == 'por_revisar'
++          && request.resource.data.teamNotified == false
++          && request.resource.data.teamResponse == null
++          && request.resource.data.proposal == null
++          && request.resource.data.decision == null
++          && request.resource.data.createdBy == request.auth.uid
++          && request.resource.data.createdAt == request.time
++          && request.resource.data.matchedShingles is list
++          && request.resource.data.matchedShingles.size() <= 800
++          && exists(/databases/$(database)/documents/events/$(eid)/projects/$(request.resource.data.projectId));
++
++        allow update: if (
++            isOrganizer(eid)
++            && !changed(['teamResponse', 'projectId', 'otherProjectId', 'otherEventId', 'eventId', 'createdBy', 'createdAt'])
++            && validTransition(resource.data.status, request.resource.data.status)
++          )
++          || (
++            resource.data.status == 'esperando_equipo'
++            && resource.data.teamNotified == true
++            && caseMember(resource.data.projectId)
++            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['teamResponse', 'status', 'updatedAt'])
++            && request.resource.data.status == 'en_revision'
++            && stamped('teamResponse')
++            && request.resource.data.teamResponse.text is string
++            && request.resource.data.teamResponse.text.size() <= 3000
++            && request.resource.data.teamResponse.links is list
++            && request.resource.data.teamResponse.links.size() <= 8
++          );
++
++        allow delete: if isSuperadmin();
++
++        // Historial inmutable del caso
++        match /log/{lid} {
++          function theCase() {
++            return get(/databases/$(database)/documents/events/$(eid)/cases/$(cid)).data;
++          }
++
++          allow read: if isOrganizer(eid)
++            || (theCase().teamNotified == true && caseMember(theCase().projectId));
++
++          allow create: if verified()
++            && request.resource.data.by == request.auth.uid
++            && request.resource.data.at == request.time
++            && request.resource.data.action is string
++            && request.resource.data.note is string
++            && request.resource.data.note.size() <= 3000
++            && (isOrganizer(eid) || (theCase().teamNotified == true && caseMember(theCase().projectId)));
++
++          allow update, delete: if false;
++        }
+       }
+ 
+       // ---------- Evaluaciones ----------
+@@ -225,28 +360,39 @@ service cloud.firestore {
+       allow read: if (verified() && myEmail() in resource.data.memberEmails) || isAdmin();
+     }
+ 
+-    // ---------- Huellas anti-plagio (historial permanente) ----------
+-    // Los enlaces se guardan como hash SHA-256, así que leerlas no revela repositorios ni videos.
+-    match /fingerprints/{pid} {
+-      function projectData(eid) {
+-        return get(/databases/$(database)/documents/events/$(eid)/projects/$(pid)).data;
+-      }
++    // ---------- Detector: índice compacto por evento (lo escribe solo el sello del organizador) ----------
++    match /originalityIndex/{docId} {
++      allow read: if verified();
++
++      allow create, update: if isOrganizer(request.resource.data.eventId)
++        && (docId == request.resource.data.eventId || docId.matches(request.resource.data.eventId + '__[0-9]+'))
++        && (resource == null || resource.data.eventId == request.resource.data.eventId)
++        && request.resource.data.entries is list
++        && request.resource.data.entries.size() <= 150
++        && request.resource.data.sealedBy == request.auth.uid
++        && request.resource.data.sealedAt == request.time;
++
++      allow delete: if isOrganizer(resource.data.eventId);
++    }
+ 
++    match /originalityShingles/{pid} {
+       allow read: if verified();
+ 
+-      allow create, update: if verified()
++      allow create, update: if isOrganizer(request.resource.data.eventId)
+         && request.resource.data.projectId == pid
+-        && request.resource.data.sigPhrases is list
+-        && request.resource.data.sigWords is list
+-        && request.resource.data.urls is list
+-        && request.resource.data.fileHashes is list
+         && (resource == null || resource.data.eventId == request.resource.data.eventId)
+-        && (
+-          isOrganizer(request.resource.data.eventId)
+-          || myEmail() in projectData(request.resource.data.eventId).memberEmails
+-        );
++        && exists(/databases/$(database)/documents/events/$(request.resource.data.eventId)/projects/$(pid))
++        && request.resource.data.shingles is list
++        && request.resource.data.shingles.size() <= 6000
++        && request.resource.data.sealedAt == request.time;
+ 
+       allow delete: if false;
+     }
++
++    // Huellas del detector anterior: ya no se escriben; solo los admins pueden consultarlas
++    match /fingerprints/{pid} {
++      allow read: if isAdmin();
++      allow write: if false;
++    }
+   }
+ }
+diff --git a/tests/firestore.rules.test.mjs b/tests/firestore.rules.test.mjs
+index 9d05bbf..8900b51 100644
+--- a/tests/firestore.rules.test.mjs
++++ b/tests/firestore.rules.test.mjs
+@@ -6,11 +6,11 @@ import { after, before, describe, test } from "node:test";
+ import {
+   collection,
+   collectionGroup,
+-  deleteDoc,
+   doc,
+   getDoc,
+   getDocs,
+   query,
++  serverTimestamp,
+   setDoc,
+   updateDoc,
+   where,
+@@ -57,6 +57,8 @@ const project = {
+   prototype: null,
+   final: null,
+ };
++// El detector exige que createdAt sea la hora del servidor
++const withTime = (data) => ({ ...data, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+ 
+ let superDb, org, admin, judge, stu, mate, outsider, blocked, fakeJudge;
+ 
+@@ -158,29 +160,29 @@ describe("cuenta suspendida", () => {
+ 
+ describe("proyectos", () => {
+   test("alumno registra su proyecto", async () => {
+-    await assertSucceeds(setDoc(doc(stu, "events/e1/projects/p1"), project));
++    await assertSucceeds(setDoc(doc(stu, "events/e1/projects/p1"), withTime(project)));
+   });
+ 
+   test("equipo más grande que el máximo falla", async () => {
+     await assertFails(
+-      setDoc(doc(outsider, "events/e1/projects/p2"), {
++      setDoc(doc(outsider, "events/e1/projects/p2"), withTime({
+         ...project,
+         leaderId: "out",
+         leaderEmail: "out@tec.mx",
+         memberEmails: ["out@tec.mx", "a@a.mx", "b@b.mx", "c@c.mx"],
+-      }),
++      })),
+     );
+   });
+ 
+   test("no se crea con resultados ya puestos", async () => {
+     await assertFails(
+-      setDoc(doc(outsider, "events/e1/projects/p3"), {
++      setDoc(doc(outsider, "events/e1/projects/p3"), withTime({
+         ...project,
+         leaderId: "out",
+         leaderEmail: "out@tec.mx",
+         memberEmails: ["out@tec.mx"],
+         feedback: {},
+-      }),
++      })),
+     );
+   });
+ 
+@@ -249,28 +251,10 @@ describe("evaluaciones", () => {
+   });
+ });
+ 
+-describe("huellas anti-plagio", () => {
+-  const fp = {
+-    projectId: "p1",
+-    eventId: "e1",
+-    eventName: "Expo",
+-    title: "AquaSense",
+-    year: 2026,
+-    sigPhrases: [1],
+-    sigWords: [1],
+-    urls: [],
+-    fileHashes: [],
+-    tokenCount: 10,
+-  };
+-
+-  test("las escribe un integrante u organizador del evento", async () => {
+-    await assertSucceeds(setDoc(doc(mate, "fingerprints/p1"), fp));
+-    await assertFails(setDoc(doc(outsider, "fingerprints/p1"), fp));
+-    await assertFails(setDoc(doc(mate, "fingerprints/p1"), { ...fp, eventId: "e9" }));
+-  });
+-
+-  test("se leen con cuenta verificada y nunca se borran", async () => {
+-    await assertSucceeds(getDocs(collection(outsider, "fingerprints")));
+-    await assertFails(deleteDoc(doc(superDb, "fingerprints/p1")));
++describe("huellas del detector anterior", () => {
++  test("ya no se escriben y solo los admins las leen", async () => {
++    await assertFails(setDoc(doc(mate, "fingerprints/p1"), { projectId: "p1", eventId: "e1" }));
++    await assertFails(getDocs(collection(outsider, "fingerprints")));
++    await assertSucceeds(getDocs(collection(admin, "fingerprints")));
+   });
+ });

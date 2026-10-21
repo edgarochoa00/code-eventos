@@ -1,0 +1,30 @@
+{
+  "//": "Compila el detector EN SU CARPETA, con las mismas rutas que tendrá ya activado (@/lib/detector, @/components/detector).",
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "incremental": false,
+    "paths": {
+      "@/lib/detector/*": [
+        "./lib/*"
+      ],
+      "@/components/detector/*": [
+        "./components/*"
+      ],
+      "@/*": [
+        "../*"
+      ]
+    }
+  },
+  "include": [
+    "../next-env.d.ts",
+    "./lib/**/*.ts",
+    "./lib/**/*.tsx",
+    "./components/**/*.tsx",
+    "./tests/**/*.ts",
+    "./scripts/**/*.ts"
+  ],
+  "exclude": [
+    "../node_modules"
+  ]
+}
