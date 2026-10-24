@@ -1,0 +1,57 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "C.O.D.E: servidor de desarrollo",
+      "type": "shell",
+      "command": "npm run dev",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": {
+        "owner": "nextjs",
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*(Starting|Compiling|compiled).*",
+          "endsPattern": ".*(Ready|Local:|ready in).*"
+        }
+      },
+      "runOptions": {
+        "instanceLimit": 1
+      },
+      "detail": "Arranca Next.js en http://localhost:3000 para la vista previa"
+    },
+    {
+      "label": "C.O.D.E: servidor con emuladores (sin tocar datos reales)",
+      "type": "shell",
+      "command": "npm run dev:emulators",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": {
+        "owner": "nextjs",
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*(Starting|Compiling|compiled).*",
+          "endsPattern": ".*(Ready|Local:|ready in).*"
+        }
+      },
+      "runOptions": {
+        "instanceLimit": 1
+      },
+      "detail": "Arranca Next.js en http://localhost:3100 contra Auth/Firestore simulados"
+    }
+  ]
+}

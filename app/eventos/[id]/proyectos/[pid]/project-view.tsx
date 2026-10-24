@@ -1,8 +1,8 @@
 "use client";
 
-import { ArrowLeft, Lock, MessageSquareQuote, Pencil, ScanSearch, Trophy, UserRound } from "lucide-react";
+import { ArrowLeft, Lock, MessageSquareQuote, Pencil, ScanSearch, Trash2, Trophy, UserRound } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { EvaluationForm } from "@/components/evaluation-form";
 import { MatchList, NotEnoughData, SimilarityBadge, SubmissionBadges } from "@/components/project-bits";
@@ -13,6 +13,7 @@ import {
   Button,
   Card,
   EmptyState,
+  Modal,
   SectionTitle,
   Spinner,
   Tabs,
@@ -22,6 +23,8 @@ import {
 import { useAccess } from "@/lib/access";
 import { useAuth } from "@/lib/auth";
 import {
+  deleteEvaluation,
+  deleteProject,
   evaluationId,
   evaluationsCol,
   eventRef,
@@ -42,7 +45,14 @@ import {
   type Phase,
   type ProjectDoc,
 } from "@/lib/types";
-import { judgesSeeOriginality, normalizeEmail, rolesInEvent, teamsSeeOriginality } from "@/lib/utils";
+import {
+  effectiveEvaluationTotal,
+  eventCategories,
+  judgesSeeOriginality,
+  normalizeEmail,
+  rolesInEvent,
+  teamsSeeOriginality,
+} from "@/lib/utils";
 
 type Tab = "info" | Phase | "evaluate" | "originality" | "scores" | "feedback";
 
@@ -91,6 +101,7 @@ function ProjectBody({
   isMember: boolean;
 }) {
   const { user } = useAuth();
+  const router = useRouter();
   const toast = useToast();
   const phases = PHASES.filter((p) => event.phases[p]);
   const isOrganizer = roles.includes("organizer");
@@ -104,8 +115,13 @@ function ProjectBody({
   const [editingInfo, setEditingInfo] = useState(false);
   const [editingPhase, setEditingPhase] = useState<Phase | null>(null);
   const [evalPhase, setEvalPhase] = useState<Phase>(firstPhase ?? "prototype");
+  const [confirmDeleteProject, setConfirmDeleteProject] = useState(false);
+  const [deletingProject, setDeletingProject] = useState(false);
+  const [evalToDelete, setEvalToDelete] = useState<EvaluationDoc | null>(null);
+  const [deletingEval, setDeletingEval] = useState(false);
 
   const canEditInfo = isOrganizer || (isMember && (event.registrationOpen || phases.some((p) => event.submissions[p])));
+  const canDeleteProject = isOrganizer || (Boolean(user?.uid) && user?.uid === project.leaderId && event.registrationOpen);
 
   // Evaluaciones: el juez ve las suyas, el organizador todas las del proyecto
   const evalQuery = isOrganizer
@@ -172,6 +188,7 @@ function ProjectBody({
               initial={project}
               leader={leader}
               maxTeamSize={event.maxTeamSize}
+              categories={eventCategories(event)}
               submitLabel="Guardar"
               onCancel={() => setEditingInfo(false)}
               onSubmit={async (input) => {
@@ -189,10 +206,19 @@ function ProjectBody({
               <SectionTitle
                 title="Información"
                 action={
-                  canEditInfo && (
-                    <Button variant="outline" size="sm" onClick={() => setEditingInfo(true)}>
-                      <Pencil className="size-3.5" /> Editar
-                    </Button>
+                  (canEditInfo || canDeleteProject) && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {canEditInfo && (
+                        <Button variant="outline" size="sm" onClick={() => setEditingInfo(true)}>
+                          <Pencil className="size-3.5" /> Editar
+                        </Button>
+                      )}
+                      {canDeleteProject && (
+                        <Button variant="ghost" size="sm" className="text-red-600 hover:bg-red-50" onClick={() => setConfirmDeleteProject(true)}>
+                          <Trash2 className="size-3.5" /> Eliminar
+                        </Button>
+                      )}
+                    </div>
                   )
                 }
               />
@@ -334,31 +360,106 @@ function ProjectBody({
           <SectionTitle title="Calificaciones de jueces" subtitle="Solo los organizadores ven quién calificó qué." />
           {evaluations.data.length ? (
             <div className="space-y-3">
-              {evaluations.data.map((e) => (
-                <div key={e.id} className="rounded-2xl bg-paper p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-medium">{e.judgeName || e.judgeEmail}</p>
-                      <p className="font-mono text-[10px] text-ink/50">{PHASE_LABEL[e.phase]}</p>
+              {evaluations.data.map((e) => {
+                const currentTotal = effectiveEvaluationTotal(event.criteria, e);
+                return (
+                  <div key={e.id} className="rounded-2xl bg-paper p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-medium">{e.judgeName || e.judgeEmail}</p>
+                        <p className="font-mono text-[10px] text-ink/50">{PHASE_LABEL[e.phase]}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-display text-2xl font-bold tabular-nums">{currentTotal.toFixed(1)}</p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`Descartar calificación de ${e.judgeName || e.judgeEmail}`}
+                          onClick={() => setEvalToDelete(e)}
+                        >
+                          <Trash2 className="size-4 text-ink/55 hover:text-red-600" />
+                        </Button>
+                      </div>
                     </div>
-                    <p className="font-display text-2xl font-bold tabular-nums">{e.total.toFixed(1)}</p>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {event.criteria.map((c) => (
+                        <Badge key={c.id}>
+                          {c.name}: {e.scores[c.id] ?? "—"}
+                        </Badge>
+                      ))}
+                    </div>
+                    {e.comment && <p className="mt-3 text-sm leading-relaxed text-ink/75">“{e.comment}”</p>}
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {event.criteria.map((c) => (
-                      <Badge key={c.id}>
-                        {c.name}: {e.scores[c.id] ?? "—"}
-                      </Badge>
-                    ))}
-                  </div>
-                  {e.comment && <p className="mt-3 text-sm leading-relaxed text-ink/75">“{e.comment}”</p>}
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <p className="font-mono text-xs text-ink/50">Ningún juez ha calificado este proyecto.</p>
           )}
         </Card>
       )}
+
+      <Modal open={confirmDeleteProject} onClose={() => setConfirmDeleteProject(false)} title="¿Eliminar proyecto?">
+        <p className="font-mono text-xs leading-relaxed text-ink/70">
+          Se eliminará el proyecto «{project.title}» y sus entregas de este evento. Esta acción no se puede deshacer.
+        </p>
+        <div className="mt-6 flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setConfirmDeleteProject(false)}>
+            Cancelar
+          </Button>
+          <Button
+            variant="danger"
+            loading={deletingProject}
+            onClick={async () => {
+              setDeletingProject(true);
+              try {
+                await deleteProject(event.id, project, isOrganizer);
+                toast("Proyecto eliminado.");
+                router.push(`/eventos/${event.id}`);
+              } catch (err) {
+                toast(firestoreErrorMessage(err), "error");
+                setDeletingProject(false);
+              }
+            }}
+          >
+            Eliminar proyecto
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal open={!!evalToDelete} onClose={() => setEvalToDelete(null)} title="¿Descartar calificación?">
+        {evalToDelete && (
+          <>
+            <p className="font-mono text-xs leading-relaxed text-ink/70">
+              Se eliminará la calificación de {evalToDelete.judgeName || evalToDelete.judgeEmail} en{" "}
+              {PHASE_LABEL[evalToDelete.phase].toLowerCase()}. El juez podrá volver a calificar si la evaluación sigue abierta.
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setEvalToDelete(null)}>
+                Cancelar
+              </Button>
+              <Button
+                variant="danger"
+                loading={deletingEval}
+                onClick={async () => {
+                  setDeletingEval(true);
+                  try {
+                    await deleteEvaluation(event.id, evalToDelete.id);
+                    toast("Calificación descartada.");
+                    setEvalToDelete(null);
+                  } catch (err) {
+                    toast(firestoreErrorMessage(err), "error");
+                  } finally {
+                    setDeletingEval(false);
+                  }
+                }}
+              >
+                Descartar
+              </Button>
+            </div>
+          </>
+        )}
+      </Modal>
 
       {tab === "feedback" && hasFeedback && (
         <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[repeat(2,minmax(0,1fr))]">

@@ -3,15 +3,16 @@
 import { ArrowUpRight, CheckCircle2, Circle, Lock, Trophy } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import { Leaderboard } from "@/components/leaderboard";
 import { SubmissionBadges } from "@/components/project-bits";
 import { ProjectForm } from "@/components/project-form";
-import { Card, EmptyState, ErrorNote, SectionTitle, Spinner, firestoreErrorMessage, useToast } from "@/components/ui";
+import { Badge, Card, EmptyState, ErrorNote, SectionTitle, Spinner, Tabs, firestoreErrorMessage, useToast } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { createProject, qMyEventProject } from "@/lib/data";
 import { useCollection } from "@/lib/hooks";
 import { PHASE_LABEL, PHASES, type EventDoc, type ProjectDoc } from "@/lib/types";
-import { cn, normalizeEmail } from "@/lib/utils";
+import { cn, eventCategories, normalizeEmail } from "@/lib/utils";
 
 export function StudentView({ event }: { event: EventDoc }) {
   const { user } = useAuth();
@@ -19,7 +20,21 @@ export function StudentView({ event }: { event: EventDoc }) {
   const router = useRouter();
   const toast = useToast();
   const mine = useCollection<ProjectDoc>(qMyEventProject(event.id, email), `myproject:${event.id}:${email}`);
-  const project = mine.data[0];
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [resultCategory, setResultCategory] = useState<string>("all");
+
+  const project = mine.data.find((p) => p.id === selectedProjectId) ?? mine.data[0];
+
+  const resultCategories = useMemo(() => {
+    if (!event.results) return [];
+    const set = new Set<string>();
+    for (const ph of PHASES) {
+      for (const r of event.results[ph] ?? []) {
+        if (r.category) set.add(r.category);
+      }
+    }
+    return Array.from(set);
+  }, [event.results]);
 
   if (mine.loading) return <Spinner />;
 
@@ -29,13 +44,23 @@ export function StudentView({ event }: { event: EventDoc }) {
 
       {project ? (
         <>
+          {mine.data.length > 1 && (
+            <Tabs
+              tabs={mine.data.map((p) => ({ id: p.id, label: p.title }))}
+              value={project.id}
+              onChange={setSelectedProjectId}
+            />
+          )}
           <ProjectProgress event={event} project={project} />
           <Link
             href={`/eventos/${event.id}/proyectos/${project.id}`}
             className="group flex items-center justify-between gap-4 rounded-3xl bg-night p-6 text-white sm:p-8"
           >
             <div className="min-w-0">
-              <p className="font-mono text-[11px] text-white/60">Tu proyecto</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-mono text-[11px] text-white/60">Tu proyecto</p>
+                {project.category && <Badge tone="lime">{project.category}</Badge>}
+              </div>
               <h2 className="mt-1 truncate font-display text-2xl font-bold">{project.title}</h2>
               <p className="mt-1 line-clamp-2 font-mono text-[11px] text-white/60">{project.summary}</p>
               <div className="mt-4">
@@ -53,6 +78,7 @@ export function StudentView({ event }: { event: EventDoc }) {
           <ProjectForm
             leader={{ name: user?.displayName ?? "", email }}
             maxTeamSize={event.maxTeamSize}
+            categories={eventCategories(event)}
             submitLabel="Registrar proyecto"
             onSubmit={async (input) => {
               if (!user) return;
@@ -75,17 +101,33 @@ export function StudentView({ event }: { event: EventDoc }) {
       )}
 
       {event.resultsPublished && event.results && (
-        <section>
+        <section className="space-y-4">
           <SectionTitle title="Resultados" subtitle="Publicados por el organizador." />
+          {resultCategories.length > 1 && (
+            <Tabs
+              tabs={[
+                { id: "all", label: "General" },
+                ...resultCategories.map((c) => ({ id: c, label: c })),
+              ]}
+              value={resultCategory}
+              onChange={setResultCategory}
+            />
+          )}
           <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[repeat(2,minmax(0,1fr))]">
-            {PHASES.filter((p) => event.phases[p] && event.results?.[p]?.length).map((phase) => (
-              <Card key={phase}>
-                <h3 className="mb-4 flex items-center gap-2 font-display text-lg font-bold">
-                  <Trophy className="size-5" /> {PHASE_LABEL[phase]}
-                </h3>
-                <Leaderboard rows={event.results![phase].slice(0, 10)} eventId={event.id} highlightId={project?.id} />
-              </Card>
-            ))}
+            {PHASES.filter((p) => event.phases[p] && event.results?.[p]?.length).map((phase) => {
+              const rows = (event.results![phase] ?? []).filter(
+                (r) => resultCategory === "all" || r.category === resultCategory,
+              );
+              return (
+                <Card key={phase}>
+                  <h3 className="mb-4 flex items-center gap-2 font-display text-lg font-bold">
+                    <Trophy className="size-5" /> {PHASE_LABEL[phase]}
+                    {resultCategory !== "all" && <Badge>{resultCategory}</Badge>}
+                  </h3>
+                  <Leaderboard rows={rows.slice(0, 10)} eventId={event.id} highlightId={project?.id} />
+                </Card>
+              );
+            })}
           </div>
         </section>
       )}

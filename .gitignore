@@ -40,8 +40,9 @@ firebase-debug.log
 firestore-debug.log
 *-debug.log
 
-# configuración local del IDE
+# configuración local del IDE y herramientas
 .kiro/
+.refugio/
 
 # vercel
 .vercel

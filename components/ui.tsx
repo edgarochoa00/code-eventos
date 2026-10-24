@@ -413,5 +413,6 @@ export function firestoreErrorMessage(err: unknown) {
   if (code === "permission-denied") return "No tienes permiso para esta acción (o la etapa está cerrada).";
   if (code === "unavailable") return "Sin conexión con el servidor.";
   if (code.startsWith("storage/")) return "No se pudo subir el archivo. ¿Está activado Firebase Storage?";
+  if (!code && err instanceof Error && err.message) return err.message;
   return "Algo salió mal. Intenta de nuevo.";
 }

@@ -4,24 +4,16 @@ import { Plus, Trash2, UserRound } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import type { ProjectInfoInput } from "@/lib/data";
 import type { Member, ProjectDoc } from "@/lib/types";
-import { isEmail, normalizeEmail } from "@/lib/utils";
+import { DEFAULT_CATEGORIES, isEmail, normalizeEmail } from "@/lib/utils";
 import { Button, Field, Input, Textarea } from "./ui";
 
-export const CATEGORIES = [
-  "Software",
-  "Hardware / IoT",
-  "Salud",
-  "Educación",
-  "Medio ambiente",
-  "Social",
-  "Negocios",
-  "Otro",
-];
+export const CATEGORIES = DEFAULT_CATEGORIES;
 
 export function ProjectForm({
   initial,
   leader,
   maxTeamSize,
+  categories = CATEGORIES,
   submitLabel,
   onSubmit,
   onCancel,
@@ -29,16 +21,23 @@ export function ProjectForm({
   initial?: ProjectDoc;
   leader: Member;
   maxTeamSize: number;
+  categories?: string[];
   submitLabel: string;
   onSubmit: (input: ProjectInfoInput) => Promise<void>;
   onCancel?: () => void;
 }) {
+  const availableCategories =
+    initial?.category && !categories.includes(initial.category)
+      ? [initial.category, ...categories]
+      : categories.length
+        ? categories
+        : CATEGORIES;
   const [title, setTitle] = useState(initial?.title ?? "");
   const [summary, setSummary] = useState(initial?.summary ?? "");
   const [problem, setProblem] = useState(initial?.problem ?? "");
   const [solution, setSolution] = useState(initial?.solution ?? "");
   const [technologies, setTechnologies] = useState(initial?.technologies.join(", ") ?? "");
-  const [category, setCategory] = useState(initial?.category ?? CATEGORIES[0]);
+  const [category, setCategory] = useState(initial?.category ?? availableCategories[0]);
   const [members, setMembers] = useState<Member[]>(
     initial ? initial.members.filter((m) => m.email !== leader.email) : [],
   );
@@ -99,7 +98,7 @@ export function ProjectForm({
             onChange={(e) => setCategory(e.target.value)}
             className="h-11 w-full rounded-xl border border-ink/10 bg-paper px-3 text-sm outline-none focus:border-ink/40"
           >
-            {CATEGORIES.map((c) => (
+            {availableCategories.map((c) => (
               <option key={c}>{c}</option>
             ))}
           </select>

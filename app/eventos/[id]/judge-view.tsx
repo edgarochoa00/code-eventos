@@ -8,12 +8,19 @@ import { useAuth } from "@/lib/auth";
 import { projectsCol, qMyEvaluations } from "@/lib/data";
 import { useCollection } from "@/lib/hooks";
 import { PHASE_LABEL, PHASES, type EvaluationDoc, type EventDoc, type ProjectDoc } from "@/lib/types";
+import {
+  effectiveEvaluationTotal,
+  hasJudgeAssignment,
+  isProjectAssignedToJudge,
+  normalizeEmail,
+} from "@/lib/utils";
 
-type Filter = "pending" | "all";
+type Filter = "pending" | "assigned" | "all";
 
 export function JudgeView({ event }: { event: EventDoc }) {
   const { user } = useAuth();
   const uid = user?.uid ?? "";
+  const email = normalizeEmail(user?.email ?? "");
   const projects = useCollection<ProjectDoc>(projectsCol(event.id), `projects:${event.id}`);
   const mine = useCollection<EvaluationDoc>(qMyEvaluations(event.id, uid), `myevals:${event.id}:${uid}`);
   const [filter, setFilter] = useState<Filter>("pending");
@@ -24,16 +31,23 @@ export function JudgeView({ event }: { event: EventDoc }) {
   const phases = PHASES.filter((p) => event.phases[p]);
   const evaluated = (p: ProjectDoc, phase: (typeof phases)[number]) =>
     mine.data.find((e) => e.projectId === p.id && e.phase === phase);
-  // Una tarea = proyecto con entrega en esa etapa
-  const tasks = projects.data.flatMap((p) => phases.filter((ph) => p[ph]).map((ph) => ({ p, ph })));
+
+  const hasCustom = hasJudgeAssignment(event, email);
+  const assignedProjects = projects.data.filter((p) => isProjectAssignedToJudge(event, p, email));
+
+  // Una tarea = proyecto asignado con entrega en esa etapa
+  const tasks = assignedProjects.flatMap((p) => phases.filter((ph) => p[ph]).map((ph) => ({ p, ph })));
   const done = tasks.filter(({ p, ph }) => evaluated(p, ph)).length;
   const pct = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
 
   const q = search.trim().toLowerCase();
-  const list = projects.data
+  const sourceProjects = filter === "all" ? projects.data : assignedProjects;
+  const list = sourceProjects
     .filter((p) => !q || p.title.toLowerCase().includes(q) || p.category.toLowerCase().includes(q))
-    .filter((p) => filter === "all" || phases.some((ph) => p[ph] && !evaluated(p, ph)))
+    .filter((p) => filter !== "pending" || phases.some((ph) => p[ph] && !evaluated(p, ph)))
     .sort((a, b) => a.title.localeCompare(b.title));
+
+  const assignmentCategories = event.judgeAssignments?.[email]?.categories ?? [];
 
   return (
     <div className="space-y-6">
@@ -54,6 +68,12 @@ export function JudgeView({ event }: { event: EventDoc }) {
           <div className="mt-4 h-2 rounded-full bg-white/10">
             <div className="h-full rounded-full bg-lime transition-all" style={{ width: `${pct}%` }} />
           </div>
+          {hasCustom && (
+            <p className="mt-3 font-mono text-[11px] text-white/60">
+              Asignado a {assignedProjects.length} proyecto(s)
+              {assignmentCategories.length > 0 ? ` · ${assignmentCategories.join(", ")}` : ""}
+            </p>
+          )}
         </div>
         {!event.judgingOpen && (
           <div className="flex max-w-sm items-start gap-3 rounded-3xl bg-amber-50 p-5 text-amber-900">
@@ -72,6 +92,7 @@ export function JudgeView({ event }: { event: EventDoc }) {
           <Tabs
             tabs={[
               { id: "pending", label: "Pendientes", count: tasks.length - done },
+              ...(hasCustom ? [{ id: "assigned" as Filter, label: "Asignados", count: assignedProjects.length }] : []),
               { id: "all", label: "Todos", count: projects.data.length },
             ]}
             value={filter}
@@ -99,12 +120,13 @@ export function JudgeView({ event }: { event: EventDoc }) {
                     <ArrowUpRight className="size-5 shrink-0 opacity-40 group-hover:opacity-100" />
                   </div>
                   <div className="flex flex-wrap gap-1.5">
+                    {p.category && <Badge>{p.category}</Badge>}
                     {phases.map((ph) => {
                       const ev = evaluated(p, ph);
                       if (!p[ph]) return <Badge key={ph}>{PHASE_LABEL[ph]}: sin entrega</Badge>;
                       return ev ? (
                         <Badge key={ph} tone="green">
-                          {PHASE_LABEL[ph]}: {ev.total.toFixed(1)}
+                          {PHASE_LABEL[ph]}: {effectiveEvaluationTotal(event.criteria, ev).toFixed(1)}
                         </Badge>
                       ) : (
                         <Badge key={ph} tone="lime">

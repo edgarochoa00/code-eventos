@@ -3,19 +3,23 @@
 import {
   AlertTriangle,
   ArrowUpRight,
+  Download,
   EyeOff,
   Gavel,
-  ShieldCheck,
   Megaphone,
   Plus,
   RefreshCw,
   ScanSearch,
+  Search,
+  ShieldCheck,
+  SlidersHorizontal,
   Trash2,
   Trophy,
   UserPlus,
   Users,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { EmailListEditor } from "@/components/email-list-editor";
 import { EventSettingsForm } from "@/components/event-settings-form";
@@ -38,9 +42,13 @@ import {
   firestoreErrorMessage,
   useToast,
 } from "@/components/ui";
+import { useAccess } from "@/lib/access";
+import { useAuth } from "@/lib/auth";
 import {
   computeStandings,
+  deleteEvent,
   evaluationsCol,
+  generateUniqueEventCode,
   projectsCol,
   publishResults,
   saveCriteria,
@@ -55,13 +63,26 @@ import {
   type Criterion,
   type EvaluationDoc,
   type EventDoc,
+  type JudgeAssignment,
   type JudgeOriginality,
   type OriginalitySettings,
   type Phase,
   type ProjectDoc,
   type TeamOriginality,
 } from "@/lib/types";
-import { cn, formatDate, originalitySettings, randomCode, randomId, todayISO } from "@/lib/utils";
+import {
+  cn,
+  downloadCsv,
+  effectiveEvaluationTotal,
+  eventCategories,
+  formatDate,
+  hasJudgeAssignment,
+  isProjectAssignedToJudge,
+  normalizeEmail,
+  originalitySettings,
+  randomId,
+  todayISO,
+} from "@/lib/utils";
 
 type Tab = "summary" | "projects" | "judges" | "rubric" | "results" | "settings";
 
@@ -139,7 +160,15 @@ function Summary({
 }) {
   const toast = useToast();
   const phases = PHASES.filter((p) => event.phases[p]);
-  const expected = phases.reduce((s, ph) => s + projects.filter((p) => p[ph]).length, 0) * event.judgeEmails.length;
+  const expected = event.judgeEmails.reduce(
+    (sum, email) =>
+      sum +
+      phases.reduce(
+        (s, ph) => s + projects.filter((p) => p[ph] && isProjectAssignedToJudge(event, p, email)).length,
+        0,
+      ),
+    0,
+  );
 
   async function toggle(patch: Partial<EventDoc>) {
     try {
@@ -370,10 +399,83 @@ function ProjectsTab({
   onReload: () => void;
 }) {
   const [sort, setSort] = useState<"name" | "similarity">("similarity");
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "prototype" | "final" | "none">("all");
   const { top: topMatch, loading: loadingFp } = analysis;
-  const sorted = [...projects].sort((a, b) =>
+
+  const categories = useMemo(() => {
+    const set = new Set<string>(eventCategories(event));
+    for (const p of projects) if (p.category) set.add(p.category);
+    return Array.from(set);
+  }, [event, projects]);
+
+  const q = search.trim().toLowerCase();
+  const filtered = projects.filter((p) => {
+    if (categoryFilter !== "all" && p.category !== categoryFilter) return false;
+    if (statusFilter === "prototype" && !p.prototype) return false;
+    if (statusFilter === "final" && !p.final) return false;
+    if (statusFilter === "none" && (p.prototype || p.final)) return false;
+    if (!q) return true;
+    const inTitle = p.title.toLowerCase().includes(q);
+    const inSummary = p.summary.toLowerCase().includes(q);
+    const inCat = p.category.toLowerCase().includes(q);
+    const inTech = p.technologies.some((t) => t.toLowerCase().includes(q));
+    const inMembers = p.members.some((m) => m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q));
+    return inTitle || inSummary || inCat || inTech || inMembers;
+  });
+
+  const sorted = [...filtered].sort((a, b) =>
     sort === "name" ? a.title.localeCompare(b.title) : (topMatch.get(b.id)?.score ?? 0) - (topMatch.get(a.id)?.score ?? 0),
   );
+
+  function exportProjectsCsv() {
+    const headers = [
+      "Proyecto",
+      "Categoría",
+      "Resumen",
+      "Tecnologías",
+      "Líder",
+      "Correo líder",
+      "Integrantes",
+      "Correos integrantes",
+      "Prototipo entregado",
+      "Enlaces prototipo",
+      "Producto final entregado",
+      "Enlaces final",
+      "Evaluaciones",
+      "Promedio",
+      "Similitud máx. (%)",
+      "Coincidencia principal",
+    ];
+    const rows = sorted.map((p) => {
+      const evs = evaluations.filter((e) => e.projectId === p.id);
+      const avg = evs.length
+        ? (evs.reduce((s, e) => s + effectiveEvaluationTotal(event.criteria, e), 0) / evs.length).toFixed(1)
+        : "";
+      const match = topMatch.get(p.id);
+      const leaderName = p.members.find((m) => m.email === p.leaderEmail)?.name ?? "";
+      return [
+        p.title,
+        p.category,
+        p.summary,
+        p.technologies.join(", "),
+        leaderName,
+        p.leaderEmail,
+        p.members.map((m) => m.name || m.email).join("; "),
+        p.members.map((m) => m.email).join("; "),
+        p.prototype ? "Sí" : "No",
+        (p.prototype?.links ?? []).map((l) => l.url).join("; "),
+        p.final ? "Sí" : "No",
+        (p.final?.links ?? []).map((l) => l.url).join("; "),
+        evs.length,
+        avg,
+        match ? match.score : "",
+        match ? `${match.other.title} (${match.other.eventName}, ${match.other.year})` : "",
+      ];
+    });
+    downloadCsv(`proyectos_${event.code}.csv`, headers, rows);
+  }
 
   if (!projects.length) {
     return (
@@ -396,48 +498,95 @@ function ProjectsTab({
           value={sort}
           onChange={setSort}
         />
-        <Button variant="outline" size="sm" onClick={onReload} loading={loadingFp}>
-          <RefreshCw className="size-3.5" /> Recalcular originalidad
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={exportProjectsCsv}>
+            <Download className="size-3.5" /> Exportar CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={onReload} loading={loadingFp}>
+            <RefreshCw className="size-3.5" /> Recalcular originalidad
+          </Button>
+        </div>
       </div>
-      <ul className="space-y-3">
-        {sorted.map((p) => {
-          const evs = evaluations.filter((e) => e.projectId === p.id);
-          const avg = evs.length ? evs.reduce((s, e) => s + e.total, 0) / evs.length : null;
-          const match = topMatch.get(p.id);
-          return (
-            <li key={p.id}>
-              <Link
-                href={`/eventos/${event.id}/proyectos/${p.id}`}
-                className="grid gap-3 rounded-3xl bg-surface p-5 transition hover:-translate-y-0.5 sm:grid-cols-[1fr_auto] sm:items-center"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-display text-lg font-bold">{p.title}</h3>
-                    {p.category && <Badge>{p.category}</Badge>}
-                  </div>
-                  <p className="mt-0.5 font-mono text-[11px] text-ink/55">
-                    {p.members.length} integrante(s) · {p.members.map((m) => m.name || m.email).join(", ")}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    <SubmissionBadges project={p} event={event} />
-                    {!loadingFp && <SimilarityBadge match={match} state={analysis.state.get(p.id)} />}
-                  </div>
-                  {match && (match.level === "alto" || match.level === "medio") && (
-                    <p className="mt-2 font-mono text-[11px] text-ink/70">
-                      Se parece a «{match.other.title}» ({match.other.eventName}, {match.other.year})
+
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-2.5 sm:grid-cols-[1.5fr_1fr_1fr]">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink/40" />
+          <Input
+            aria-label="Buscar proyecto o integrante"
+            placeholder="Buscar proyecto, integrante o tecnología"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="bg-surface pl-9"
+          />
+        </div>
+        <select
+          aria-label="Filtrar por categoría"
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          className="h-11 w-full rounded-xl border border-ink/10 bg-surface px-3 font-mono text-xs text-ink outline-none focus:border-ink/40"
+        >
+          <option value="all">Todas las categorías</option>
+          {categories.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+        <select
+          aria-label="Filtrar por estado de entrega"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+          className="h-11 w-full rounded-xl border border-ink/10 bg-surface px-3 font-mono text-xs text-ink outline-none focus:border-ink/40"
+        >
+          <option value="all">Todas las entregas</option>
+          {event.phases.prototype && <option value="prototype">Con prototipo</option>}
+          {event.phases.final && <option value="final">Con producto final</option>}
+          <option value="none">Sin entregas</option>
+        </select>
+      </div>
+
+      {sorted.length ? (
+        <ul className="space-y-3">
+          {sorted.map((p) => {
+            const evs = evaluations.filter((e) => e.projectId === p.id);
+            const avg = evs.length ? evs.reduce((s, e) => s + effectiveEvaluationTotal(event.criteria, e), 0) / evs.length : null;
+            const match = topMatch.get(p.id);
+            return (
+              <li key={p.id}>
+                <Link
+                  href={`/eventos/${event.id}/proyectos/${p.id}`}
+                  className="grid gap-3 rounded-3xl bg-surface p-5 transition hover:-translate-y-0.5 sm:grid-cols-[1fr_auto] sm:items-center"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-display text-lg font-bold">{p.title}</h3>
+                      {p.category && <Badge>{p.category}</Badge>}
+                    </div>
+                    <p className="mt-0.5 font-mono text-[11px] text-ink/55">
+                      {p.members.length} integrante(s) · {p.members.map((m) => m.name || m.email).join(", ")}
                     </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-4 sm:flex-col sm:items-end sm:gap-1">
-                  <p className="font-display text-2xl font-bold tabular-nums">{avg !== null ? avg.toFixed(1) : "—"}</p>
-                  <p className="font-mono text-[10px] text-ink/50">{evs.length} evaluación(es)</p>
-                </div>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      <SubmissionBadges project={p} event={event} />
+                      {!loadingFp && <SimilarityBadge match={match} state={analysis.state.get(p.id)} />}
+                    </div>
+                    {match && (match.level === "alto" || match.level === "medio") && (
+                      <p className="mt-2 font-mono text-[11px] text-ink/70">
+                        Se parece a «{match.other.title}» ({match.other.eventName}, {match.other.year})
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-4 sm:flex-col sm:items-end sm:gap-1">
+                    <p className="font-display text-2xl font-bold tabular-nums">{avg !== null ? avg.toFixed(1) : "—"}</p>
+                    <p className="font-mono text-[10px] text-ink/50">{evs.length} evaluación(es)</p>
+                  </div>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <EmptyState title="Sin coincidencias" text="Prueba con otra búsqueda o cambia los filtros." />
+      )}
     </div>
   );
 }
@@ -445,9 +594,21 @@ function ProjectsTab({
 /* ---------- Jueces y organizadores ---------- */
 
 function JudgesTab({ event, evaluations, projects }: { event: EventDoc; evaluations: EvaluationDoc[]; projects: ProjectDoc[] }) {
+  const toast = useToast();
   const phases = PHASES.filter((p) => event.phases[p]);
-  const tasks = phases.reduce((s, ph) => s + projects.filter((p) => p[ph]).length, 0);
   const ownerEmail = event.ownerEmail;
+  const [editingJudge, setEditingJudge] = useState<string | null>(null);
+
+  const categories = useMemo(() => {
+    const set = new Set<string>(eventCategories(event));
+    for (const p of projects) if (p.category) set.add(p.category);
+    return Array.from(set);
+  }, [event, projects]);
+
+  function judgeTasksCount(email: string) {
+    const assigned = projects.filter((p) => isProjectAssignedToJudge(event, p, email));
+    return phases.reduce((s, ph) => s + assigned.filter((p) => p[ph]).length, 0);
+  }
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[repeat(2,minmax(0,1fr))]">
@@ -458,7 +619,7 @@ function JudgesTab({ event, evaluations, projects }: { event: EventDoc; evaluati
         onSave={(judgeEmails) => updateEvent(event.id, { judgeEmails })}
         progress={(email) => {
           const n = evaluations.filter((e) => e.judgeEmail === email).length;
-          return `${n}/${tasks} evaluaciones`;
+          return `${n}/${judgeTasksCount(email)} evaluaciones`;
         }}
       />
       <EmailListEditor
@@ -468,12 +629,202 @@ function JudgesTab({ event, evaluations, projects }: { event: EventDoc; evaluati
         locked={[ownerEmail]}
         onSave={(organizerEmails) => updateEvent(event.id, { organizerEmails })}
       />
+
+      {event.judgeEmails.length > 0 && (
+        <Card className="lg:col-span-2">
+          <SectionTitle
+            title="Asignación de jueces"
+            subtitle="Por defecto cada juez evalúa todos los proyectos. Puedes limitar a un juez por categorías o proyectos específicos."
+          />
+          <ul className="divide-y divide-ink/5">
+            {event.judgeEmails.map((email) => {
+              const key = normalizeEmail(email);
+              const hasCustom = hasJudgeAssignment(event, key);
+              const a = event.judgeAssignments?.[key];
+              const assignedCount = projects.filter((p) => isProjectAssignedToJudge(event, p, key)).length;
+              return (
+                <li key={key} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-mono text-xs font-medium">{key}</p>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {!hasCustom ? (
+                        <Badge>Todos los proyectos ({projects.length})</Badge>
+                      ) : (
+                        <>
+                          <Badge tone="lime">{assignedCount} proyecto(s) asignado(s)</Badge>
+                          {(a?.categories ?? []).map((c) => (
+                            <Badge key={c}>{c}</Badge>
+                          ))}
+                          {(a?.projectIds?.length ?? 0) > 0 && (
+                            <Badge>{a!.projectIds!.length} proyecto(s) individual(es)</Badge>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => setEditingJudge(key)}>
+                    <SlidersHorizontal className="size-3.5" /> Asignar
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
+
       <div className="flex items-start gap-3 rounded-3xl bg-lime p-5 lg:col-span-2">
         <Gavel className="mt-0.5 size-5 shrink-0" />
         <p className="font-mono text-[11px] leading-relaxed">
           Los jueces no necesitan código: al iniciar sesión con el correo que agregaste, el evento aparece en su panel en
           «Para evaluar». Cada juez solo ve sus propias calificaciones.
         </p>
+      </div>
+
+      <Modal open={!!editingJudge} onClose={() => setEditingJudge(null)} title="Asignar proyectos a juez">
+        {editingJudge && (
+          <JudgeAssignmentModal
+            judgeEmail={editingJudge}
+            categories={categories}
+            projects={projects}
+            initial={event.judgeAssignments?.[editingJudge]}
+            onClose={() => setEditingJudge(null)}
+            onSave={async (assignment) => {
+              try {
+                const next = { ...(event.judgeAssignments ?? {}) };
+                if (!assignment.categories?.length && !assignment.projectIds?.length) {
+                  delete next[editingJudge];
+                } else {
+                  next[editingJudge] = assignment;
+                }
+                await updateEvent(event.id, { judgeAssignments: next });
+                toast("Asignación guardada.");
+                setEditingJudge(null);
+              } catch (err) {
+                toast(firestoreErrorMessage(err), "error");
+              }
+            }}
+          />
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+function JudgeAssignmentModal({
+  judgeEmail,
+  categories,
+  projects,
+  initial,
+  onSave,
+  onClose,
+}: {
+  judgeEmail: string;
+  categories: string[];
+  projects: ProjectDoc[];
+  initial?: JudgeAssignment;
+  onSave: (assignment: JudgeAssignment) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [selectedCats, setSelectedCats] = useState<string[]>(initial?.categories ?? []);
+  const [selectedProjs, setSelectedProjs] = useState<string[]>(initial?.projectIds ?? []);
+  const [busy, setBusy] = useState(false);
+
+  const isAll = selectedCats.length === 0 && selectedProjs.length === 0;
+
+  function toggleCat(cat: string) {
+    setSelectedCats((prev) => (prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]));
+  }
+
+  function toggleProj(id: string) {
+    setSelectedProjs((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));
+  }
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <p className="font-mono text-xs font-medium">{judgeEmail}</p>
+        <p className="mt-1 font-mono text-[11px] text-ink/60">
+          {isAll
+            ? "Actualmente evalúa todos los proyectos del evento."
+            : "Solo verá como pendientes los proyectos de las categorías o proyectos que marques abajo."}
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="font-mono text-xs font-medium text-ink/80">Por categoría</p>
+          {!isAll && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCats([]);
+                setSelectedProjs([]);
+              }}
+              className="font-mono text-[11px] text-ink/60 underline hover:text-ink"
+            >
+              Evaluar todos
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {categories.map((cat) => {
+            const active = selectedCats.includes(cat);
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => toggleCat(cat)}
+                className={cn(
+                  "rounded-full px-3 py-1.5 font-mono text-xs transition",
+                  active ? "bg-ink text-surface" : "bg-paper text-ink/70 hover:text-ink",
+                )}
+              >
+                {cat}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {projects.length > 0 && (
+        <div className="space-y-2">
+          <p className="font-mono text-xs font-medium text-ink/80">Proyectos específicos</p>
+          <div className="max-h-52 divide-y divide-ink/5 overflow-y-auto rounded-2xl bg-paper px-3">
+            {projects.map((p) => {
+              const byCat = Boolean(p.category && selectedCats.includes(p.category));
+              const checked = byCat || selectedProjs.includes(p.id);
+              return (
+                <Toggle
+                  key={p.id}
+                  label={p.title}
+                  description={byCat ? `${p.category} (incluido por categoría)` : p.category}
+                  checked={checked}
+                  disabled={byCat}
+                  onChange={() => toggleProj(p.id)}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" onClick={onClose}>
+          Cancelar
+        </Button>
+        <Button
+          loading={busy}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              await onSave({ categories: selectedCats, projectIds: selectedProjs });
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          Guardar asignación
+        </Button>
       </div>
     </div>
   );
@@ -499,8 +850,8 @@ function RubricTab({ event, hasEvaluations }: { event: EventDoc; hasEvaluations:
       />
       {hasEvaluations && (
         <p className="mb-4 rounded-xl bg-amber-50 px-3 py-2.5 font-mono text-[11px] text-amber-800">
-          Ya hay evaluaciones. Si cambias criterios, las calificaciones guardadas conservan su total original hasta que el
-          juez las actualice.
+          Ya hay evaluaciones. Si cambias los pesos o quitas un criterio, los promedios se recalculan automáticamente. Si
+          agregas un criterio nuevo, avisa a los jueces para que lo califiquen.
         </p>
       )}
       <div className="space-y-3">
@@ -576,8 +927,58 @@ function ResultsTab({ event, projects, evaluations }: { event: EventDoc; project
   const toast = useToast();
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const standings = computeStandings(event, projects, evaluations);
   const phases = PHASES.filter((p) => event.phases[p]);
+
+  const resultCategories = useMemo(() => {
+    const set = new Set<string>();
+    for (const ph of phases) {
+      for (const s of standings[ph]) if (s.category) set.add(s.category);
+    }
+    return Array.from(set);
+  }, [phases, standings]);
+
+  function exportResultsCsv() {
+    const criterionHeaders = event.criteria.map((c) => `${c.name} (0-10)`);
+    const headers = [
+      "Etapa",
+      "Lugar general",
+      "Lugar categoría",
+      "Proyecto",
+      "Categoría",
+      "Integrantes",
+      "Correos",
+      "Jueces que evaluaron",
+      ...criterionHeaders,
+      "Puntaje final (0-100)",
+      "Comentarios",
+    ];
+    const rows: Array<Array<string | number>> = [];
+    for (const ph of phases) {
+      const catCounts = new Map<string, number>();
+      standings[ph].forEach((s, idx) => {
+        const proj = projects.find((p) => p.id === s.projectId);
+        const cat = s.category ?? proj?.category ?? "";
+        const catRank = (catCounts.get(cat) ?? 0) + 1;
+        catCounts.set(cat, catRank);
+        rows.push([
+          PHASE_LABEL[ph],
+          idx + 1,
+          cat ? catRank : "",
+          s.title,
+          cat,
+          proj ? proj.members.map((m) => m.name || m.email).join("; ") : "",
+          proj ? proj.members.map((m) => m.email).join("; ") : "",
+          s.judges,
+          ...event.criteria.map((c) => s.criteria[c.id] ?? ""),
+          s.score,
+          s.comments.join(" | "),
+        ]);
+      });
+    }
+    downloadCsv(`resultados_${event.code}.csv`, headers, rows);
+  }
 
   return (
     <div className="space-y-4">
@@ -591,36 +992,61 @@ function ResultsTab({ event, projects, evaluations }: { event: EventDoc; project
             comentarios (anónimos).
           </p>
         </div>
-        {event.resultsPublished ? (
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => setConfirm(true)}>
-              <RefreshCw className="size-4" /> Actualizar
+        <div className="flex flex-wrap gap-2">
+          {evaluations.length > 0 && (
+            <Button variant="outline" onClick={exportResultsCsv}>
+              <Download className="size-4" /> Exportar CSV
             </Button>
-            <Button
-              variant="ghost"
-              onClick={async () => {
-                await unpublishResults(event.id).catch((e) => toast(firestoreErrorMessage(e), "error"));
-              }}
-            >
-              <EyeOff className="size-4" /> Ocultar
+          )}
+          {event.resultsPublished ? (
+            <>
+              <Button variant="outline" onClick={() => setConfirm(true)}>
+                <RefreshCw className="size-4" /> Actualizar
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={async () => {
+                  await unpublishResults(event.id).catch((e) => toast(firestoreErrorMessage(e), "error"));
+                }}
+              >
+                <EyeOff className="size-4" /> Ocultar
+              </Button>
+            </>
+          ) : (
+            <Button variant="dark" onClick={() => setConfirm(true)} disabled={!evaluations.length}>
+              <Megaphone className="size-4" /> Publicar resultados
             </Button>
-          </div>
-        ) : (
-          <Button variant="dark" onClick={() => setConfirm(true)} disabled={!evaluations.length}>
-            <Megaphone className="size-4" /> Publicar resultados
-          </Button>
-        )}
+          )}
+        </div>
       </Card>
 
+      {resultCategories.length > 1 && (
+        <Tabs
+          tabs={[
+            { id: "all", label: "General" },
+            ...resultCategories.map((c) => ({ id: c, label: c })),
+          ]}
+          value={categoryFilter}
+          onChange={setCategoryFilter}
+        />
+      )}
+
       <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[repeat(2,minmax(0,1fr))]">
-        {phases.map((ph) => (
-          <Card key={ph}>
-            <h3 className="mb-4 flex items-center gap-2 font-display text-lg font-bold">
-              <Trophy className="size-5" /> {PHASE_LABEL[ph]}
-            </h3>
-            <Leaderboard rows={standings[ph]} eventId={event.id} linkable />
-          </Card>
-        ))}
+        {phases.map((ph) => {
+          const rows =
+            categoryFilter === "all"
+              ? standings[ph]
+              : standings[ph].filter((r) => r.category === categoryFilter);
+          return (
+            <Card key={ph}>
+              <h3 className="mb-4 flex items-center gap-2 font-display text-lg font-bold">
+                <Trophy className="size-5" /> {PHASE_LABEL[ph]}
+                {categoryFilter !== "all" && <Badge>{categoryFilter}</Badge>}
+              </h3>
+              <Leaderboard rows={rows} eventId={event.id} linkable />
+            </Card>
+          );
+        })}
       </div>
 
       <Modal open={confirm} onClose={() => setConfirm(false)} title="¿Publicar resultados?">
@@ -659,7 +1085,15 @@ function ResultsTab({ event, projects, evaluations }: { event: EventDoc; project
 /* ---------- Ajustes ---------- */
 
 function SettingsTab({ event }: { event: EventDoc }) {
+  const { user } = useAuth();
+  const access = useAccess();
+  const router = useRouter();
   const toast = useToast();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const canDeleteEvent = access.isSuperadmin || (Boolean(user?.uid) && user?.uid === event.ownerId);
+
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[1.5fr_1fr]">
       <Card>
@@ -688,13 +1122,59 @@ function SettingsTab({ event }: { event: EventDoc }) {
             size="sm"
             className="mt-3"
             onClick={async () => {
-              await updateEvent(event.id, { code: randomCode() }).catch((e) => toast(firestoreErrorMessage(e), "error"));
+              try {
+                const code = await generateUniqueEventCode();
+                await updateEvent(event.id, { code });
+                toast("Código actualizado.");
+              } catch (e) {
+                toast(firestoreErrorMessage(e), "error");
+              }
             }}
           >
             <RefreshCw className="size-3.5" /> Nuevo código
           </Button>
         </Card>
+
+        {canDeleteEvent && (
+          <Card className="h-fit border border-red-200/70">
+            <SectionTitle
+              title="Eliminar evento"
+              subtitle="Borra este evento junto con todos sus proyectos y calificaciones."
+            />
+            <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)}>
+              <Trash2 className="size-3.5" /> Eliminar evento
+            </Button>
+          </Card>
+        )}
       </div>
+
+      <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)} title="¿Eliminar evento?">
+        <p className="font-mono text-xs leading-relaxed text-ink/70">
+          Se eliminará «{event.name}» junto con todos sus proyectos y evaluaciones. Esta acción no se puede deshacer.
+        </p>
+        <div className="mt-6 flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
+            Cancelar
+          </Button>
+          <Button
+            variant="danger"
+            loading={deleting}
+            onClick={async () => {
+              setDeleting(true);
+              try {
+                await deleteEvent(event.id);
+                toast("Evento eliminado.");
+                router.push("/panel");
+              } catch (err) {
+                toast(firestoreErrorMessage(err), "error");
+                setDeleting(false);
+              }
+            }}
+          >
+            Eliminar definitivamente
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }

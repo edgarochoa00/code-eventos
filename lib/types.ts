@@ -22,6 +22,16 @@ export type ResultRow = {
   title: string;
   score: number;
   judges: number;
+  category?: string;
+};
+
+/**
+ * Asignación opcional de un juez a categorías o proyectos específicos.
+ * Si ambas listas están vacías (o el juez no aparece en judgeAssignments), evalúa todos los proyectos.
+ */
+export type JudgeAssignment = {
+  categories?: string[];
+  projectIds?: string[];
 };
 
 export type EventDoc = {
@@ -40,6 +50,10 @@ export type EventDoc = {
   judgingOpen: boolean;
   maxTeamSize: number;
   criteria: Criterion[];
+  /** Opcional: categorías personalizadas del evento (si no existe usa DEFAULT_CATEGORIES). */
+  categories?: string[];
+  /** Opcional: qué categorías o proyectos evalúa cada juez (clave = correo normalizado). */
+  judgeAssignments?: Record<string, JudgeAssignment>;
   startDate: string;
   endDate: string;
   resultsPublished: boolean;

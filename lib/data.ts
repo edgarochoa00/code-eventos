@@ -31,7 +31,13 @@ import type {
   Submission,
 } from "./types";
 import { DEFAULT_ORIGINALITY, SUPERADMIN_EMAIL } from "./types";
-import { DEFAULT_CRITERIA, normalizeEmail, randomCode } from "./utils";
+import {
+  DEFAULT_CATEGORIES,
+  DEFAULT_CRITERIA,
+  effectiveEvaluationTotal,
+  normalizeEmail,
+  randomCode,
+} from "./utils";
 
 /* ---------- Referencias ---------- */
 
@@ -113,13 +119,25 @@ export type NewEventInput = {
   endDate: string;
   maxTeamSize: number;
   phases: Record<Phase, boolean>;
+  categories?: string[];
 };
+
+export async function generateUniqueEventCode() {
+  for (let i = 0; i < 8; i++) {
+    const candidate = randomCode();
+    const existing = await findEventByCode(candidate);
+    if (!existing) return candidate;
+  }
+  return randomCode(8);
+}
 
 export async function createEvent(input: NewEventInput, user: User) {
   const email = normalizeEmail(user.email ?? "");
+  const code = await generateUniqueEventCode();
   const data: Omit<EventDoc, "id"> = {
     ...input,
-    code: randomCode(),
+    categories: input.categories?.length ? input.categories : DEFAULT_CATEGORIES,
+    code,
     ownerId: user.uid,
     ownerEmail: email,
     organizerEmails: [email],
@@ -144,6 +162,32 @@ export function updateEvent(
   return updateDoc(eventRef(eventId), patch);
 }
 
+export async function deleteEvent(eventId: string) {
+  // Primero se borran las subcolecciones mientras el evento aún existe (para que isOrganizer(eid) en las reglas sea válido).
+  try {
+    const [projSnap, evalSnap] = await Promise.all([
+      getDocs(projectsCol(eventId)),
+      getDocs(evaluationsCol(eventId)),
+    ]);
+    const files: FileItem[] = [];
+    for (const d of projSnap.docs) {
+      const p = d.data() as ProjectDoc;
+      if (p.prototype?.files?.length) files.push(...p.prototype.files);
+      if (p.final?.files?.length) files.push(...p.final.files);
+    }
+    await Promise.all(files.map(removeSubmissionFile));
+    const refs = [...evalSnap.docs.map((d) => d.ref), ...projSnap.docs.map((d) => d.ref)];
+    for (let i = 0; i < refs.length; i += 400) {
+      const batch = writeBatch(db);
+      refs.slice(i, i + 400).forEach((r) => batch.delete(r));
+      await batch.commit();
+    }
+  } catch {
+    // Si alguna lectura/borrado de subcolección falla, continúa con el borrado del evento.
+  }
+  await deleteDoc(eventRef(eventId));
+}
+
 export async function findEventByCode(code: string) {
   const snap = await getDocs(query(collection(db, "events"), where("code", "==", code.trim().toUpperCase()), limit(1)));
   return snap.empty ? null : snap.docs[0].id;
@@ -165,16 +209,50 @@ async function writeFingerprint(project: ProjectDoc, event: EventDoc) {
   await setDoc(doc(db, "fingerprints", project.id), { ...fp, updatedAt: serverTimestamp() });
 }
 
+async function assertNoDuplicateMembersInEvent(
+  eventId: string,
+  memberEmails: string[],
+  selfEmail?: string,
+  excludeProjectId?: string,
+) {
+  if (selfEmail) {
+    const ownSnap = await getDocs(qMyEventProject(eventId, selfEmail));
+    const otherOwn = ownSnap.docs.find((d) => d.id !== excludeProjectId);
+    if (otherOwn) {
+      const otherTitle = (otherOwn.data() as ProjectDoc).title;
+      throw new Error(`Ya perteneces al proyecto «${otherTitle}» en este evento.`);
+    }
+  }
+  for (let i = 0; i < memberEmails.length; i += 10) {
+    const chunk = memberEmails.slice(i, i + 10);
+    if (!chunk.length) continue;
+    try {
+      const snap = await getDocs(query(projectsCol(eventId), where("memberEmails", "array-contains-any", chunk)));
+      const conflictDoc = snap.docs.find((d) => d.id !== excludeProjectId);
+      if (conflictDoc) {
+        const other = conflictDoc.data() as ProjectDoc;
+        const dup = chunk.find((em) => other.memberEmails?.includes(em)) ?? chunk[0];
+        throw new Error(`El correo ${dup} ya pertenece al proyecto «${other.title}» en este evento.`);
+      }
+    } catch (err) {
+      if ((err as { code?: string })?.code === "permission-denied") continue;
+      throw err;
+    }
+  }
+}
+
 export async function createProject(event: EventDoc, input: ProjectInfoInput, user: User) {
   const leaderEmail = normalizeEmail(user.email ?? "");
   const members = dedupeMembers([{ name: user.displayName ?? "", email: leaderEmail }, ...input.members]);
+  const memberEmails = members.map((m) => m.email);
+  await assertNoDuplicateMembersInEvent(event.id, memberEmails, leaderEmail);
   const ref = doc(projectsCol(event.id));
   const project: ProjectDoc = {
     ...input,
     id: ref.id,
     eventId: event.id,
     members,
-    memberEmails: members.map((m) => m.email),
+    memberEmails,
     leaderId: user.uid,
     leaderEmail,
     prototype: null,
@@ -194,9 +272,29 @@ export async function updateProjectInfo(event: EventDoc, project: ProjectDoc, in
   if (!members.some((m) => m.email === project.leaderEmail)) {
     members.unshift(project.members.find((m) => m.email === project.leaderEmail) ?? { name: "", email: project.leaderEmail });
   }
-  const patch = { ...input, members, memberEmails: members.map((m) => m.email) };
+  const memberEmails = members.map((m) => m.email);
+  await assertNoDuplicateMembersInEvent(event.id, memberEmails, undefined, project.id);
+  const patch = { ...input, members, memberEmails };
   await updateDoc(projectRef(event.id, project.id), { ...patch, updatedAt: serverTimestamp() });
   await writeFingerprint({ ...project, ...patch }, event);
+}
+
+export async function deleteProject(eventId: string, project: ProjectDoc, asOrganizer = false) {
+  const files = [...(project.prototype?.files ?? []), ...(project.final?.files ?? [])];
+  await Promise.all(files.map(removeSubmissionFile));
+  if (asOrganizer) {
+    try {
+      const evalSnap = await getDocs(query(evaluationsCol(eventId), where("projectId", "==", project.id)));
+      if (!evalSnap.empty) {
+        const batch = writeBatch(db);
+        evalSnap.docs.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
+    } catch {
+      // Continúa con el borrado del proyecto.
+    }
+  }
+  await deleteDoc(projectRef(eventId, project.id));
 }
 
 export async function saveSubmission(event: EventDoc, project: ProjectDoc, phase: Phase, submission: Submission) {
@@ -258,6 +356,10 @@ export async function saveEvaluation(
   await setDoc(doc(evaluationsCol(event.id), id), { ...data, updatedAt: serverTimestamp() });
 }
 
+export function deleteEvaluation(eventId: string, evalId: string) {
+  return deleteDoc(doc(evaluationsCol(eventId), evalId));
+}
+
 /* ---------- Resultados ---------- */
 
 export type PhaseStanding = ResultRow & { criteria: Record<string, number>; comments: string[] };
@@ -281,7 +383,8 @@ export function computeStandings(
       out[phase].push({
         projectId: p.id,
         title: p.title,
-        score: round1(evs.reduce((a, e) => a + e.total, 0) / evs.length),
+        category: p.category,
+        score: round1(evs.reduce((a, e) => a + effectiveEvaluationTotal(event.criteria, e), 0) / evs.length),
         judges: evs.length,
         criteria,
         comments: evs.map((e) => e.comment).filter(Boolean),
@@ -296,8 +399,20 @@ export async function publishResults(event: EventDoc, projects: ProjectDoc[], ev
   const standings = computeStandings(event, projects, evaluations);
   const batch = writeBatch(db);
   const results: Record<Phase, ResultRow[]> = {
-    prototype: standings.prototype.map(({ projectId, title, score, judges }) => ({ projectId, title, score, judges })),
-    final: standings.final.map(({ projectId, title, score, judges }) => ({ projectId, title, score, judges })),
+    prototype: standings.prototype.map(({ projectId, title, category, score, judges }) => ({
+      projectId,
+      title,
+      ...(category ? { category } : {}),
+      score,
+      judges,
+    })),
+    final: standings.final.map(({ projectId, title, category, score, judges }) => ({
+      projectId,
+      title,
+      ...(category ? { category } : {}),
+      score,
+      judges,
+    })),
   };
   batch.update(eventRef(event.id), { results, resultsPublished: true, judgingOpen: false });
 

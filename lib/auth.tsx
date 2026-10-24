@@ -60,6 +60,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signInGoogle = useCallback(async () => {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
+    // Solo ventana emergente. signInWithRedirect no sirve aquí: la app corre en
+    // otro dominio que authDomain (code-94fbe.firebaseapp.com) y Chrome 115+,
+    // Safari 16.1+ y Firefox 109+ bloquean el almacenamiento de terceros que
+    // usa para devolver el resultado, así que el usuario regresa sin sesión.
     await signInWithPopup(auth, provider);
   }, []);
 
@@ -109,6 +113,9 @@ const AUTH_ERRORS: Record<string, string> = {
   "auth/weak-password": "La contraseña debe tener al menos 6 caracteres.",
   "auth/too-many-requests": "Demasiados intentos. Espera un momento.",
   "auth/popup-closed-by-user": "Se cerró la ventana de Google.",
+  "auth/popup-blocked": "El navegador bloqueó la ventana emergente. Permite ventanas emergentes para este sitio.",
+  "auth/cancelled-popup-request": "Ya hay una ventana de Google abierta.",
+  "auth/unauthorized-domain": "Este dominio no está autorizado en Firebase. Agrégalo en Authentication → Configuración → Dominios autorizados.",
   "auth/operation-not-allowed": "Este método de acceso no está habilitado en Firebase.",
   "auth/configuration-not-found": "Firebase Authentication no está activado en el proyecto.",
   "auth/network-request-failed": "Sin conexión. Revisa tu internet.",

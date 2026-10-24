@@ -1,5 +1,13 @@
 import type { Timestamp } from "firebase/firestore";
-import { DEFAULT_ORIGINALITY, type Criterion, type EventDoc, type EventRole, type OriginalitySettings } from "./types";
+import {
+  DEFAULT_ORIGINALITY,
+  type Criterion,
+  type EvaluationDoc,
+  type EventDoc,
+  type EventRole,
+  type OriginalitySettings,
+  type ProjectDoc,
+} from "./types";
 
 export function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -105,6 +113,68 @@ export function weightedTotal(criteria: Criterion[], scores: Record<string, numb
   if (!totalWeight) return 0;
   const raw = criteria.reduce((sum, c) => sum + ((scores[c.id] ?? 0) / 10) * Math.max(0, c.weight), 0);
   return Math.round((raw / totalWeight) * 1000) / 10;
+}
+
+/**
+ * Calcula el total de una evaluación usando los pesos actuales de la rúbrica
+ * sobre los criterios que el juez calificó. Si no hay coincidencia, usa el total guardado.
+ */
+export function effectiveEvaluationTotal(criteria: Criterion[], evaluation: Pick<EvaluationDoc, "scores" | "total">) {
+  const scored = criteria.filter((c) => typeof evaluation.scores?.[c.id] === "number");
+  if (!scored.length) return evaluation.total;
+  return weightedTotal(scored, evaluation.scores);
+}
+
+export const DEFAULT_CATEGORIES = [
+  "Software",
+  "Hardware / IoT",
+  "Salud",
+  "Educación",
+  "Medio ambiente",
+  "Social",
+  "Negocios",
+  "Otro",
+];
+
+export function eventCategories(event?: Pick<EventDoc, "categories"> | null): string[] {
+  return event?.categories?.length ? event.categories : DEFAULT_CATEGORIES;
+}
+
+export function hasJudgeAssignment(event: EventDoc, judgeEmail: string): boolean {
+  const a = event.judgeAssignments?.[normalizeEmail(judgeEmail)];
+  return Boolean((a?.categories && a.categories.length > 0) || (a?.projectIds && a.projectIds.length > 0));
+}
+
+export function isProjectAssignedToJudge(event: EventDoc, project: ProjectDoc, judgeEmail: string): boolean {
+  const email = normalizeEmail(judgeEmail);
+  if (!hasJudgeAssignment(event, email)) return true;
+  const a = event.judgeAssignments?.[email];
+  const byCat = Boolean(project.category && a?.categories?.includes(project.category));
+  const byProj = Boolean(a?.projectIds?.includes(project.id));
+  return byCat || byProj;
+}
+
+/** Descarga un archivo CSV compatible con Excel (UTF-8 con BOM). */
+export function downloadCsv(
+  filename: string,
+  headers: string[],
+  rows: Array<Array<string | number | null | undefined>>,
+) {
+  const escapeCell = (val: string | number | null | undefined) => {
+    const str = val == null ? "" : String(val);
+    if (/[",\r\n]/.test(str)) return `"${str.replace(/"/g, '""')}"`;
+    return str;
+  };
+  const lines = [headers.map(escapeCell).join(","), ...rows.map((r) => r.map(escapeCell).join(","))];
+  const blob = new Blob(["\uFEFF" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename.endsWith(".csv") ? filename : `${filename}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 export function safeUrl(url: string) {

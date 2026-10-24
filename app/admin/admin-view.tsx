@@ -36,7 +36,7 @@ import {
 } from "@/components/ui";
 import { useAccess } from "@/lib/access";
 import { useAuth } from "@/lib/auth";
-import { qAllEvents, qAllProjects, qAllStaff, qAllUsers, setEventMembership, setStaffRole, updateEvent } from "@/lib/data";
+import { deleteEvent, qAllEvents, qAllProjects, qAllStaff, qAllUsers, setEventMembership, setStaffRole, updateEvent } from "@/lib/data";
 import { useCollection } from "@/lib/hooks";
 import {
   GLOBAL_ROLE_LABEL,
@@ -431,7 +431,12 @@ function PersonPanel({ person, events }: { person: Person; events: EventDoc[] })
 /* ---------- Eventos ---------- */
 
 function EventsTab({ events, projects }: { events: EventDoc[]; projects: ProjectDoc[] }) {
+  const { user } = useAuth();
+  const access = useAccess();
+  const toast = useToast();
   const [team, setTeam] = useState<string | null>(null);
+  const [toDelete, setToDelete] = useState<EventDoc | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const current = events.find((e) => e.id === team) ?? null;
   const sorted = [...events].sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
 
@@ -444,6 +449,7 @@ function EventsTab({ events, projects }: { events: EventDoc[]; projects: Project
       <ul className="grid grid-cols-[minmax(0,1fr)] gap-3 md:grid-cols-[repeat(2,minmax(0,1fr))]">
         {sorted.map((e) => {
           const count = projects.filter((p) => p.eventId === e.id).length;
+          const canDelete = access.isSuperadmin || (Boolean(user?.uid) && user?.uid === e.ownerId);
           return (
             <li key={e.id} className="flex flex-col gap-4 rounded-3xl bg-surface p-5">
               <div className="min-w-0">
@@ -457,16 +463,29 @@ function EventsTab({ events, projects }: { events: EventDoc[]; projects: Project
                 <MiniStat label="Jueces" value={e.judgeEmails.length} />
                 <MiniStat label="Organiz." value={e.organizerEmails.length} />
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={() => setTeam(e.id)}>
-                  <Gavel className="size-3.5" /> Jueces y organizadores
-                </Button>
-                <Link
-                  href={`/eventos/${e.id}`}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-xl px-3 font-mono text-xs hover:bg-ink/5"
-                >
-                  Abrir <ArrowUpRight className="size-3.5" />
-                </Link>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setTeam(e.id)}>
+                    <Gavel className="size-3.5" /> Jueces y organizadores
+                  </Button>
+                  <Link
+                    href={`/eventos/${e.id}`}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-xl px-3 font-mono text-xs hover:bg-ink/5"
+                  >
+                    Abrir <ArrowUpRight className="size-3.5" />
+                  </Link>
+                </div>
+                {canDelete && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Eliminar ${e.name}`}
+                    className="text-red-600 hover:bg-red-50"
+                    onClick={() => setToDelete(e)}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                )}
               </div>
             </li>
           );
@@ -490,6 +509,40 @@ function EventsTab({ events, projects }: { events: EventDoc[]; projects: Project
               onSave={(organizerEmails) => updateEvent(current.id, { organizerEmails })}
             />
           </div>
+        )}
+      </Modal>
+
+      <Modal open={!!toDelete} onClose={() => setToDelete(null)} title="¿Eliminar evento?">
+        {toDelete && (
+          <>
+            <p className="font-mono text-xs leading-relaxed text-ink/70">
+              Se eliminará «{toDelete.name}» junto con todos sus proyectos y calificaciones. Esta acción no se puede
+              deshacer.
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setToDelete(null)}>
+                Cancelar
+              </Button>
+              <Button
+                variant="danger"
+                loading={deleting}
+                onClick={async () => {
+                  setDeleting(true);
+                  try {
+                    await deleteEvent(toDelete.id);
+                    toast("Evento eliminado.");
+                    setToDelete(null);
+                  } catch (err) {
+                    toast(firestoreErrorMessage(err), "error");
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}
+              >
+                Eliminar definitivamente
+              </Button>
+            </div>
+          </>
         )}
       </Modal>
     </>
