@@ -4,7 +4,7 @@ Web app pensada primero para celular para organizar eventos de proyectos. El org
 
 Stack: Next.js 16 (App Router) · React 19 · Tailwind 4 · Firebase (Auth + Firestore, proyecto `code-94fbe`) · Supabase Storage (archivos).
 
-Cada evento tiene nombre, instrucciones y criterios propios, definidos por el organizador al crearlo. Por ejemplo, **Carteles** y **Prototipos** se crean como dos eventos independientes, cada uno con su código, jueces y resultados. Cada evento admite una entrega y una segunda opcional, ambas con nombre libre. No se precargan criterios de evaluación; las categorías empiezan en General y se pueden personalizar. Los eventos anteriores conservan sus entregas y rúbricas.
+Cada evento tiene nombre, descripción y criterios propios, definidos por el organizador al crearlo. Por ejemplo, **Carteles** y **Prototipos** se crean como dos eventos independientes, cada uno con su código, jueces y resultados. No se precargan criterios de evaluación; las categorías empiezan en General y se pueden personalizar. Los eventos anteriores conservan sus entregas y rúbricas.
 
 ## Arranque
 

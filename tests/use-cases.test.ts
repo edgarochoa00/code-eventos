@@ -121,6 +121,10 @@ describe("Configuración de cada evento por su organizador", () => {
     assert.match(getPhaseDetails(baseEvent, "prototype").description, /Qué funciona ya/);
     assert.equal(baseEvent.phaseDetails, undefined);
     assert.equal(getPhaseLabel(carteles, "final"), "Producto final");
+    assert.deepEqual(getPhaseDetails({ phases: { prototype: true, final: false } }, "prototype"), {
+      name: "Entrega",
+      description: "",
+    });
   });
 
   test("una entrega personalizada sin instrucciones no hereda las de prototipo", () => {

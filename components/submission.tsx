@@ -10,10 +10,11 @@ import { formatBytes, formatDate } from "@/lib/utils";
 import { Badge, Button, Field, Textarea, firestoreErrorMessage, useToast } from "./ui";
 
 export function SubmissionView({ submission, label }: { submission: Submission | null; label: string }) {
+  const generic = label.toLowerCase() === "entrega";
   if (!submission) {
     return (
       <p className="rounded-2xl bg-paper p-4 font-mono text-xs text-muted">
-        El equipo aún no ha enviado esta entrega: {label}.
+        {generic ? "El equipo aún no ha enviado su entrega." : `El equipo aún no ha enviado esta entrega: ${label}.`}
       </p>
     );
   }
@@ -163,9 +164,10 @@ export function SubmissionEditor({ eventId, projectId, phase, label, instruction
     }
   }
 
+  const generic = label.toLowerCase() === "entrega";
   return (
     <form onSubmit={handleSubmit} className="space-y-5" aria-busy={locked}>
-      <Field label={`Descripción de la entrega: ${label}`} htmlFor={`desc-${phase}`} hint={instructions}>
+      <Field label={generic ? "Descripción de la entrega" : `Descripción de la entrega: ${label}`} htmlFor={`desc-${phase}`} hint={instructions}>
         <Textarea id={`desc-${phase}`} rows={5} value={description} disabled={locked} onChange={event => setDescription(event.target.value)} maxLength={5000} />
       </Field>
       <div className="space-y-2">
@@ -176,7 +178,7 @@ export function SubmissionEditor({ eventId, projectId, phase, label, instruction
         </p>
         {entries.length > 0 && <FileList entries={entries} disabled={locked} onRemove={index => setEntries(current => current.filter((_, i) => i !== index))} />}
         <input ref={fileInput} type="file" multiple disabled={locked || entries.length >= MAX_SUBMISSION_FILES}
-          className="hidden" aria-label={`Archivos de la entrega: ${label}`} id={`file-${phase}`} onChange={event => void addFiles(event.target.files)} />
+          className="hidden" aria-label={generic ? "Archivos de la entrega" : `Archivos de la entrega: ${label}`} id={`file-${phase}`} onChange={event => void addFiles(event.target.files)} />
         <Button type="button" variant="outline" className="h-auto w-full flex-col border-dashed py-6"
           disabled={locked || entries.length >= MAX_SUBMISSION_FILES} onClick={() => fileInput.current?.click()}>
           <Upload className="size-5" /> Toca para elegir archivos
@@ -191,7 +193,7 @@ export function SubmissionEditor({ eventId, projectId, phase, label, instruction
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         {onCancel && <Button type="button" variant="ghost" disabled={locked} onClick={onCancel}>Cancelar</Button>}
         <Button type="submit" loading={busy} disabled={locked}>
-          {initial ? "Guardar cambios" : `Entregar: ${label}`}
+          {initial ? "Guardar cambios" : generic ? "Guardar entrega" : `Entregar: ${label}`}
         </Button>
       </div>
     </form>

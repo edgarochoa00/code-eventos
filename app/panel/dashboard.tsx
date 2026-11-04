@@ -1,6 +1,6 @@
 "use client";
 
-import { FolderKanban, Gavel, Plus, ShieldCheck, Sparkles, Ticket } from "lucide-react";
+import { FolderKanban, Gavel, Plus, ShieldCheck, Ticket } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
@@ -242,10 +242,6 @@ export function Dashboard() {
           {hasProjects && myProjects}
         </>
       )}
-
-      <p className="flex items-center justify-center gap-1.5 font-mono text-[10px] text-muted">
-        <Sparkles className="size-3" /> Todo se actualiza en tiempo real
-      </p>
     </div>
   );
 }

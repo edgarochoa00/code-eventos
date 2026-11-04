@@ -3,11 +3,11 @@
 import { Plus, RotateCcw, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import type { EventSettingsInput } from "@/lib/data";
-import { criteriaError, deliverySettingsError, getPhaseDetails } from "@/lib/event-config";
-import { PHASES, type Criterion, type Phase, type PhaseDetails } from "@/lib/types";
+import { criteriaError } from "@/lib/event-config";
+import type { Criterion } from "@/lib/types";
 import { DEFAULT_CATEGORIES } from "@/lib/utils";
 import { CriteriaEditor } from "./criteria-editor";
-import { Button, Field, Input, Textarea, Toggle } from "./ui";
+import { Button, Field, Input, Textarea } from "./ui";
 
 export function EventSettingsForm({
   initial,
@@ -26,11 +26,6 @@ export function EventSettingsForm({
   const [startDate, setStartDate] = useState(initial?.startDate ?? "");
   const [endDate, setEndDate] = useState(initial?.endDate ?? "");
   const [maxTeamSize, setMaxTeamSize] = useState(initial?.maxTeamSize ?? 5);
-  const [phases, setPhases] = useState<Record<Phase, boolean>>(initial?.phases ?? { prototype: true, final: false });
-  const [phaseDetails, setPhaseDetails] = useState<Record<Phase, PhaseDetails>>(() => ({
-    prototype: initial ? getPhaseDetails(initial, "prototype") : { name: "", description: "" },
-    final: initial ? getPhaseDetails(initial, "final") : { name: "", description: "" },
-  }));
   const [categories, setCategories] = useState<string[]>(
     initial?.categories?.length ? initial.categories : initial ? DEFAULT_CATEGORIES : ["General"],
   );
@@ -54,8 +49,6 @@ export function EventSettingsForm({
     e.preventDefault();
     setError("");
     if (name.trim().length < 3) return setError("Escribe el nombre del evento.");
-    const deliveryError = deliverySettingsError({ phases, phaseDetails });
-    if (deliveryError) return setError(deliveryError);
     if (rubric) {
       const rubricError = criteriaError(rubric.criteria);
       if (rubricError) return setError(rubricError);
@@ -71,11 +64,8 @@ export function EventSettingsForm({
         startDate,
         endDate,
         maxTeamSize: Math.min(15, Math.max(1, maxTeamSize)),
-        phases,
-        phaseDetails: Object.fromEntries(PHASES.map((phase) => [phase, {
-          name: phaseDetails[phase].name.trim(),
-          description: phaseDetails[phase].description.trim(),
-        }])) as Record<Phase, PhaseDetails>,
+        phases: { prototype: true, final: false },
+        phaseDetails: { prototype: { name: "Entrega", description: "" } },
         categories,
       });
     } catch {
@@ -119,35 +109,6 @@ export function EventSettingsForm({
             onChange={(e) => setMaxTeamSize(Number(e.target.value))}
           />
         </Field>
-      </div>
-      <div className="space-y-3">
-        <div>
-          <h2 className="font-display text-lg font-bold">Entregas del evento</h2>
-          <p className="mt-1 font-mono text-xs leading-relaxed text-muted">
-            Tú defines qué presentan los equipos y cómo se llama su entrega. Si Carteles y Prototipos son eventos distintos,
-            crea cada uno con sus propias entregas y rúbrica.
-          </p>
-        </div>
-        {PHASES.map((phase, index) => (
-          <div key={phase} className="rounded-2xl bg-paper px-4">
-            <Toggle label={index === 0 ? "Primera entrega" : "Segunda entrega (opcional)"}
-              checked={phases[phase]} onChange={(value) => setPhases((current) => ({ ...current, [phase]: value }))} />
-            {phases[phase] && (
-              <div className="space-y-3 pb-4">
-                <Field label="Nombre de la entrega" htmlFor={`ev-delivery-${phase}`}>
-                  <Input id={`ev-delivery-${phase}`} value={phaseDetails[phase].name} maxLength={80}
-                    placeholder="Ej. Cartel, prototipo o presentación"
-                    onChange={(e) => setPhaseDetails((current) => ({ ...current, [phase]: { ...current[phase], name: e.target.value } }))} />
-                </Field>
-                <Field label="Instrucciones para los equipos" htmlFor={`ev-instructions-${phase}`}
-                  hint="Opcional. Explica qué deben presentar en este evento.">
-                  <Textarea id={`ev-instructions-${phase}`} value={phaseDetails[phase].description} maxLength={2000} rows={3}
-                    onChange={(e) => setPhaseDetails((current) => ({ ...current, [phase]: { ...current[phase], description: e.target.value } }))} />
-                </Field>
-              </div>
-            )}
-          </div>
-        ))}
       </div>
 
       {rubric && (

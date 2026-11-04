@@ -1,10 +1,14 @@
 import { PHASE_LABEL, PHASES, type Criterion, type EventDoc, type Phase, type PhaseDetails } from "./types";
 
-type EventDeliveries = Pick<EventDoc, "phaseDetails">;
+type EventDeliveries = Partial<Pick<EventDoc, "phases" | "phaseDetails">>;
 
 /** Conserva el significado de las entregas históricas sin migrar sus archivos ni calificaciones. */
 export function getPhaseDetails(event: EventDeliveries | null | undefined, phase: Phase): PhaseDetails {
-  return event?.phaseDetails?.[phase] ?? {
+  if (event?.phaseDetails?.[phase]) return event.phaseDetails[phase]!;
+  if (phase === "prototype" && event?.phases && !event.phases.final) {
+    return { name: "Entrega", description: "" };
+  }
+  return {
     name: PHASE_LABEL[phase],
     description: phase === "prototype"
       ? "Qué funciona ya, qué falta y cómo lo probaron."

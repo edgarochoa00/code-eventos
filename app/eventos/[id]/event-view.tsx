@@ -133,7 +133,9 @@ function EventHeader({ event, role, viaAdmin }: { event: EventDoc; role: EventRo
             <p className="font-mono text-[11px] text-muted">Código para los equipos</p>
             <p className="mt-1 font-mono text-4xl font-bold tracking-[0.2em]">{event.code}</p>
             <p className="mt-2 font-mono text-[11px] text-muted">
-              Entregas: {phaseNames(event)} · Equipos de hasta {event.maxTeamSize}
+              {PHASES.filter((phase) => event.phases[phase]).length > 1
+                ? `Entregas: ${phaseNames(event)} · Equipos de hasta ${event.maxTeamSize}`
+                : `Equipos de hasta ${event.maxTeamSize} integrantes`}
             </p>
           </div>
           <Button variant="dark" onClick={share} className="self-start">
@@ -168,12 +170,15 @@ function StatusCard({ event, role }: { event: EventDoc; role: EventRole }) {
         ]
       : [
           { label: "Registro", open: event.registrationOpen, on: "Abierto", off: "Cerrado" },
-          ...PHASES.filter((p) => event.phases[p]).map((p) => ({
-            label: `Entrega: ${getPhaseLabel(event, p)}`,
-            open: event.submissions[p],
-            on: "Abierta",
-            off: "Cerrada",
-          })),
+          ...PHASES.filter((p) => event.phases[p]).map((p) => {
+            const label = getPhaseLabel(event, p);
+            return {
+              label: label.toLowerCase() === "entrega" ? "Entrega" : `Entrega: ${label}`,
+              open: event.submissions[p],
+              on: "Abierta",
+              off: "Cerrada",
+            };
+          }),
           { label: "Resultados", open: event.resultsPublished, on: "Publicados", off: "Pendientes" },
         ];
 

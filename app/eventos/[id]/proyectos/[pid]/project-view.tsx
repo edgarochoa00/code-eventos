@@ -252,53 +252,59 @@ function ProjectBody({
       )}
 
       {phases.map(
-        (phase) =>
-          tab === phase && (
-            <Card key={phase}>
-              {canParticipate && !event.resultsPublished && event.submissions[phase] && (editingPhase === phase || !project[phase]) ? (
-                <>
-                  <SectionTitle title={`Entrega: ${getPhaseLabel(event, phase)}`} />
-                  <SubmissionEditor
-                    eventId={event.id}
-                    projectId={project.id}
-                    phase={phase}
-                    label={getPhaseLabel(event, phase)}
-                    instructions={getPhaseDetails(event, phase).description}
-                    initial={project[phase]}
-                    userEmail={normalizeEmail(user?.email ?? "")}
-                    onCancel={project[phase] ? () => setEditingPhase(null) : undefined}
-                    onSave={async (submission) => {
-                      await saveSubmission(event, project, phase, submission);
-                      toast(`Entrega guardada: ${getPhaseLabel(event, phase)}.`);
-                      setEditingPhase(null);
-                    }}
-                  />
-                </>
-              ) : (
-                <>
-                  <SectionTitle
-                    title={`Entrega: ${getPhaseLabel(event, phase)}`}
-                    subtitle={getPhaseDetails(event, phase).description}
-                    action={
-                      canParticipate && !event.resultsPublished &&
-                      project[phase] &&
-                      event.submissions[phase] && (
-                        <Button variant="outline" size="sm" onClick={() => setEditingPhase(phase)}>
-                          <Pencil className="size-3.5" /> Editar
-                        </Button>
-                      )
-                    }
-                  />
-                  {isMember && !event.submissions[phase] && !project[phase] && (
-                    <p className="mb-4 flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-2.5 font-mono text-[11px] text-amber-800">
-                      <Lock className="size-3.5" /> La recepción de esta entrega está cerrada: {getPhaseLabel(event, phase)}.
-                    </p>
-                  )}
-                  <SubmissionView submission={project[phase]} label={getPhaseLabel(event, phase)} />
-                </>
-              )}
-            </Card>
-          ),
+        (phase) => {
+          const label = getPhaseLabel(event, phase);
+          const generic = label.toLowerCase() === "entrega";
+          const title = generic ? "Entrega" : `Entrega: ${label}`;
+          return (
+            tab === phase && (
+              <Card key={phase}>
+                {canParticipate && !event.resultsPublished && event.submissions[phase] && (editingPhase === phase || !project[phase]) ? (
+                  <>
+                    <SectionTitle title={title} />
+                    <SubmissionEditor
+                      eventId={event.id}
+                      projectId={project.id}
+                      phase={phase}
+                      label={label}
+                      instructions={getPhaseDetails(event, phase).description}
+                      initial={project[phase]}
+                      userEmail={normalizeEmail(user?.email ?? "")}
+                      onCancel={project[phase] ? () => setEditingPhase(null) : undefined}
+                      onSave={async (submission) => {
+                        await saveSubmission(event, project, phase, submission);
+                        toast(generic ? "Entrega guardada." : `Entrega guardada: ${label}.`);
+                        setEditingPhase(null);
+                      }}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <SectionTitle
+                      title={title}
+                      subtitle={getPhaseDetails(event, phase).description}
+                      action={
+                        canParticipate && !event.resultsPublished &&
+                        project[phase] &&
+                        event.submissions[phase] && (
+                          <Button variant="outline" size="sm" onClick={() => setEditingPhase(phase)}>
+                            <Pencil className="size-3.5" /> Editar
+                          </Button>
+                        )
+                      }
+                    />
+                    {isMember && !event.submissions[phase] && !project[phase] && (
+                      <p className="mb-4 flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-2.5 font-mono text-[11px] text-amber-800">
+                        <Lock className="size-3.5" /> {generic ? "La recepción de entregas está cerrada." : `La recepción de esta entrega está cerrada: ${label}.`}
+                      </p>
+                    )}
+                    <SubmissionView submission={project[phase]} label={label} />
+                  </>
+                )}
+              </Card>
+            )
+          );
+        },
       )}
 
       {tab === "evaluate" && isJudge && user && (

@@ -181,7 +181,13 @@ function Summary({
 
   const stats = [
     { label: "Proyectos", value: projects.length },
-    ...phases.map((ph) => ({ label: `Entregas: ${getPhaseLabel(event, ph)}`, value: projects.filter((p) => p[ph]).length })),
+    ...phases.map((ph) => {
+      const label = getPhaseLabel(event, ph);
+      return {
+        label: phases.length === 1 && label.toLowerCase() === "entrega" ? "Entregas" : `Entregas: ${label}`,
+        value: projects.filter((p) => p[ph]).length,
+      };
+    }),
     { label: "Evaluaciones", value: `${evaluations.length}${expected ? `/${expected}` : ""}` },
   ];
 
@@ -196,15 +202,18 @@ function Summary({
             checked={event.registrationOpen}
             onChange={(v) => toggle({ registrationOpen: v })}
           />
-          {phases.map((ph) => (
-            <Toggle
-              key={ph}
-              label={`Recibir: ${getPhaseLabel(event, ph)}`}
-              description="Los equipos pueden subir o actualizar esta entrega."
-              checked={event.submissions[ph]}
-              onChange={(v) => toggle({ submissions: { ...event.submissions, [ph]: v } })}
-            />
-          ))}
+          {phases.map((ph) => {
+            const label = getPhaseLabel(event, ph);
+            return (
+              <Toggle
+                key={ph}
+                label={phases.length === 1 && label.toLowerCase() === "entrega" ? "Recepción de entregas" : `Recibir: ${label}`}
+                description="Los equipos pueden subir o actualizar esta entrega."
+                checked={event.submissions[ph]}
+                onChange={(v) => toggle({ submissions: { ...event.submissions, [ph]: v } })}
+              />
+            );
+          })}
           <Toggle
             label="Evaluación de jueces"
             description={event.resultsPublished ? "Oculta los resultados antes de reabrir la evaluación." : event.judgeEmails.length ? "Los jueces pueden calificar." : "Primero invita jueces."}
@@ -536,9 +545,14 @@ function ProjectsTab({
           className="h-11 w-full rounded-xl border border-control bg-surface px-3 font-mono text-base text-ink sm:text-xs outline-none focus:border-ink/40"
         >
           <option value="all">Todas las entregas</option>
-          {PHASES.filter((phase) => event.phases[phase]).map((phase) => (
-            <option key={phase} value={phase}>Con entrega: {getPhaseLabel(event, phase)}</option>
-          ))}
+          {PHASES.filter((phase) => event.phases[phase]).map((phase) => {
+            const label = getPhaseLabel(event, phase);
+            return (
+              <option key={phase} value={phase}>
+                {label.toLowerCase() === "entrega" ? "Con entrega" : `Con entrega: ${label}`}
+              </option>
+            );
+          })}
           <option value="none">Sin entregas</option>
         </select>
       </div>

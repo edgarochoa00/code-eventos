@@ -42,7 +42,7 @@ export function NewEventForm() {
       <Card className="sm:p-8">
         <h1 className="font-display text-3xl font-bold">Nuevo evento</h1>
         <p className="mb-6 mt-1 font-mono text-xs text-muted">
-          Define el nombre, las entregas y los criterios de este evento. Después podrás invitar jueces y abrir o cerrar las etapas.
+          Define los datos y los criterios de evaluación de este evento. Después podrás invitar jueces y abrir o cerrar el registro y las entregas.
         </p>
         <EventSettingsForm
           submitLabel="Crear evento"
