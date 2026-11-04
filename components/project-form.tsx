@@ -4,7 +4,7 @@ import { Plus, Trash2, UserRound } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import type { ProjectInfoInput } from "@/lib/data";
 import type { Member, ProjectDoc } from "@/lib/types";
-import { DEFAULT_CATEGORIES, isEmail, normalizeEmail } from "@/lib/utils";
+import { DEFAULT_CATEGORIES, displayEmail, isEmail, normalizeEmail } from "@/lib/utils";
 import { Button, Field, Input, Textarea } from "./ui";
 
 export const CATEGORIES = DEFAULT_CATEGORIES;
@@ -129,7 +129,7 @@ export function ProjectForm({
           <UserRound className="size-4 shrink-0" />
           <div className="min-w-0">
             <p className="truncate text-sm font-medium">{leader.name || "Tú"} · Líder</p>
-            <p className="truncate font-mono text-[11px] text-muted">{leader.email}</p>
+            <p className="truncate font-mono text-[11px] text-muted">{displayEmail(leader.email)}</p>
           </div>
         </div>
         {!canManageMembers &&
@@ -138,7 +138,7 @@ export function ProjectForm({
               <UserRound className="size-4 shrink-0" />
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{m.name || "Integrante"}</p>
-                <p className="truncate font-mono text-[11px] text-muted">{m.email}</p>
+                <p className="truncate font-mono text-[11px] text-muted">{displayEmail(m.email)}</p>
               </div>
             </div>
           ))}

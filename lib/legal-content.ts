@@ -20,12 +20,12 @@ export type LegalDocument = {
   sections: LegalSection[];
 };
 
-const { name, address, email } = SERVICE_CONTACT;
-const mail = { href: `mailto:${email}`, label: email };
+const { name, address } = SERVICE_CONTACT;
+const privacyContact = { href: "/privacidad#derechos", label: "Cómo enviar una solicitud de privacidad" };
 
 const operator = [
   `${name} opera Feria 2027 y es responsable del tratamiento de datos personales descrito en el aviso de privacidad. Domicilio señalado por el responsable: ${address}`,
-  "El domicilio corresponde a la ubicación del Instituto Tecnológico de Culiacán, indicada por el operador para estos documentos. Esta referencia no atribuye al instituto la operación, el respaldo ni la responsabilidad sobre Feria 2027. Cada evento pertenece a quien lo organiza, y la atención del servicio se realiza por el correo indicado, no mediante los canales institucionales del instituto.",
+  "El domicilio corresponde a la ubicación del Instituto Tecnológico de Culiacán, indicada por el operador para estos documentos. Esta referencia no atribuye al instituto la operación, el respaldo ni la responsabilidad sobre Feria 2027. Cada evento pertenece a quien lo organiza, y la atención del servicio corresponde al responsable identificado en estos documentos, no a los canales institucionales del instituto.",
 ];
 
 export type LegalDocumentKey = "terminos" | "privacidad" | "cookies";
@@ -38,8 +38,8 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocument> = {
       {
         id: "operador",
         title: "Operador y contacto",
-        paragraphs: [...operator, `Para soporte, consultas sobre estas condiciones o solicitudes de cierre de cuenta, escribe a ${email}.`],
-        links: [mail],
+        paragraphs: [...operator, `Para soporte, consultas sobre estas condiciones o solicitudes de cierre de cuenta, dirige una solicitud por escrito a ${name} en el domicilio señalado.`],
+        links: [privacyContact],
       },
       {
         id: "servicio",
@@ -81,9 +81,9 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocument> = {
         paragraphs: [
           "El servicio puede tener interrupciones, mantenimiento o cambios de funciones. No se garantiza disponibilidad ininterrumpida ni la recuperación de cualquier contenido; conserva copias de tus archivos y enlaces importantes.",
           "Esta versión no incluye cobros por usar Feria 2027. Cualquier modalidad de pago futura deberá informar sus condiciones y requerir una contratación separada; no se aplicará una suscripción por silencio.",
-          `Puedes solicitar el cierre de tu cuenta a ${email}. La atención es manual y requiere verificar tu identidad; no hay un botón de eliminación automática. Antes del cierre se revisan los eventos que organizas, los proyectos que compartes con tu equipo y las obligaciones legales aplicables.`,
+          `Puedes solicitar el cierre de tu cuenta mediante un escrito dirigido a ${name} en el domicilio señalado. La atención es manual y requiere verificar tu identidad; no hay un botón de eliminación automática. Antes del cierre se revisan los eventos que organizas, los proyectos que compartes con tu equipo y las obligaciones legales aplicables.`,
         ],
-        links: [mail],
+        links: [privacyContact],
       },
       {
         id: "ediciones",
@@ -104,8 +104,8 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocument> = {
       {
         id: "responsable",
         title: "Responsable y contacto de privacidad",
-        paragraphs: [...operator, `El responsable atiende consultas y solicitudes de privacidad en ${email}.`],
-        links: [mail],
+        paragraphs: [...operator, "El responsable atiende consultas y solicitudes de privacidad por escrito en el domicilio señalado."],
+        links: [privacyContact],
       },
       {
         id: "datos",
@@ -164,12 +164,11 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocument> = {
         id: "derechos",
         title: "Derechos ARCO y solicitudes de privacidad",
         paragraphs: [
-          `Puedes solicitar acceso, rectificación, cancelación u oposición; revocar el consentimiento; limitar el uso o divulgación; o solicitar el cierre de tu cuenta escribiendo a ${email}. Indica como asunto «Privacidad Feria 2027» y el derecho o solicitud que deseas ejercer.`,
+          `Puedes solicitar acceso, rectificación, cancelación u oposición; revocar el consentimiento; limitar el uso o divulgación; o solicitar el cierre de tu cuenta mediante un escrito dirigido a ${name} en ${address} Indica como asunto «Privacidad Feria 2027» y el derecho o solicitud que deseas ejercer.`,
           "Incluye tu nombre, el correo de la cuenta, un medio para recibir respuesta, la descripción de los datos y lo que solicitas. Para rectificación, explica el cambio y su sustento. El responsable verificará tu identidad o representación con los datos mínimos necesarios antes de entregar información o hacer cambios; nunca se solicitarán contraseñas.",
           "Las solicitudes se atienden manualmente. La respuesta se comunicará dentro de veinte días hábiles desde la recepción y, si procede, se ejecutará dentro de los quince días hábiles siguientes. Una ampliación legalmente justificada se notificará; el ejercicio es gratuito, salvo costos de reproducción o envío que legalmente correspondan.",
           "La revocación no afecta tratamientos anteriores y puede impedir continuar en funciones que necesiten esos datos, como participar en un evento. La cancelación u oposición se evalúa considerando obligaciones legales y derechos de otras personas; se explicará cualquier negativa o limitación.",
         ],
-        links: [mail],
       },
       {
         id: "cambios",
@@ -239,9 +238,9 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocument> = {
         title: "Controles del navegador y contacto",
         paragraphs: [
           "Puedes consultar y borrar los datos del sitio desde la configuración de tu navegador. Borrar la sesión te pedirá entrar de nuevo, pero no elimina tus datos guardados en el servicio. Desde Privacidad de mi cuenta puedes cerrar sesión en este dispositivo y restablecer el tema.",
-          `El responsable es ${name}. Para consultas o solicitudes sobre estos datos escribe a ${email}; el aviso de privacidad describe los derechos y el tratamiento en el servicio.`,
+          `El responsable es ${name}. Para consultas o solicitudes sobre estos datos puedes dirigirle un escrito al domicilio señalado en el aviso de privacidad, que también describe los derechos y el tratamiento en el servicio.`,
         ],
-        links: [mail],
+        links: [privacyContact],
       },
     ],
   },

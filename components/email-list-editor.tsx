@@ -2,7 +2,7 @@
 
 import { Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { parseEmails } from "@/lib/utils";
+import { displayEmail, parseEmails } from "@/lib/utils";
 import { Badge, Button, Card, SectionTitle, Textarea, firestoreErrorMessage, useToast } from "./ui";
 
 /** Lista editable de correos (jueces u organizadores de un evento). */
@@ -68,7 +68,7 @@ export function EmailListEditor({
         {emails.map((email) => (
           <li key={email} className="flex items-center justify-between gap-3 py-3">
             <div className="min-w-0">
-              <p className="truncate text-sm">{email}</p>
+              <p className="truncate text-sm">{displayEmail(email)}</p>
               {progress && <p className="font-mono text-[10px] text-muted">{progress(email)}</p>}
             </div>
             {locked.includes(email) ? (
@@ -77,7 +77,7 @@ export function EmailListEditor({
               <Button
                 variant="ghost"
                 size="sm"
-                aria-label={`Quitar ${email}`}
+                aria-label={`Quitar ${displayEmail(email)}`}
                 onClick={() => save(emails.filter((e) => e !== email))}
               >
                 <Trash2 className="size-4" />

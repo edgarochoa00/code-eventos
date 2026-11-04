@@ -56,7 +56,7 @@ import {
   type StaffRole,
   type UserDoc,
 } from "@/lib/types";
-import { cn, formatDate, initials, isEmail, normalizeEmail } from "@/lib/utils";
+import { cn, displayEmail, formatDate, initials, isEmail, normalizeEmail } from "@/lib/utils";
 
 type Tab = "people" | "events" | "roles";
 type Filter = "all" | "admins" | "organizers" | "judges" | "blocked" | "pending";
@@ -228,7 +228,7 @@ function PeopleTab({ people, events }: { people: Person[]; events: EventDoc[] })
       if (filter === "pending") return !p.user;
       return true;
     })
-    .filter((p) => !q || p.email.includes(q) || (p.user?.displayName ?? "").toLowerCase().includes(q));
+    .filter((p) => !q || displayEmail(p.email).toLowerCase().includes(q) || (p.user?.displayName ?? "").toLowerCase().includes(q));
 
   const current = people.find((p) => p.email === selected) ?? null;
 
@@ -273,11 +273,11 @@ function PeopleTab({ people, events }: { people: Person[]; events: EventDoc[] })
                   )}
                   aria-hidden
                 >
-                  {initials(p.user?.displayName || p.email)}
+                  {initials(p.user?.displayName || displayEmail(p.email))}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">{p.user?.displayName || "Sin nombre"}</span>
-                  <span className="block truncate font-mono text-[11px] text-muted">{p.email}</span>
+                  <span className="block truncate font-mono text-[11px] text-muted">{displayEmail(p.email)}</span>
                   <span className="mt-2 flex flex-wrap gap-1.5">
                     <Badge tone={ROLE_TONE[p.role]}>
                       {p.role === "superadmin" && <Crown className="size-3" />}
@@ -341,11 +341,11 @@ function PersonPanel({ person, events }: { person: Person; events: EventDoc[] })
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <span className="grid size-12 shrink-0 place-items-center rounded-full bg-lime font-mono text-sm font-bold text-coal">
-          {initials(person.user?.displayName || person.email)}
+          {initials(person.user?.displayName || displayEmail(person.email))}
         </span>
         <div className="min-w-0">
           <p className="truncate font-display text-lg font-bold">{person.user?.displayName || "Sin nombre"}</p>
-          <p className="truncate font-mono text-[11px] text-muted">{person.email}</p>
+          <p className="truncate font-mono text-[11px] text-muted">{displayEmail(person.email)}</p>
           {!person.user && (
             <p className="font-mono text-[10px] text-amber-700">Aún no crea su cuenta. Los permisos se aplican al registrarse.</p>
           )}
@@ -461,7 +461,7 @@ function EventsTab({ events, projects }: { events: EventDoc[]; projects: Project
                 <EventStatus event={e} />
                 <h3 className="mt-3 break-words font-display text-lg font-bold leading-tight">{e.name}</h3>
                 <p className="mt-0.5 font-mono text-[11px] text-muted">{e.institution || "Sin institución"}</p>
-                <p className="truncate font-mono text-[10px] text-muted">Creado por {e.ownerEmail}</p>
+                <p className="truncate font-mono text-[10px] text-muted">Creado por {displayEmail(e.ownerEmail)}</p>
               </div>
               <div className="grid grid-cols-[repeat(3,minmax(0,1fr))] gap-2 text-center">
                 <MiniStat label="Proyectos" value={count} />
@@ -639,8 +639,8 @@ function RolesTab({ people }: { people: Person[] }) {
           {withRoles.map((p) => (
             <li key={p.email} className="flex items-center justify-between gap-3 py-3">
               <div className="min-w-0">
-                <p className="truncate text-sm">{p.user?.displayName || p.email}</p>
-                {p.user?.displayName && <p className="truncate font-mono text-[10px] text-muted">{p.email}</p>}
+                <p className="truncate text-sm">{p.user?.displayName || displayEmail(p.email)}</p>
+                {p.user?.displayName && <p className="truncate font-mono text-[10px] text-muted">{displayEmail(p.email)}</p>}
               </div>
               <div className="flex shrink-0 items-center gap-1">
                 <Badge tone={ROLE_TONE[p.role]}>{GLOBAL_ROLE_LABEL[p.role]}</Badge>
@@ -648,7 +648,7 @@ function RolesTab({ people }: { people: Person[] }) {
                   <Button
                     variant="ghost"
                     size="sm"
-                    aria-label={`Quitar permiso a ${p.email}`}
+                    aria-label={`Quitar permiso a ${displayEmail(p.email)}`}
                     onClick={async () => {
                       try {
                         await setStaffRole(p.email, "user", user!);

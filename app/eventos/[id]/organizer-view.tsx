@@ -73,6 +73,7 @@ import {
 } from "@/lib/types";
 import {
   cn,
+  displayEmail,
   downloadCsv,
   effectiveEvaluationTotal,
   eventCategories,
@@ -422,7 +423,7 @@ function ProjectsTab({
     const inSummary = p.summary.toLowerCase().includes(q);
     const inCat = p.category.toLowerCase().includes(q);
     const inTech = p.technologies.some((t) => t.toLowerCase().includes(q));
-    const inMembers = p.members.some((m) => m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q));
+    const inMembers = p.members.some((m) => m.name.toLowerCase().includes(q) || displayEmail(m.email).toLowerCase().includes(q));
     return inTitle || inSummary || inCat || inTech || inMembers;
   });
 
@@ -460,9 +461,9 @@ function ProjectsTab({
         p.summary,
         p.technologies.join(", "),
         leaderName,
-        p.leaderEmail,
-        p.members.map((m) => m.name || m.email).join("; "),
-        p.members.map((m) => m.email).join("; "),
+        displayEmail(p.leaderEmail),
+        p.members.map((m) => m.name || displayEmail(m.email)).join("; "),
+        p.members.map((m) => displayEmail(m.email)).join("; "),
         ...phases.flatMap((phase) => [p[phase] ? "Sí" : "No", (p[phase]?.links ?? []).map((l) => l.url).join("; ")]),
         evs.length,
         avg,
@@ -560,7 +561,7 @@ function ProjectsTab({
                       {p.category && <Badge>{p.category}</Badge>}
                     </div>
                     <p className="mt-0.5 font-mono text-[11px] text-muted">
-                      {p.members.length} integrante(s) · {p.members.map((m) => m.name || m.email).join(", ")}
+                      {p.members.length} integrante(s) · {p.members.map((m) => m.name || displayEmail(m.email)).join(", ")}
                     </p>
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       <SubmissionBadges project={p} event={event} />
@@ -643,7 +644,7 @@ function JudgesTab({ event, evaluations, projects }: { event: EventDoc; evaluati
               return (
                 <li key={key} className="flex flex-wrap items-center justify-between gap-3 py-3">
                   <div className="min-w-0">
-                    <p className="truncate font-mono text-xs font-medium">{key}</p>
+                    <p className="truncate font-mono text-xs font-medium">{displayEmail(key)}</p>
                     <div className="mt-1 flex flex-wrap gap-1.5">
                       {!hasCustom ? (
                         <Badge>Todos los proyectos ({projects.length})</Badge>
@@ -740,7 +741,7 @@ function JudgeAssignmentModal({
   return (
     <div className="space-y-5">
       <div>
-        <p className="font-mono text-xs font-medium">{judgeEmail}</p>
+        <p className="font-mono text-xs font-medium">{displayEmail(judgeEmail)}</p>
         <p className="mt-1 font-mono text-[11px] text-muted">
           {isAll
             ? "Actualmente evalúa todos los proyectos del evento."
@@ -919,8 +920,8 @@ function ResultsTab({ event, projects, evaluations }: { event: EventDoc; project
           cat ? catRank : "",
           s.title,
           cat,
-          proj ? proj.members.map((m) => m.name || m.email).join("; ") : "",
-          proj ? proj.members.map((m) => m.email).join("; ") : "",
+          proj ? proj.members.map((m) => m.name || displayEmail(m.email)).join("; ") : "",
+          proj ? proj.members.map((m) => displayEmail(m.email)).join("; ") : "",
           s.judges,
           ...event.criteria.map((c) => s.criteria[c.id] ?? ""),
           s.score,

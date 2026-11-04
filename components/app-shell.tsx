@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useAccess } from "@/lib/access";
 import { useAuth } from "@/lib/auth";
-import { cn } from "@/lib/utils";
+import { cn, displayEmail } from "@/lib/utils";
 import { LegalLinks } from "./legal-links";
 import { Logo } from "./logo";
 import { ThemeToggle } from "./theme-toggle";
@@ -68,7 +68,7 @@ function Header() {
   const access = useAccess();
   const router = useRouter();
   const pathname = usePathname();
-  const initials = (user?.displayName || user?.email || "?")
+  const initials = (user?.displayName || displayEmail(user?.email ?? "") || "?")
     .split(/[\s@.]+/)
     .slice(0, 2)
     .map((s) => s[0]?.toUpperCase())
@@ -100,11 +100,11 @@ function Header() {
             <>
               <div className="hidden min-w-0 text-right md:block">
                 <p className="truncate text-sm font-medium leading-tight">{user.displayName || "Sin nombre"}</p>
-                <p className="truncate font-mono text-[10px] text-muted">{user.email}</p>
+                <p className="truncate font-mono text-[10px] text-muted">{displayEmail(user.email ?? "")}</p>
               </div>
               <span
                 className="hidden size-9 shrink-0 place-items-center rounded-full bg-lime font-mono text-xs font-bold text-coal sm:grid"
-                title={user.email ?? ""}
+                title={displayEmail(user.email ?? "")}
                 aria-hidden
               >
                 {initials}
@@ -151,7 +151,7 @@ function Blocked() {
 }
 
 function VerifyEmail() {
-  const { user, resendVerification, refreshUser } = useAuth();
+  const { resendVerification, refreshUser } = useAuth();
   const toast = useToast();
   const [busy, setBusy] = useState<"check" | "send" | null>(null);
 
@@ -163,7 +163,7 @@ function VerifyEmail() {
         </div>
         <h1 className="font-display text-2xl font-bold">Verifica tu correo</h1>
         <p className="mt-2 font-mono text-xs leading-relaxed text-muted">
-          Enviamos un enlace a <strong className="text-ink">{user?.email}</strong>. Lo pedimos para que nadie pueda
+          Enviamos un enlace a tu correo. Lo pedimos para que nadie pueda
           hacerse pasar por un juez o por un integrante de tu equipo. Revisa también spam.
         </p>
         <div className="mt-6 grid gap-2">

@@ -46,6 +46,7 @@ import {
   type ProjectDoc,
 } from "@/lib/types";
 import {
+  displayEmail,
   effectiveEvaluationTotal,
   eventCategories,
   judgesSeeOriginality,
@@ -178,7 +179,7 @@ function ProjectBody({
                 <UserRound className="size-3.5" />
               </span>
               <span className="text-xs">
-                {m.name || m.email}
+                {m.name || displayEmail(m.email)}
                 {m.email === project.leaderEmail && <span className="font-mono text-[10px] text-muted"> · líder</span>}
               </span>
             </li>
@@ -385,7 +386,7 @@ function ProjectBody({
                   <div key={e.id} className="rounded-2xl bg-paper p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
-                        <p className="text-sm font-medium">{e.judgeName || e.judgeEmail}</p>
+                        <p className="text-sm font-medium">{e.judgeName || displayEmail(e.judgeEmail)}</p>
                         <p className="font-mono text-[10px] text-muted">{getPhaseLabel(event, e.phase)}</p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -394,7 +395,7 @@ function ProjectBody({
                           <Button
                             variant="ghost"
                             size="sm"
-                            aria-label={`Descartar calificación de ${e.judgeName || e.judgeEmail}`}
+                            aria-label={`Descartar calificación de ${e.judgeName || displayEmail(e.judgeEmail)}`}
                             onClick={() => setEvalToDelete(e)}
                           >
                             <Trash2 className="size-4 text-muted hover:text-red-600" />
@@ -452,7 +453,7 @@ function ProjectBody({
         {evalToDelete && (
           <>
             <p className="font-mono text-xs leading-relaxed text-muted">
-              Se eliminará la calificación de {evalToDelete.judgeName || evalToDelete.judgeEmail} en{" "}
+              Se eliminará la calificación de {evalToDelete.judgeName || displayEmail(evalToDelete.judgeEmail)} en{" "}
               {getPhaseLabel(event, evalToDelete.phase)}. El juez podrá volver a calificar si la evaluación sigue abierta.
             </p>
             <div className="mt-6 flex justify-end gap-2">

@@ -10,6 +10,7 @@ import { readStoredTheme, resetTheme, type Theme } from "@/components/theme-togg
 import { Button } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { LEGAL_VERSION, SERVICE_CONTACT } from "@/lib/legal";
+import { displayEmail } from "@/lib/utils";
 
 type ControlId = "theme" | "session";
 
@@ -91,7 +92,7 @@ export function PrivacyCenter() {
       icon: KeyRound,
       title: "Sesión en este navegador",
       text: "Firebase guarda tu sesión para que no tengas que entrar en cada visita. Al cerrarla se borra de este navegador; tus eventos y proyectos siguen guardados en el servicio.",
-      status: user?.email ? `Sesión iniciada como ${user.email}.` : "Sin sesión iniciada.",
+      status: user?.email ? `Sesión iniciada como ${displayEmail(user.email)}.` : "Sin sesión iniciada.",
       label: "Cerrar sesión en este dispositivo",
       question: "¿Cerrar sesión en este navegador? Tendrás que volver a entrar.",
       disabled: !user,
@@ -192,22 +193,21 @@ export function PrivacyCenter() {
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-muted">
           Tus eventos, proyectos, entregas y calificaciones se guardan en el servicio, no en este navegador. Para solicitar
-          acceso, rectificación, cancelación, oposición o el cierre de tu cuenta, escribe a {SERVICE_CONTACT.name}. La
-          atención es manual y requiere verificar tu identidad.
+          acceso, rectificación, cancelación, oposición o el cierre de tu cuenta, dirige una solicitud por escrito a {SERVICE_CONTACT.name} en
+          el domicilio indicado en el aviso de privacidad. La atención es manual y requiere verificar tu identidad.
         </p>
         {/* En el celular van a todo lo ancho y el texto puede partirse en dos líneas */}
         <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-2 sm:flex sm:flex-wrap">
-          <a
-            href={`mailto:${SERVICE_CONTACT.email}?subject=${encodeURIComponent(`Privacidad ${APP_NAME}`)}`}
+          <Link
+            href="/privacidad#derechos"
             className={`${ACTION_LINK} bg-lime text-coal hover:brightness-95`}
           >
-            Contactar por privacidad <ArrowUpRight className="size-4 shrink-0" aria-hidden />
-          </a>
+            Cómo enviar una solicitud <ArrowUpRight className="size-4 shrink-0" aria-hidden />
+          </Link>
           <Link href="/privacidad" className={`${ACTION_LINK} border border-line bg-surface hover:border-ink/40`}>
             Consultar el aviso de privacidad <ArrowUpRight className="size-4 shrink-0" aria-hidden />
           </Link>
         </div>
-        <p className="mt-3 font-mono text-[11px] text-muted [overflow-wrap:anywhere]">{SERVICE_CONTACT.email}</p>
       </section>
     </div>
   );

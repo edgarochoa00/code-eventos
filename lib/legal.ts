@@ -3,13 +3,12 @@
  * La versión de cada documento es independiente de la versión de la app.
  */
 
-export const LEGAL_VERSION = "2026-11-03.1";
-export const LEGAL_UPDATED_LABEL = "3 de noviembre de 2026";
+export const LEGAL_VERSION = "2026-11-04.1";
+export const LEGAL_UPDATED_LABEL = "4 de noviembre de 2026";
 
 export const SERVICE_CONTACT = {
   name: "Edgar Ochoa",
   address: "Juan de Dios Bátiz 310 Poniente, colonia Guadalupe, C.P. 80220, Culiacán, Sinaloa, México.",
-  email: "edgarochoa0173@gmail.com",
 };
 
 export const LEGAL_LINKS = [

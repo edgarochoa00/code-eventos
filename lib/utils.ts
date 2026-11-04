@@ -18,6 +18,11 @@ export function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
+/** Etiqueta visible; el correo real se conserva para autenticar y aplicar permisos. */
+export function displayEmail(email: string) {
+  return normalizeEmail(email) === SUPERADMIN_EMAIL ? "Superadmin" : email;
+}
+
 export function initials(nameOrEmail: string) {
   return (
     nameOrEmail
