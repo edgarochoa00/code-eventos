@@ -6,7 +6,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useAccess } from "@/lib/access";
 import { useAuth } from "@/lib/auth";
-import { GLOBAL_ROLE_LABEL } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { LegalLinks } from "./legal-links";
 import { Logo } from "./logo";
@@ -40,15 +39,18 @@ export function AppShell({ children, requireVerified = true }: { children: React
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
+      <a href="#contenido" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-50 focus:rounded-xl focus:bg-ink focus:px-4 focus:py-3 focus:text-surface">
+        Ir al contenido
+      </a>
       <Header />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-4 sm:px-6 sm:pt-6">{content}</main>
-      <footer className="border-t border-ink/5 px-4 pb-[max(1.5rem,calc(env(safe-area-inset-bottom)+1rem))] pt-4 sm:px-6">
+      <main id="contenido" className="mx-auto w-full min-w-0 max-w-6xl flex-1 px-4 pb-16 pt-5 sm:px-6 sm:pt-8">{content}</main>
+      <footer className="border-t border-line bg-surface px-4 pb-[max(1.5rem,calc(env(safe-area-inset-bottom)+1rem))] pt-4 sm:px-6">
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-1 sm:flex-row sm:justify-between sm:gap-4">
           <Link
             href="/panel/privacidad"
             className={cn(
               "inline-flex min-h-11 items-center gap-1.5 font-mono text-[11px] hover:text-ink sm:min-h-0 sm:py-1",
-              pathname === "/panel/privacidad" ? "text-ink" : "text-ink/60",
+              pathname === "/panel/privacidad" ? "text-ink" : "text-muted",
             )}
             aria-current={pathname === "/panel/privacidad" ? "page" : undefined}
           >
@@ -74,7 +76,7 @@ function Header() {
   const showAdmin = access.isAdmin && user?.emailVerified;
 
   return (
-    <header className="sticky top-0 z-30 border-b border-ink/5 bg-paper/85 pt-[env(safe-area-inset-top)] backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-line bg-surface pt-[env(safe-area-inset-top)] shadow-xs">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-4 sm:px-6">
         <Logo href="/panel" />
         <div className="flex min-w-0 items-center gap-1 sm:gap-2">
@@ -82,10 +84,10 @@ function Header() {
             <Link
               href="/admin"
               className={cn(
-                "flex h-10 items-center gap-1.5 rounded-full border-2 px-3.5 font-display text-[11px] font-bold uppercase tracking-[0.08em] transition",
+                "flex size-11 shrink-0 items-center justify-center gap-1.5 rounded-full border-2 font-display text-[11px] font-bold uppercase tracking-[0.08em] transition sm:w-auto sm:px-3.5",
                 pathname.startsWith("/admin")
-                  ? "border-[#0b1536] bg-[#0b1536] text-white ring-1 ring-inset ring-white/80"
-                  : "border-ink/15 bg-surface text-ink hover:border-ink/40",
+                  ? "border-ink bg-ink text-surface"
+                  : "border-line bg-surface text-ink hover:border-ink/40",
               )}
               aria-label="Administración"
             >
@@ -98,13 +100,10 @@ function Header() {
             <>
               <div className="hidden min-w-0 text-right md:block">
                 <p className="truncate text-sm font-medium leading-tight">{user.displayName || "Sin nombre"}</p>
-                <p className="truncate font-mono text-[10px] text-ink/50">
-                  {access.role !== "user" ? `${GLOBAL_ROLE_LABEL[access.role]} · ` : ""}
-                  {user.email}
-                </p>
+                <p className="truncate font-mono text-[10px] text-muted">{user.email}</p>
               </div>
               <span
-                className="grid size-9 shrink-0 place-items-center rounded-full bg-lime font-mono text-xs font-bold text-coal"
+                className="hidden size-9 shrink-0 place-items-center rounded-full bg-lime font-mono text-xs font-bold text-coal sm:grid"
                 title={user.email ?? ""}
                 aria-hidden
               >
@@ -113,7 +112,7 @@ function Header() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="size-10 px-0"
+                className="size-11 px-0"
                 aria-label="Cerrar sesión"
                 onClick={async () => {
                   await signOut();
@@ -139,7 +138,7 @@ function Blocked() {
           <Ban className="size-6" />
         </div>
         <h1 className="font-display text-2xl font-bold">Cuenta suspendida</h1>
-        <p className="mt-2 font-mono text-xs leading-relaxed text-ink/60">
+        <p className="mt-2 font-mono text-xs leading-relaxed text-muted">
           Un administrador suspendió el acceso de esta cuenta. Si crees que es un error, contacta al organizador del
           evento.
         </p>
@@ -163,7 +162,7 @@ function VerifyEmail() {
           <MailCheck className="size-6" />
         </div>
         <h1 className="font-display text-2xl font-bold">Verifica tu correo</h1>
-        <p className="mt-2 font-mono text-xs leading-relaxed text-ink/60">
+        <p className="mt-2 font-mono text-xs leading-relaxed text-muted">
           Enviamos un enlace a <strong className="text-ink">{user?.email}</strong>. Lo pedimos para que nadie pueda
           hacerse pasar por un juez o por un integrante de tu equipo. Revisa también spam.
         </p>

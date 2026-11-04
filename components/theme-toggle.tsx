@@ -4,13 +4,13 @@ import { Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** Script que corre antes del primer pintado: aplica el tema guardado o el claro. */
-export const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem("theme");if(t!=="light"&&t!=="dark"){t="light"}var d=document.documentElement;d.setAttribute("data-theme",t);var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",t==="dark"?"#000000":"#ffffff")}catch(e){}})()`;
+export const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem("theme");if(t!=="light"&&t!=="dark"){t="light"}var d=document.documentElement;d.setAttribute("data-theme",t);var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",t==="dark"?"#0a1120":"#edf2f8")}catch(e){}})()`;
 
 export type Theme = "light" | "dark";
 
 function paintTheme(theme: Theme) {
   document.documentElement.setAttribute("data-theme", theme);
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#000000" : "#ffffff");
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#0a1120" : "#edf2f8");
 }
 
 function applyTheme(theme: Theme) {
@@ -55,7 +55,7 @@ export function ThemeToggle({ className }: { className?: string }) {
         applyTheme(current === "dark" ? "light" : "dark");
       }}
       className={cn(
-        "grid size-10 shrink-0 place-items-center rounded-full border-2 border-ink/15 bg-surface text-ink transition hover:border-ink/40 hover:bg-ink/5 focus-visible:outline-2 focus-visible:outline-ink",
+        "grid size-11 shrink-0 place-items-center rounded-full border-2 border-line bg-surface text-ink transition hover:border-ink/40 hover:bg-ink/5 focus-visible:outline-2 focus-visible:outline-ink",
         className,
       )}
       aria-label="Cambiar entre modo claro y oscuro"

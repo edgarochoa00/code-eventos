@@ -19,8 +19,8 @@ export function EventCard({ event, role, tone = "white" }: { event: EventDoc; ro
   return (
     <Link
       href={`/eventos/${event.id}`}
-      className={`group flex flex-col justify-between gap-6 rounded-3xl p-5 transition hover:-translate-y-0.5 ${
-        dark ? "bg-night text-white" : "bg-surface"
+      className={`group flex min-w-0 flex-col justify-between gap-6 rounded-3xl p-5 transition hover:-translate-y-0.5 ${
+        dark ? "border border-white/20 bg-night text-white shadow-panel" : "ui-panel ui-interactive"
       }`}
     >
       <div>
@@ -31,11 +31,11 @@ export function EventCard({ event, role, tone = "white" }: { event: EventDoc; ro
           </div>
           <ArrowUpRight className="size-5 shrink-0 opacity-40 transition group-hover:opacity-100" />
         </div>
-        <h3 className="mt-4 font-display text-xl font-bold leading-tight">{event.name}</h3>
-        {event.institution && <p className={`mt-1 font-mono text-[11px] ${dark ? "text-white/60" : "text-ink/55"}`}>{event.institution}</p>}
+        <h3 className="mt-4 break-words font-display text-xl font-bold leading-tight">{event.name}</h3>
+        {event.institution && <p className={`mt-1 font-mono text-[11px] ${dark ? "text-white/75" : "text-muted"}`}>{event.institution}</p>}
       </div>
       {(event.startDate || event.endDate) && (
-        <p className={`flex items-center gap-1.5 font-mono text-[11px] ${dark ? "text-white/60" : "text-ink/55"}`}>
+        <p className={`flex items-center gap-1.5 font-mono text-[11px] ${dark ? "text-white/75" : "text-muted"}`}>
           <CalendarDays className="size-3.5" />
           {formatDate(event.startDate)}
           {event.endDate && event.endDate !== event.startDate && ` – ${formatDate(event.endDate)}`}

@@ -65,7 +65,7 @@ export function LoginForm() {
       </div>
 
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-6 sm:py-10">
-        <div className="rounded-3xl border-2 border-ink/12 bg-surface p-6 shadow-xs sm:p-8">
+        <div className="rounded-3xl border-2 border-line bg-surface p-6 shadow-xs sm:p-8">
           <div className="mb-6 flex flex-col items-center text-center">
             <span className="grid size-24 place-items-center overflow-hidden rounded-full bg-white p-1 shadow-md ring-2 ring-ink/15">
               <Image
@@ -144,7 +144,7 @@ export function LoginForm() {
             <button
               type="button"
               onClick={onReset}
-              className="mt-5 font-display text-[11px] font-bold uppercase tracking-[0.08em] text-ink/70 underline underline-offset-4 hover:text-ink"
+              className="mt-5 font-display text-[11px] font-bold uppercase tracking-[0.08em] text-muted underline underline-offset-4 hover:text-ink"
             >
               Olvidé mi contraseña
             </button>

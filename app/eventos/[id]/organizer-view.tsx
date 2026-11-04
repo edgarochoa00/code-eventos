@@ -7,7 +7,6 @@ import {
   EyeOff,
   Gavel,
   Megaphone,
-  Plus,
   RefreshCw,
   ScanSearch,
   Search,
@@ -21,6 +20,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { CriteriaEditor } from "@/components/criteria-editor";
 import { EmailListEditor } from "@/components/email-list-editor";
 import { EventSettingsForm } from "@/components/event-settings-form";
 import { Leaderboard } from "@/components/leaderboard";
@@ -57,9 +57,9 @@ import {
   updateEvent,
 } from "@/lib/data";
 import { useCollection, useFingerprints } from "@/lib/hooks";
+import { criteriaError, getPhaseLabel } from "@/lib/event-config";
 import { analysisState, findMatches, type AnalysisState } from "@/lib/similarity";
 import {
-  PHASE_LABEL,
   PHASES,
   type Criterion,
   type EvaluationDoc,
@@ -81,7 +81,6 @@ import {
   isProjectAssignedToJudge,
   normalizeEmail,
   originalitySettings,
-  randomId,
   todayISO,
 } from "@/lib/utils";
 
@@ -181,7 +180,7 @@ function Summary({
 
   const stats = [
     { label: "Proyectos", value: projects.length },
-    ...phases.map((ph) => ({ label: `${PHASE_LABEL[ph]}s entregados`, value: projects.filter((p) => p[ph]).length })),
+    ...phases.map((ph) => ({ label: `Entregas: ${getPhaseLabel(event, ph)}`, value: projects.filter((p) => p[ph]).length })),
     { label: "Evaluaciones", value: `${evaluations.length}${expected ? `/${expected}` : ""}` },
   ];
 
@@ -189,7 +188,7 @@ function Summary({
     <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[1fr_1.1fr]">
       <Card>
         <SectionTitle title="Etapas" subtitle="Abre y cierra cada etapa cuando quieras. Los cambios son inmediatos." />
-        <div className="divide-y divide-ink/5">
+        <div className="divide-y divide-line">
           <Toggle
             label="Registro de proyectos"
             description="Los equipos pueden registrarse y editar su información."
@@ -199,7 +198,7 @@ function Summary({
           {phases.map((ph) => (
             <Toggle
               key={ph}
-              label={`Entregas de ${PHASE_LABEL[ph].toLowerCase()}`}
+              label={`Recibir: ${getPhaseLabel(event, ph)}`}
               description="Los equipos pueden subir o actualizar esta entrega."
               checked={event.submissions[ph]}
               onChange={(v) => toggle({ submissions: { ...event.submissions, [ph]: v } })}
@@ -218,9 +217,9 @@ function Summary({
       <div className="space-y-4">
         <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3">
           {stats.map((s) => (
-            <div key={s.label} className="rounded-3xl bg-surface p-5">
+            <div key={s.label} className="ui-panel rounded-3xl p-5">
               <p className="font-display text-3xl font-bold tabular-nums">{s.value}</p>
-              <p className="mt-1 font-mono text-[11px] text-ink/55">{s.label}</p>
+              <p className="mt-1 font-mono text-[11px] text-muted">{s.label}</p>
             </div>
           ))}
         </div>
@@ -304,14 +303,14 @@ function OriginalityCard({
           {tone === "alert" ? <AlertTriangle className="size-5" /> : tone === "ok" ? <ShieldCheck className="size-5" /> : <ScanSearch className="size-5" />}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block font-mono text-[10px] uppercase tracking-wider text-white/50">Originalidad</span>
+          <span className="block font-mono text-[10px] uppercase tracking-wider text-white/75">Originalidad</span>
           <span className="mt-0.5 block font-display font-bold">{title}</span>
-          <span className="mt-1 block font-mono text-[11px] leading-relaxed text-white/60">{text}</span>
+          <span className="mt-1 block font-mono text-[11px] leading-relaxed text-white/75">{text}</span>
         </span>
         <ArrowUpRight className="size-5 shrink-0" />
       </button>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-3">
-        <span className="flex items-center gap-1.5 font-mono text-[10px] text-white/60">
+        <span className="flex items-center gap-1.5 font-mono text-[10px] text-white/75">
           <EyeOff className="size-3.5" /> {teamVisibilityText(event)}
         </span>
         <button onClick={() => onGo("settings")} className="font-mono text-[10px] text-lime underline underline-offset-2">
@@ -375,7 +374,7 @@ function OriginalitySettingsCard({ event }: { event: EventDoc }) {
               />
             </Field>
           )}
-          <p className="font-mono text-[11px] leading-relaxed text-ink/55">
+          <p className="font-mono text-[11px] leading-relaxed text-muted">
             Los equipos solo ven el porcentaje de su proyecto y el motivo. Nunca ven el nombre de los otros proyectos con
             los que coincide.
           </p>
@@ -417,7 +416,7 @@ function ProjectsTab({
     if (categoryFilter !== "all" && p.category !== categoryFilter) return false;
     if (statusFilter === "prototype" && !p.prototype) return false;
     if (statusFilter === "final" && !p.final) return false;
-    if (statusFilter === "none" && (p.prototype || p.final)) return false;
+    if (statusFilter === "none" && PHASES.some((phase) => event.phases[phase] && p[phase])) return false;
     if (!q) return true;
     const inTitle = p.title.toLowerCase().includes(q);
     const inSummary = p.summary.toLowerCase().includes(q);
@@ -432,6 +431,7 @@ function ProjectsTab({
   );
 
   function exportProjectsCsv() {
+    const phases = PHASES.filter((phase) => event.phases[phase]);
     const headers = [
       "Proyecto",
       "Categoría",
@@ -441,10 +441,7 @@ function ProjectsTab({
       "Correo líder",
       "Integrantes",
       "Correos integrantes",
-      "Prototipo entregado",
-      "Enlaces prototipo",
-      "Producto final entregado",
-      "Enlaces final",
+      ...phases.flatMap((phase) => [`Entrega: ${getPhaseLabel(event, phase)}`, `Enlaces: ${getPhaseLabel(event, phase)}`]),
       "Evaluaciones",
       "Promedio",
       "Similitud máx. (%)",
@@ -466,10 +463,7 @@ function ProjectsTab({
         p.leaderEmail,
         p.members.map((m) => m.name || m.email).join("; "),
         p.members.map((m) => m.email).join("; "),
-        p.prototype ? "Sí" : "No",
-        (p.prototype?.links ?? []).map((l) => l.url).join("; "),
-        p.final ? "Sí" : "No",
-        (p.final?.links ?? []).map((l) => l.url).join("; "),
+        ...phases.flatMap((phase) => [p[phase] ? "Sí" : "No", (p[phase]?.links ?? []).map((l) => l.url).join("; ")]),
         evs.length,
         avg,
         match ? match.score : "",
@@ -512,7 +506,7 @@ function ProjectsTab({
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-2.5 sm:grid-cols-[1.5fr_1fr_1fr]">
         <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink/40" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
           <Input
             aria-label="Buscar proyecto o integrante"
             placeholder="Buscar proyecto, integrante o tecnología"
@@ -525,7 +519,7 @@ function ProjectsTab({
           aria-label="Filtrar por categoría"
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-          className="h-11 w-full rounded-xl border border-ink/10 bg-surface px-3 font-mono text-xs text-ink outline-none focus:border-ink/40"
+          className="h-11 w-full rounded-xl border border-control bg-surface px-3 font-mono text-base text-ink sm:text-xs outline-none focus:border-ink/40"
         >
           <option value="all">Todas las categorías</option>
           {categories.map((c) => (
@@ -538,11 +532,12 @@ function ProjectsTab({
           aria-label="Filtrar por estado de entrega"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-          className="h-11 w-full rounded-xl border border-ink/10 bg-surface px-3 font-mono text-xs text-ink outline-none focus:border-ink/40"
+          className="h-11 w-full rounded-xl border border-control bg-surface px-3 font-mono text-base text-ink sm:text-xs outline-none focus:border-ink/40"
         >
           <option value="all">Todas las entregas</option>
-          {event.phases.prototype && <option value="prototype">Con prototipo</option>}
-          {event.phases.final && <option value="final">Con producto final</option>}
+          {PHASES.filter((phase) => event.phases[phase]).map((phase) => (
+            <option key={phase} value={phase}>Con entrega: {getPhaseLabel(event, phase)}</option>
+          ))}
           <option value="none">Sin entregas</option>
         </select>
       </div>
@@ -557,14 +552,14 @@ function ProjectsTab({
               <li key={p.id}>
                 <Link
                   href={`/eventos/${event.id}/proyectos/${p.id}`}
-                  className="grid gap-3 rounded-3xl bg-surface p-5 transition hover:-translate-y-0.5 sm:grid-cols-[1fr_auto] sm:items-center"
+                  className="grid gap-3 ui-panel ui-interactive rounded-3xl p-5 transition hover:-translate-y-0.5 sm:grid-cols-[1fr_auto] sm:items-center"
                 >
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="font-display text-lg font-bold">{p.title}</h3>
                       {p.category && <Badge>{p.category}</Badge>}
                     </div>
-                    <p className="mt-0.5 font-mono text-[11px] text-ink/55">
+                    <p className="mt-0.5 font-mono text-[11px] text-muted">
                       {p.members.length} integrante(s) · {p.members.map((m) => m.name || m.email).join(", ")}
                     </p>
                     <div className="mt-3 flex flex-wrap gap-1.5">
@@ -572,14 +567,14 @@ function ProjectsTab({
                       {!loadingFp && <SimilarityBadge match={match} state={analysis.state.get(p.id)} />}
                     </div>
                     {match && (match.level === "alto" || match.level === "medio") && (
-                      <p className="mt-2 font-mono text-[11px] text-ink/70">
+                      <p className="mt-2 font-mono text-[11px] text-muted">
                         Se parece a «{match.other.title}» ({match.other.eventName}, {match.other.year})
                       </p>
                     )}
                   </div>
                   <div className="flex items-center gap-4 sm:flex-col sm:items-end sm:gap-1">
                     <p className="font-display text-2xl font-bold tabular-nums">{avg !== null ? avg.toFixed(1) : "—"}</p>
-                    <p className="font-mono text-[10px] text-ink/50">{evs.length} evaluación(es)</p>
+                    <p className="font-mono text-[10px] text-muted">{evs.length} evaluación(es)</p>
                   </div>
                 </Link>
               </li>
@@ -639,7 +634,7 @@ function JudgesTab({ event, evaluations, projects }: { event: EventDoc; evaluati
             title="Asignación de jueces"
             subtitle="Por defecto cada juez evalúa todos los proyectos. Puedes limitar a un juez por categorías o proyectos específicos."
           />
-          <ul className="divide-y divide-ink/5">
+          <ul className="divide-y divide-line">
             {event.judgeEmails.map((email) => {
               const key = normalizeEmail(email);
               const hasCustom = hasJudgeAssignment(event, key);
@@ -746,7 +741,7 @@ function JudgeAssignmentModal({
     <div className="space-y-5">
       <div>
         <p className="font-mono text-xs font-medium">{judgeEmail}</p>
-        <p className="mt-1 font-mono text-[11px] text-ink/60">
+        <p className="mt-1 font-mono text-[11px] text-muted">
           {isAll
             ? "Actualmente evalúa todos los proyectos del evento."
             : "Solo verá como pendientes los proyectos de las categorías o proyectos que marques abajo."}
@@ -763,7 +758,7 @@ function JudgeAssignmentModal({
                 setSelectedCats([]);
                 setSelectedProjs([]);
               }}
-              className="font-mono text-[11px] text-ink/60 underline hover:text-ink"
+              className="font-mono text-[11px] text-muted underline hover:text-ink"
             >
               Evaluar todos
             </button>
@@ -779,7 +774,7 @@ function JudgeAssignmentModal({
                 onClick={() => toggleCat(cat)}
                 className={cn(
                   "rounded-full px-3 py-1.5 font-mono text-xs transition",
-                  active ? "bg-ink text-surface" : "bg-paper text-ink/70 hover:text-ink",
+                  active ? "bg-ink text-surface" : "bg-paper text-muted hover:text-ink",
                 )}
               >
                 {cat}
@@ -792,7 +787,7 @@ function JudgeAssignmentModal({
       {projects.length > 0 && (
         <div className="space-y-2">
           <p className="font-mono text-xs font-medium text-ink/80">Proyectos específicos</p>
-          <div className="max-h-52 divide-y divide-ink/5 overflow-y-auto rounded-2xl bg-paper px-3">
+          <div className="max-h-52 divide-y divide-line overflow-y-auto rounded-2xl bg-paper px-3">
             {projects.map((p) => {
               const byCat = Boolean(p.category && selectedCats.includes(p.category));
               const checked = byCat || selectedProjs.includes(p.id);
@@ -839,17 +834,12 @@ function RubricTab({ event, hasEvaluations }: { event: EventDoc; hasEvaluations:
   const toast = useToast();
   const [criteria, setCriteria] = useState<Criterion[]>(event.criteria);
   const [busy, setBusy] = useState(false);
-  const total = criteria.reduce((s, c) => s + (Number(c.weight) || 0), 0);
-
-  function update(i: number, patch: Partial<Criterion>) {
-    setCriteria((list) => list.map((c, idx) => (idx === i ? { ...c, ...patch } : c)));
-  }
 
   return (
     <Card>
       <SectionTitle
         title="Rúbrica"
-        subtitle="Cada criterio se califica de 0 a 10. El peso define cuánto cuenta en el total de 100."
+        subtitle="Tú defines los criterios de este evento. Cada criterio se califica de 0 a 10; su peso define cuánto cuenta en el total de 100."
       />
       {hasEvaluations && (
         <p className="mb-4 rounded-xl bg-amber-50 px-3 py-2.5 font-mono text-[11px] text-amber-800">
@@ -857,68 +847,26 @@ function RubricTab({ event, hasEvaluations }: { event: EventDoc; hasEvaluations:
           agregas un criterio nuevo, avisa a los jueces para que lo califiquen.
         </p>
       )}
-      <div className="space-y-3">
-        {criteria.map((c, i) => (
-          <div key={c.id} className="grid gap-2 rounded-2xl bg-paper p-3 sm:grid-cols-[1fr_1.5fr_90px_auto]">
-            <Input aria-label="Criterio" value={c.name} onChange={(e) => update(i, { name: e.target.value })} className="bg-surface" />
-            <Input
-              aria-label="Descripción"
-              value={c.description}
-              onChange={(e) => update(i, { description: e.target.value })}
-              className="bg-surface"
-            />
-            <Input
-              aria-label="Peso"
-              type="number"
-              min={0}
-              max={100}
-              value={c.weight}
-              onChange={(e) => update(i, { weight: Number(e.target.value) })}
-              className="bg-surface"
-            />
-            <Button
-              variant="ghost"
-              aria-label={`Quitar ${c.name}`}
-              onClick={() => setCriteria((l) => l.filter((_, idx) => idx !== i))}
-              disabled={criteria.length <= 1}
-            >
-              <Trash2 className="size-4" />
-            </Button>
-          </div>
-        ))}
-      </div>
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+      <CriteriaEditor criteria={criteria} onChange={setCriteria} />
+      <div className="mt-4 flex justify-end">
         <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setCriteria((l) => [...l, { id: randomId("c"), name: "Nuevo criterio", description: "", weight: 10 }])}
+          loading={busy}
+          onClick={async () => {
+            const error = criteriaError(criteria);
+            if (error) return toast(error, "error");
+            setBusy(true);
+            try {
+              await saveCriteria(event.id, criteria.map((c) => ({ ...c, name: c.name.trim(), description: c.description.trim() })));
+              toast("Rúbrica guardada.");
+            } catch (err) {
+              toast(firestoreErrorMessage(err), "error");
+            } finally {
+              setBusy(false);
+            }
+          }}
         >
-          <Plus className="size-4" /> Criterio
+          Guardar rúbrica
         </Button>
-        <div className="flex items-center gap-3">
-          <span className={`font-mono text-xs ${total === 100 ? "text-ink/60" : "text-amber-700"}`}>
-            Suma de pesos: {total}
-            {total !== 100 && " (se normaliza a 100)"}
-          </span>
-          <Button
-            loading={busy}
-            onClick={async () => {
-              if (criteria.some((c) => !c.name.trim())) return toast("Todos los criterios necesitan nombre.", "error");
-              if (total <= 0) return toast("La suma de pesos debe ser mayor a 0.", "error");
-              setBusy(true);
-              try {
-                await saveCriteria(event.id, criteria.map((c) => ({ ...c, name: c.name.trim(), weight: Number(c.weight) || 0 })));
-                toast("Rúbrica guardada.");
-              } catch (err) {
-                toast(firestoreErrorMessage(err), "error");
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            Guardar rúbrica
-          </Button>
-        </div>
       </div>
     </Card>
   );
@@ -966,7 +914,7 @@ function ResultsTab({ event, projects, evaluations }: { event: EventDoc; project
         const catRank = (catCounts.get(cat) ?? 0) + 1;
         catCounts.set(cat, catRank);
         rows.push([
-          PHASE_LABEL[ph],
+          getPhaseLabel(event, ph),
           idx + 1,
           cat ? catRank : "",
           s.title,
@@ -990,7 +938,7 @@ function ResultsTab({ event, projects, evaluations }: { event: EventDoc; project
           <h2 className="font-display text-xl font-bold">
             {event.resultsPublished ? "Resultados publicados" : "Vista previa en vivo"}
           </h2>
-          <p className="mt-1 max-w-lg font-mono text-[11px] text-ink/60">
+          <p className="mt-1 max-w-lg font-mono text-[11px] text-muted">
             Promedio de los jueces por etapa. Al publicar, se cierra la evaluación y cada equipo ve su lugar, puntaje y
             comentarios (anónimos).
           </p>
@@ -1043,7 +991,7 @@ function ResultsTab({ event, projects, evaluations }: { event: EventDoc; project
           return (
             <Card key={ph}>
               <h3 className="mb-4 flex items-center gap-2 font-display text-lg font-bold">
-                <Trophy className="size-5" /> {PHASE_LABEL[ph]}
+                <Trophy className="size-5" /> {getPhaseLabel(event, ph)}
                 {categoryFilter !== "all" && <Badge>{categoryFilter}</Badge>}
               </h3>
               <Leaderboard rows={rows} eventId={event.id} linkable />
@@ -1053,7 +1001,7 @@ function ResultsTab({ event, projects, evaluations }: { event: EventDoc; project
       </div>
 
       <Modal open={confirm} onClose={() => setConfirm(false)} title="¿Publicar resultados?">
-        <p className="font-mono text-xs leading-relaxed text-ink/70">
+        <p className="font-mono text-xs leading-relaxed text-muted">
           Se cerrará la evaluación de jueces y todos los participantes verán el ranking. Cada equipo verá su puntaje por
           criterio y los comentarios de los jueces sin sus nombres. Puedes ocultarlos después.
         </p>
@@ -1117,8 +1065,8 @@ function SettingsTab({ event }: { event: EventDoc }) {
         <OriginalitySettingsCard event={event} />
         <Card className="h-fit">
           <SectionTitle title="Código" subtitle="Genera uno nuevo si el actual se compartió donde no debía." />
-          <Field label="Código actual">
-            <Input readOnly value={event.code} className="font-mono tracking-[0.3em]" />
+          <Field label="Código actual" htmlFor="event-code">
+            <Input id="event-code" readOnly value={event.code} className="font-mono tracking-[0.3em]" />
           </Field>
           <Button
             variant="outline"
@@ -1152,7 +1100,7 @@ function SettingsTab({ event }: { event: EventDoc }) {
       </div>
 
       <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)} title="¿Eliminar evento?">
-        <p className="font-mono text-xs leading-relaxed text-ink/70">
+        <p className="font-mono text-xs leading-relaxed text-muted">
           Se eliminará «{event.name}» junto con todos sus proyectos y evaluaciones. Esta acción no se puede deshacer.
         </p>
         <div className="mt-6 flex justify-end gap-2">

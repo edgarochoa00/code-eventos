@@ -6,15 +6,14 @@ import { isUploadedFile, MAX_FILE_MB, MAX_SUBMISSION_FILES, validateFileSize } f
 import { downloadSubmissionFile, removeSubmissionFile, uploadSubmissionFile } from "@/lib/submission-storage";
 import { sha256File } from "@/lib/similarity";
 import type { FileItem, Phase, Submission } from "@/lib/types";
-import { PHASE_LABEL } from "@/lib/types";
 import { formatBytes, formatDate } from "@/lib/utils";
 import { Badge, Button, Field, Textarea, firestoreErrorMessage, useToast } from "./ui";
 
-export function SubmissionView({ submission, phase }: { submission: Submission | null; phase: Phase }) {
+export function SubmissionView({ submission, label }: { submission: Submission | null; label: string }) {
   if (!submission) {
     return (
-      <p className="rounded-2xl bg-paper p-4 font-mono text-xs text-ink/60">
-        El equipo aún no entrega su {PHASE_LABEL[phase].toLowerCase()}.
+      <p className="rounded-2xl bg-paper p-4 font-mono text-xs text-muted">
+        El equipo aún no ha enviado esta entrega: {label}.
       </p>
     );
   }
@@ -23,7 +22,7 @@ export function SubmissionView({ submission, phase }: { submission: Submission |
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone="green">Entregado</Badge>
         {submission.submittedAt && (
-          <span className="font-mono text-[11px] text-ink/55">Última actualización: {formatDate(submission.submittedAt)}</span>
+          <span className="font-mono text-[11px] text-muted">Última actualización: {formatDate(submission.submittedAt)}</span>
         )}
       </div>
       <p className="whitespace-pre-line text-sm leading-relaxed">{submission.description}</p>
@@ -59,7 +58,7 @@ function FileList({ entries, onRemove, disabled }: { entries: Entry[]; onRemove?
             {uploaded ? <FileCheck2 className="size-4 shrink-0" /> : <FileClock className="size-4 shrink-0" />}
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-medium">{file.name}</span>
-              <span className="block font-mono text-[10px] text-ink/50">
+              <span className="block font-mono text-[10px] text-muted">
                 {formatBytes(file.size)} · {uploaded ? "Archivo subido" : local ? "Listo para subir al guardar" : "Debes volver a subirlo"}
               </span>
             </span>
@@ -81,10 +80,12 @@ function FileList({ entries, onRemove, disabled }: { entries: Entry[]; onRemove?
   );
 }
 
-export function SubmissionEditor({ eventId, projectId, phase, initial, userEmail, onSave, onCancel }: {
+export function SubmissionEditor({ eventId, projectId, phase, label, instructions, initial, userEmail, onSave, onCancel }: {
   eventId: string;
   projectId: string;
   phase: Phase;
+  label: string;
+  instructions?: string;
   initial: Submission | null;
   userEmail: string;
   onSave: (submission: Submission) => Promise<void>;
@@ -164,25 +165,24 @@ export function SubmissionEditor({ eventId, projectId, phase, initial, userEmail
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5" aria-busy={locked}>
-      <Field label={`Describe tu ${PHASE_LABEL[phase].toLowerCase()}`} htmlFor={`desc-${phase}`}
-        hint={phase === "prototype" ? "Qué funciona ya, qué falta y cómo lo probaron." : "Qué entregan, cómo se usa y qué resultados obtuvieron."}>
+      <Field label={`Descripción de la entrega: ${label}`} htmlFor={`desc-${phase}`} hint={instructions}>
         <Textarea id={`desc-${phase}`} rows={5} value={description} disabled={locked} onChange={event => setDescription(event.target.value)} maxLength={5000} />
       </Field>
       <div className="space-y-2">
         <p className="font-mono text-xs font-medium text-ink/80">Archivos de la entrega</p>
-        <p className="font-mono text-[11px] leading-relaxed text-ink/55">
+        <p className="font-mono text-[11px] leading-relaxed text-muted">
           Adjunta tu APK, código en ZIP, PDF, presentación o video. Los archivos se suben al guardar la entrega.
           Máximo {MAX_FILE_MB} MB por archivo y {MAX_SUBMISSION_FILES} archivos por entrega.
         </p>
         {entries.length > 0 && <FileList entries={entries} disabled={locked} onRemove={index => setEntries(current => current.filter((_, i) => i !== index))} />}
         <input ref={fileInput} type="file" multiple disabled={locked || entries.length >= MAX_SUBMISSION_FILES}
-          className="sr-only" id={`file-${phase}`} onChange={event => void addFiles(event.target.files)} />
+          className="hidden" aria-label={`Archivos de la entrega: ${label}`} id={`file-${phase}`} onChange={event => void addFiles(event.target.files)} />
         <Button type="button" variant="outline" className="h-auto w-full flex-col border-dashed py-6"
           disabled={locked || entries.length >= MAX_SUBMISSION_FILES} onClick={() => fileInput.current?.click()}>
           <Upload className="size-5" /> Toca para elegir archivos
         </Button>
         {processing && (
-          <p role="status" className="flex items-center gap-2 font-mono text-xs text-ink/70">
+          <p role="status" className="flex items-center gap-2 font-mono text-xs text-muted">
             <Loader2 className="size-4 animate-spin" /> {processing}
           </p>
         )}
@@ -191,7 +191,7 @@ export function SubmissionEditor({ eventId, projectId, phase, initial, userEmail
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         {onCancel && <Button type="button" variant="ghost" disabled={locked} onClick={onCancel}>Cancelar</Button>}
         <Button type="submit" loading={busy} disabled={locked}>
-          {initial ? "Guardar cambios" : `Entregar ${PHASE_LABEL[phase].toLowerCase()}`}
+          {initial ? "Guardar cambios" : `Entregar: ${label}`}
         </Button>
       </div>
     </form>

@@ -6,7 +6,7 @@
 /*
  * Tokens de color institucionales (inspirados en el logo TECNM Culiacán · Sistemas y TICs):
  *   ink     azul marino institucional para texto y elementos fuertes (se invierte en oscuro)
- *   paper   fondo blanco de la página (negro en modo oscuro)
+ *   paper   fondo de trabajo gris azulado, separado de las tarjetas
  *   surface tarjetas y paneles blancos
  *   night   paneles destacados en azul marino profundo (siguen oscuros en ambos modos)
  *   coal    azul marino oscuro fijo sobre acentos claros
@@ -14,12 +14,17 @@
  */
 @theme {
   --color-ink: #0b1536;
-  --color-paper: #ffffff;
+  --color-paper: #edf2f8;
   --color-surface: #ffffff;
+  --color-muted: #4d5e78;
+  --color-line: #c7d2e2;
+  --color-control: #7b89a0;
+  --color-field: #f7f9fc;
   --color-night: #0b1536;
   --color-coal: #0b1536;
   --color-lime: #cfe0ff;
   --color-sage: #93b4e8;
+  --shadow-panel: 0 2px 4px rgb(11 21 54 / 0.04), 0 8px 24px rgb(11 21 54 / 0.05);
 }
 
 @theme inline {
@@ -31,9 +36,14 @@
 @layer base {
   [data-theme="dark"] {
     --color-ink: #eef3ff;
-    --color-paper: #000000;
-    --color-surface: #171717;
-    --color-night: #15234d;
+    --color-paper: #0a1120;
+    --color-surface: #152238;
+    --color-muted: #b2c0d5;
+    --color-line: #40516b;
+    --color-control: #788ca9;
+    --color-field: #0e1a2e;
+    --color-night: #172d56;
+    --shadow-panel: 0 2px 4px rgb(0 0 0 / 0.12), 0 8px 24px rgb(0 0 0 / 0.16);
     color-scheme: dark;
   }
 
@@ -42,12 +52,18 @@
     --color-ink: #0b1536;
     --color-paper: #eef3fb;
     --color-surface: #ffffff;
+    --color-muted: #4d5e78;
+    --color-line: #a0b7dc;
+    --color-control: #7b89a0;
+    --color-field: #f7f9fc;
     --color-night: #0b1536;
     color: var(--color-ink);
   }
 
   html {
     -webkit-tap-highlight-color: transparent;
+    scroll-padding-top: 6rem;
+    color-scheme: light;
   }
 
   body {
@@ -55,6 +71,36 @@
     color: var(--color-ink);
     transition: background-color 0.2s ease;
   }
+
+  :where(a, button, input, textarea, select, [tabindex]):focus-visible {
+    outline: 3px solid var(--color-ink);
+    outline-offset: 3px;
+  }
+
+  :where(button, [role="switch"], input[type="range"]):not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+/* Superficies compartidas por los paneles de todos los roles. */
+@utility ui-panel {
+  border: 1px solid var(--color-line);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-panel);
+}
+
+@utility ui-interactive {
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+
+  &:hover {
+    border-color: var(--color-sage);
+    box-shadow: 0 4px 8px rgb(11 21 54 / 0.06), 0 12px 28px rgb(11 21 54 / 0.1);
+  }
+}
+
+@utility ui-inset {
+  border: 1px solid var(--color-line);
+  background-color: var(--color-field);
 }
 
 /* Avisos de estado en modo oscuro (fondos pastel → tintes translúcidos) */
@@ -107,6 +153,13 @@
   }
   body {
     transition: none;
+  }
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0s !important;
+    animation-duration: 0s !important;
   }
 }
 

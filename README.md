@@ -1,8 +1,10 @@
 # C.O.D.E · Evaluación de proyectos escolares
 
-Web app pensada primero para celular para organizar eventos de proyectos. Los equipos registran su proyecto y suben su prototipo y su producto final, los jueces califican con una rúbrica y el organizador publica los resultados. Incluye detección de similitud contra todos los proyectos históricos, modo claro y oscuro, y un panel de superadmin.
+Web app pensada primero para celular para organizar eventos de proyectos. El organizador define el nombre del evento, sus entregas y la rúbrica; los equipos registran su proyecto, los jueces califican y el organizador publica los resultados. Incluye detección de similitud contra todos los proyectos históricos, modo claro y oscuro, y un panel de superadmin.
 
 Stack: Next.js 16 (App Router) · React 19 · Tailwind 4 · Firebase (Auth + Firestore, proyecto `code-94fbe`) · Supabase Storage (archivos).
+
+Cada evento tiene nombre, instrucciones y criterios propios, definidos por el organizador al crearlo. Por ejemplo, **Carteles** y **Prototipos** se crean como dos eventos independientes, cada uno con su código, jueces y resultados. Cada evento admite una entrega y una segunda opcional, ambas con nombre libre. No se precargan criterios de evaluación; las categorías empiezan en General y se pueden personalizar. Los eventos anteriores conservan sus entregas y rúbricas.
 
 ## Arranque
 
@@ -54,7 +56,7 @@ Los permisos se guardan en `staff/{correo}` y funcionan aunque la persona todav�
 | --- | --- | --- |
 | Organizador | Crea el evento, lo agregan en «Jueces → Organizadores» o es admin | Abre y cierra etapas, invita jueces, edita la rúbrica, ve calificaciones y originalidad, publica resultados |
 | Juez | Su correo está en la lista de jueces, sin administrar ni concursar en ese evento | Califica de 0 a 10 por criterio con comentario, únicamente en sus categorías o proyectos asignados y etapas habilitadas |
-| Alumno | Entra con el código o un compañero lo agrega | Registra su proyecto, entrega prototipo y producto final mientras la etapa esté abierta, ve su resultado. Solo el líder agrega o quita integrantes |
+| Alumno | Entra con el código o un compañero lo agrega | Registra su proyecto, presenta las entregas definidas por el organizador mientras estén abiertas y ve su resultado. Solo el líder agrega o quita integrantes |
 
 Conflictos de interés que se bloquean (en la interfaz y en `firestore.rules`):
 

@@ -14,7 +14,7 @@ export function Leaderboard({
   highlightId?: string;
   linkable?: boolean;
 }) {
-  if (!rows.length) return <p className="font-mono text-xs text-ink/50">Sin calificaciones todavía.</p>;
+  if (!rows.length) return <p className="font-mono text-xs text-muted">Sin calificaciones todavía.</p>;
   return (
     <ol className="space-y-2">
       {rows.map((r, i) => {
@@ -30,8 +30,8 @@ export function Leaderboard({
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate font-medium">{r.title}</span>
-              <span className="font-mono text-[10px] text-ink/50">
-                {r.judges} juez{r.judges === 1 ? "" : "es"}
+              <span className="font-mono text-[10px] text-muted">
+                {r.judges} {r.judges === 1 ? "juez" : "jueces"}
               </span>
             </span>
             <span className="font-display text-xl font-bold tabular-nums">{r.score.toFixed(1)}</span>
@@ -39,7 +39,7 @@ export function Leaderboard({
         );
         const cls = cn(
           "flex items-center gap-3 rounded-2xl border px-3 py-2.5",
-          r.projectId === highlightId ? "border-ink bg-lime/30" : "border-ink/5 bg-surface",
+          r.projectId === highlightId ? "border-sage bg-lime/30 dark:bg-lime/10" : "border-line bg-surface",
         );
         return (
           <li key={r.projectId}>

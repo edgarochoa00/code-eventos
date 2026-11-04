@@ -168,6 +168,39 @@ describe("eventos", () => {
   test("búsqueda por código", async () => {
     await assertSucceeds(getDocs(query(collection(outsider, "events"), where("code", "==", "ABC123"))));
   });
+
+  test("cada evento guarda las entregas y la rúbrica que define su organizador", async () => {
+    const carteles = {
+      ...eventFor("org", "org@tec.mx"),
+      name: "Carteles",
+      phases: { prototype: true, final: false },
+      phaseDetails: { prototype: { name: "Cartel", description: "Presenta tu investigación en PDF." } },
+      criteria: [{ id: "diseno", name: "Diseño del cartel", description: "Claridad visual", weight: 100 }],
+    };
+    const prototipos = {
+      ...eventFor("org", "org@tec.mx"),
+      name: "Prototipos",
+      phases: { prototype: true, final: false },
+      phaseDetails: { prototype: { name: "Modelo funcional", description: "Presenta su funcionamiento." } },
+      criteria: [{ id: "prueba", name: "Demostración", description: "Funcionamiento en vivo", weight: 100 }],
+    };
+    await assertSucceeds(createEvent(org, "custom-carteles", carteles));
+    await assertSucceeds(createEvent(org, "custom-prototipos", prototipos));
+    const first = (await getDoc(doc(stu, "events/custom-carteles"))).data();
+    const second = (await getDoc(doc(judge, "events/custom-prototipos"))).data();
+    assert.deepEqual(first.phaseDetails, carteles.phaseDetails);
+    assert.deepEqual(first.criteria, carteles.criteria);
+    assert.deepEqual(second.phaseDetails, prototipos.phaseDetails);
+    assert.deepEqual(second.criteria, prototipos.criteria);
+    await assertSucceeds(updateDoc(doc(org, "events/custom-carteles"), {
+      "phaseDetails.prototype.name": "Cartel científico",
+    }));
+    await assertFails(updateDoc(doc(stu, "events/custom-carteles"), {
+      "phaseDetails.prototype.name": "Cambiado por alumno",
+    }));
+    await assertFails(updateDoc(doc(judge, "events/custom-carteles"), { criteria: prototipos.criteria }));
+    assert.equal((await getDoc(doc(org, "events/custom-prototipos"))).data().phaseDetails.prototype.name, "Modelo funcional");
+  });
 });
 
 describe("cuenta suspendida", () => {

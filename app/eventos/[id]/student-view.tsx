@@ -11,7 +11,8 @@ import { Badge, Card, EmptyState, ErrorNote, SectionTitle, Spinner, Tabs, firest
 import { useAuth } from "@/lib/auth";
 import { createProject, qMyEventProject } from "@/lib/data";
 import { useCollection } from "@/lib/hooks";
-import { PHASE_LABEL, PHASES, type EventDoc, type ProjectDoc } from "@/lib/types";
+import { getPhaseLabel } from "@/lib/event-config";
+import { PHASES, type EventDoc, type ProjectDoc } from "@/lib/types";
 import { cn, eventCategories, normalizeEmail } from "@/lib/utils";
 
 export function StudentView({ event }: { event: EventDoc }) {
@@ -58,13 +59,13 @@ export function StudentView({ event }: { event: EventDoc }) {
           >
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="font-mono text-[11px] text-white/60">Tu proyecto</p>
+                <p className="font-mono text-[11px] text-white/75">Tu proyecto</p>
                 {project.category && <Badge tone="lime">{project.category}</Badge>}
               </div>
-              <h2 className="mt-1 truncate font-display text-2xl font-bold">{project.title}</h2>
-              <p className="mt-1 line-clamp-2 font-mono text-[11px] text-white/60">{project.summary}</p>
+              <h2 className="mt-1 break-words font-display text-2xl font-bold leading-tight">{project.title}</h2>
+              <p className="mt-1 line-clamp-2 font-mono text-[11px] text-white/75">{project.summary}</p>
               <div className="mt-4">
-                <SubmissionBadges project={project} event={event} />
+                <SubmissionBadges project={project} event={event} onDark />
               </div>
             </div>
             <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-lime text-ink transition group-hover:rotate-45">
@@ -121,7 +122,7 @@ export function StudentView({ event }: { event: EventDoc }) {
               return (
                 <Card key={phase}>
                   <h3 className="mb-4 flex items-center gap-2 font-display text-lg font-bold">
-                    <Trophy className="size-5" /> {PHASE_LABEL[phase]}
+                    <Trophy className="size-5" /> {getPhaseLabel(event, phase)}
                     {resultCategory !== "all" && <Badge>{resultCategory}</Badge>}
                   </h3>
                   <Leaderboard rows={rows.slice(0, 10)} eventId={event.id} highlightId={project?.id} />
@@ -139,7 +140,7 @@ function ProjectProgress({ event, project }: { event: EventDoc; project: Project
   const steps = [
     { label: "Registro", done: true, note: "Listo" },
     ...PHASES.filter((p) => event.phases[p]).map((p) => ({
-      label: PHASE_LABEL[p],
+      label: getPhaseLabel(event, p),
       done: !!project[p],
       note: project[p] ? "Entregado" : event.submissions[p] ? "Abierto" : "Aún no abre",
     })),
@@ -148,13 +149,13 @@ function ProjectProgress({ event, project }: { event: EventDoc; project: Project
   return (
     <ol className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-2 sm:grid-cols-[repeat(4,minmax(0,1fr))]">
       {steps.map((s, i) => (
-        <li key={s.label} className={cn("rounded-2xl p-4", s.done ? "bg-lime" : "bg-surface")}>
+        <li key={s.label} className={cn("min-w-0 rounded-2xl border p-4", s.done ? "border-coal/25 bg-lime" : "border-line bg-surface shadow-panel")}>
           <div className="flex items-center justify-between">
-            <span className="font-mono text-[10px] text-ink/50">0{i + 1}</span>
+            <span className="font-mono text-[10px] text-muted">0{i + 1}</span>
             {s.done ? <CheckCircle2 className="size-4" /> : <Circle className="size-4 text-ink/30" />}
           </div>
           <p className="mt-3 text-sm font-medium">{s.label}</p>
-          <p className="font-mono text-[10px] text-ink/60">{s.note}</p>
+          <p className="font-mono text-[10px] text-muted">{s.note}</p>
         </li>
       ))}
     </ol>

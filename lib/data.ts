@@ -19,6 +19,7 @@ import {
 } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import { auth, db } from "./firebase";
+import { criteriaError, deliverySettingsError } from "./event-config";
 import { validateSubmissionFiles } from "./submission-files";
 import { removeSubmissionFile, verifySubmissionFiles } from "./submission-storage";
 import { buildFingerprint } from "./similarity";
@@ -28,6 +29,7 @@ import type {
   EventDoc,
   FingerprintDoc,
   Phase,
+  PhaseDetails,
   PhaseFeedback,
   ParticipantRoster,
   ProjectDoc,
@@ -37,8 +39,6 @@ import type {
 } from "./types";
 import { DEFAULT_ORIGINALITY, SUPERADMIN_EMAIL } from "./types";
 import {
-  DEFAULT_CATEGORIES,
-  DEFAULT_CRITERIA,
   effectiveEvaluationTotal,
   isProjectAssignedToJudge,
   normalizeEmail,
@@ -182,7 +182,7 @@ export async function upsertUserProfile(user: User) {
 
 /* ---------- Eventos ---------- */
 
-export type NewEventInput = {
+export type EventSettingsInput = {
   name: string;
   description: string;
   institution: string;
@@ -190,8 +190,11 @@ export type NewEventInput = {
   endDate: string;
   maxTeamSize: number;
   phases: Record<Phase, boolean>;
+  phaseDetails: Partial<Record<Phase, PhaseDetails>>;
   categories?: string[];
 };
+
+export type NewEventInput = EventSettingsInput & { criteria: Criterion[] };
 
 export async function generateUniqueEventCode() {
   for (let i = 0; i < 8; i++) {
@@ -203,21 +206,23 @@ export async function generateUniqueEventCode() {
 }
 
 export async function createEvent(input: NewEventInput, user: User) {
+  const error = deliverySettingsError(input) ?? criteriaError(input.criteria);
+  if (error) throw new Error(error);
   const email = normalizeEmail(user.email ?? "");
   const code = await generateUniqueEventCode();
   const data: Omit<EventDoc, "id"> = {
     ...input,
     accessVersion: 1,
-    categories: input.categories?.length ? input.categories : DEFAULT_CATEGORIES,
+    categories: input.categories?.length ? input.categories : ["General"],
     code,
     ownerId: user.uid,
     ownerEmail: email,
     organizerEmails: [email],
     judgeEmails: [],
-    submissions: { prototype: input.phases.prototype, final: false },
+    submissions: { ...input.phases },
     registrationOpen: true,
     judgingOpen: false,
-    criteria: DEFAULT_CRITERIA,
+    criteria: input.criteria.map((c) => ({ ...c, name: c.name.trim(), description: c.description.trim() })),
     resultsPublished: false,
     results: null,
     originality: DEFAULT_ORIGINALITY,
@@ -267,6 +272,8 @@ export async function findEventByCode(code: string) {
 }
 
 export function saveCriteria(eventId: string, criteria: Criterion[]) {
+  const error = criteriaError(criteria);
+  if (error) throw new Error(error);
   return updateDoc(eventRef(eventId), { criteria });
 }
 

@@ -9,6 +9,11 @@ export const PHASE_LABEL: Record<Phase, string> = {
   final: "Producto final",
 };
 
+export type PhaseDetails = {
+  name: string;
+  description: string;
+};
+
 export type Criterion = {
   id: string;
   name: string;
@@ -47,6 +52,8 @@ export type EventDoc = {
   organizerEmails: string[];
   judgeEmails: string[];
   phases: Record<Phase, boolean>;
+  /** Nombres e instrucciones del organizador; los eventos antiguos conservan sus etiquetas. */
+  phaseDetails?: Partial<Record<Phase, PhaseDetails>>;
   submissions: Record<Phase, boolean>;
   registrationOpen: boolean;
   judgingOpen: boolean;

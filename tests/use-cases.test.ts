@@ -1,6 +1,7 @@
 // Casos de uso integrales por rol, lógica de negocio, evaluación y originalidad (sin conectar a la nube).
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
+import { criteriaError, deliverySettingsError, getPhaseDetails, getPhaseLabel } from "../lib/event-config";
 import {
   analysisState,
   buildFingerprint,
@@ -84,6 +85,93 @@ const makeProject = (overrides: Partial<ProjectDoc> = {}): ProjectDoc => ({
   createdAt: null,
   updatedAt: null,
   ...overrides,
+});
+
+describe("Configuración de cada evento por su organizador", () => {
+  const carteles: EventDoc = {
+    ...baseEvent,
+    name: "Carteles",
+    phases: { prototype: true, final: false },
+    phaseDetails: { prototype: { name: "Cartel", description: "Presenta un cartel con los resultados de tu investigación." } },
+    criteria: [{ id: "claridad", name: "Claridad visual", description: "Lectura y organización del cartel", weight: 100 }],
+  };
+  const prototipos: EventDoc = {
+    ...baseEvent,
+    name: "Prototipos",
+    phases: { prototype: true, final: false },
+    phaseDetails: { prototype: { name: "Modelo funcional", description: "Explica y demuestra su funcionamiento." } },
+    criteria: [{ id: "demostracion", name: "Demostración", description: "Funcionamiento en vivo", weight: 100 }],
+  };
+
+  test("Carteles y Prototipos tienen entregas, instrucciones y criterios independientes", () => {
+    assert.equal(getPhaseLabel(carteles, "prototype"), "Cartel");
+    assert.equal(getPhaseLabel(prototipos, "prototype"), "Modelo funcional");
+    assert.match(getPhaseDetails(carteles, "prototype").description, /investigación/);
+    assert.equal(deliverySettingsError(carteles), null);
+    assert.equal(deliverySettingsError(prototipos), null);
+    assert.equal(criteriaError(carteles.criteria), null);
+    assert.equal(weightedTotal(carteles.criteria, { claridad: 8 }), 80);
+    assert.equal(weightedTotal(prototipos.criteria, { demostracion: 9.5 }), 95);
+    assert.equal(carteles.criteria[0].name, "Claridad visual");
+  });
+
+  test("las entregas históricas conservan sus etiquetas y sus instrucciones", () => {
+    assert.equal(getPhaseLabel(baseEvent, "prototype"), "Prototipo");
+    assert.equal(getPhaseLabel(baseEvent, "final"), "Producto final");
+    assert.match(getPhaseDetails(baseEvent, "prototype").description, /Qué funciona ya/);
+    assert.equal(baseEvent.phaseDetails, undefined);
+    assert.equal(getPhaseLabel(carteles, "final"), "Producto final");
+  });
+
+  test("una entrega personalizada sin instrucciones no hereda las de prototipo", () => {
+    assert.deepEqual(getPhaseDetails({ phaseDetails: { prototype: { name: "Cartel", description: "" } } }, "prototype"), {
+      name: "Cartel", description: "",
+    });
+  });
+
+  test("permite una sola entrega en cualquiera de los espacios y una segunda opcional", () => {
+    assert.equal(deliverySettingsError({
+      phases: { prototype: false, final: true },
+      phaseDetails: { final: { name: "Exposición", description: "" } },
+    }), null);
+    assert.equal(deliverySettingsError({
+      phases: { prototype: true, final: true },
+      phaseDetails: {
+        prototype: { name: "Cartel", description: "" },
+        final: { name: "Defensa oral", description: "" },
+      },
+    }), null);
+  });
+
+  test("rechaza entregas sin nombre, duplicadas, demasiado largas o todas desactivadas", () => {
+    assert.ok(deliverySettingsError({ phases: { prototype: false, final: false } }));
+    assert.ok(deliverySettingsError({ phases: carteles.phases }));
+    assert.ok(deliverySettingsError({ ...carteles, phaseDetails: { prototype: { name: "  ", description: "" } } }));
+    assert.ok(deliverySettingsError({
+      phases: { prototype: true, final: true },
+      phaseDetails: {
+        prototype: { name: "Cartel", description: "" },
+        final: { name: " CARTEL ", description: "" },
+      },
+    }));
+    assert.ok(deliverySettingsError({ ...carteles, phaseDetails: { prototype: { name: "a".repeat(81), description: "" } } }));
+    assert.ok(deliverySettingsError({ ...carteles, phaseDetails: { prototype: { name: "Cartel", description: "a".repeat(2001) } } }));
+  });
+
+  test("la rúbrica necesita criterios propios con nombres y pesos válidos", () => {
+    assert.ok(criteriaError([]));
+    assert.ok(criteriaError([{ id: "a", name: "  ", description: "", weight: 100 }]));
+    for (const weight of [0, -1, 101, NaN, Infinity]) {
+      assert.ok(criteriaError([{ id: "a", name: "Diseño", description: "", weight }]));
+    }
+    assert.ok(criteriaError([...carteles.criteria, ...carteles.criteria]));
+    assert.ok(criteriaError(Array.from({ length: 21 }, (_, i) => ({ id: `c${i}`, name: `Criterio ${i}`, description: "", weight: 1 }))));
+    assert.equal(criteriaError([
+      { id: "a", name: "Diseño", description: "", weight: 3 },
+      { id: "b", name: "Contenido", description: "", weight: 7 },
+      { id: "c", name: "Opcional", description: "", weight: 0 },
+    ]), null);
+  });
 });
 
 describe("Casos de uso · Roles y permisos en eventos (rolesInEvent)", () => {

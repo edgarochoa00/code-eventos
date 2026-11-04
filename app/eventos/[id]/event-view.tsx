@@ -10,7 +10,8 @@ import { useAccess } from "@/lib/access";
 import { useAuth } from "@/lib/auth";
 import { eventRef, prepareEventAccess, qMyEventProject } from "@/lib/data";
 import { useCollection, useDocument } from "@/lib/hooks";
-import { PHASE_LABEL, PHASES, type EventDoc, type EventRole, type ProjectDoc } from "@/lib/types";
+import { getPhaseLabel } from "@/lib/event-config";
+import { PHASES, type EventDoc, type EventRole, type ProjectDoc } from "@/lib/types";
 import { formatDate, normalizeEmail, rolesInEvent } from "@/lib/utils";
 import { JudgeView } from "./judge-view";
 import { OrganizerView } from "./organizer-view";
@@ -48,7 +49,7 @@ export function EventView() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link href="/panel" className="inline-flex items-center gap-1.5 font-mono text-xs text-ink/60 hover:text-ink">
+        <Link href="/panel" className="inline-flex items-center gap-1.5 font-mono text-xs text-muted hover:text-ink">
           <ArrowLeft className="size-3.5" /> Panel
         </Link>
       </div>
@@ -106,7 +107,7 @@ function EventHeader({ event, role, viaAdmin }: { event: EventDoc; role: EventRo
 
   return (
     <section className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[1.6fr_1fr]">
-      <div className="min-w-0 rounded-3xl bg-surface p-6 sm:p-8">
+      <div className="min-w-0 ui-panel rounded-3xl p-6 sm:p-8">
         <div className="flex flex-wrap gap-1.5">
           <EventStatus event={event} />
           <Badge tone={role === "organizer" ? "dark" : role === "judge" ? "lime" : "neutral"}>
@@ -114,12 +115,12 @@ function EventHeader({ event, role, viaAdmin }: { event: EventDoc; role: EventRo
           </Badge>
         </div>
         <h1 className="mt-4 break-words font-display text-3xl font-bold leading-tight sm:text-4xl">{event.name}</h1>
-        {event.institution && <p className="mt-1 font-mono text-xs text-ink/60">{event.institution}</p>}
+        {event.institution && <p className="mt-1 font-mono text-xs text-muted">{event.institution}</p>}
         {event.description && (
           <p className="mt-4 max-w-2xl whitespace-pre-line text-sm leading-relaxed text-ink/80">{event.description}</p>
         )}
         {(event.startDate || event.endDate) && (
-          <p className="mt-4 flex items-center gap-1.5 font-mono text-[11px] text-ink/55">
+          <p className="mt-4 flex items-center gap-1.5 font-mono text-[11px] text-muted">
             <CalendarDays className="size-3.5" /> {formatDate(event.startDate)}
             {event.endDate && ` – ${formatDate(event.endDate)}`}
           </p>
@@ -129,10 +130,10 @@ function EventHeader({ event, role, viaAdmin }: { event: EventDoc; role: EventRo
         // Solo el organizador necesita el código para invitar equipos
         <div className="flex flex-col justify-between gap-6 rounded-3xl bg-lime p-6 sm:p-8">
           <div>
-            <p className="font-mono text-[11px] text-ink/70">Código para los equipos</p>
+            <p className="font-mono text-[11px] text-muted">Código para los equipos</p>
             <p className="mt-1 font-mono text-4xl font-bold tracking-[0.2em]">{event.code}</p>
-            <p className="mt-2 font-mono text-[11px] text-ink/70">
-              Etapas: {phaseNames(event)} · Equipos de hasta {event.maxTeamSize}
+            <p className="mt-2 font-mono text-[11px] text-muted">
+              Entregas: {phaseNames(event)} · Equipos de hasta {event.maxTeamSize}
             </p>
           </div>
           <Button variant="dark" onClick={share} className="self-start">
@@ -148,7 +149,7 @@ function EventHeader({ event, role, viaAdmin }: { event: EventDoc; role: EventRo
 }
 
 function phaseNames(event: EventDoc) {
-  return [event.phases.prototype && "Prototipo", event.phases.final && "Producto final"].filter(Boolean).join(" + ");
+  return PHASES.filter((phase) => event.phases[phase]).map((phase) => getPhaseLabel(event, phase)).join(" + ");
 }
 
 /** Estado del evento desde el punto de vista del juez o del alumno. */
@@ -158,7 +159,7 @@ function StatusCard({ event, role }: { event: EventDoc; role: EventRole }) {
       ? [
           { label: "Evaluación", open: event.judgingOpen, on: "Abierta, ya puedes calificar", off: "Aún no abre" },
           ...PHASES.filter((p) => event.phases[p]).map((p) => ({
-            label: PHASE_LABEL[p],
+            label: getPhaseLabel(event, p),
             open: event.submissions[p],
             on: "Los equipos están entregando",
             off: "Entregas cerradas",
@@ -168,7 +169,7 @@ function StatusCard({ event, role }: { event: EventDoc; role: EventRole }) {
       : [
           { label: "Registro", open: event.registrationOpen, on: "Abierto", off: "Cerrado" },
           ...PHASES.filter((p) => event.phases[p]).map((p) => ({
-            label: `Entrega de ${PHASE_LABEL[p].toLowerCase()}`,
+            label: `Entrega: ${getPhaseLabel(event, p)}`,
             open: event.submissions[p],
             on: "Abierta",
             off: "Cerrada",
@@ -178,8 +179,8 @@ function StatusCard({ event, role }: { event: EventDoc; role: EventRole }) {
 
   return (
     <div className="rounded-3xl bg-lime p-6 sm:p-8">
-      <p className="font-mono text-[11px] text-ink/70">{role === "judge" ? "Tu evaluación" : "Etapas del evento"}</p>
-      <ul className="mt-3 divide-y divide-ink/10">
+      <p className="font-mono text-[11px] text-muted">{role === "judge" ? "Tu evaluación" : "Etapas del evento"}</p>
+      <ul className="mt-3 divide-y divide-line">
         {rows.map((r) => (
           <li key={r.label} className="flex items-center justify-between gap-3 py-2.5">
             <span className="text-sm font-medium">{r.label}</span>
@@ -190,7 +191,7 @@ function StatusCard({ event, role }: { event: EventDoc; role: EventRole }) {
           </li>
         ))}
       </ul>
-      <p className="mt-3 font-mono text-[10px] text-ink/60">
+      <p className="mt-3 font-mono text-[10px] text-muted">
         {role === "judge"
           ? `Rúbrica de ${event.criteria.length} criterio${event.criteria.length === 1 ? "" : "s"} · calificas de 0 a 10`
           : `Equipos de hasta ${event.maxTeamSize} integrantes`}

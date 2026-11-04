@@ -13,6 +13,7 @@ import {
   useState,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
+  type KeyboardEvent,
   type ReactNode,
   type TextareaHTMLAttributes,
 } from "react";
@@ -20,12 +21,14 @@ import { cn } from "@/lib/utils";
 
 /* ---------- Botones ---------- */
 
-type Variant = "primary" | "dark" | "outline" | "ghost" | "danger";
+type Variant = "primary" | "dark" | "accent" | "outline" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg";
 
 const VARIANTS: Record<Variant, string> = {
+  accent:
+    "border-2 border-lime bg-lime text-coal shadow-sm hover:border-sage hover:bg-sage",
   primary:
-    "bg-[#0b1536] text-white border-2 border-[#0b1536] ring-1 ring-inset ring-white/85 shadow-xs hover:bg-[#142459] active:bg-[#081029] dark:bg-[#162a66] dark:text-white dark:border-white/80 dark:ring-white/35 dark:hover:bg-[#1f3a8a]",
+    "bg-[#0b1536] text-white border-2 border-[#0b1536] shadow-sm hover:bg-[#142459] active:bg-[#081029] dark:bg-[#cfe0ff] dark:text-[#0b1536] dark:border-[#cfe0ff] dark:hover:bg-[#b8d0fa]",
   dark:
     "bg-ink text-surface border-2 border-ink ring-1 ring-inset ring-surface/75 shadow-xs hover:bg-ink/90",
   outline:
@@ -37,13 +40,13 @@ const VARIANTS: Record<Variant, string> = {
 };
 
 const SIZES: Record<Size, string> = {
-  sm: "h-9 px-4 text-[11px]",
-  md: "h-11 px-5 text-xs",
-  lg: "h-12 px-6 text-xs sm:text-sm",
+  sm: "min-h-11 px-4 py-2 text-[11px]",
+  md: "min-h-11 px-5 py-2.5 text-xs",
+  lg: "min-h-12 px-6 py-3 text-xs sm:text-sm",
 };
 
 const base =
-  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full font-display font-bold uppercase tracking-[0.08em] transition active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink";
+  "inline-flex max-w-full shrink-0 items-center justify-center gap-2 whitespace-normal rounded-full text-center font-display font-bold uppercase leading-snug tracking-[0.06em] transition-transform active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink [&>svg]:shrink-0";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant;
@@ -91,7 +94,7 @@ export function ButtonLink({
 /* ---------- Contenedores ---------- */
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
-  return <div className={cn("rounded-3xl border-2 border-ink/10 bg-surface p-5 shadow-2xs sm:p-6", className)}>{children}</div>;
+  return <div className={cn("ui-panel min-w-0 rounded-3xl p-5 sm:p-6", className)}>{children}</div>;
 }
 
 export function SectionTitle({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
@@ -99,7 +102,7 @@ export function SectionTitle({ title, subtitle, action }: { title: string; subti
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
       <div>
         <h2 className="font-display text-xl font-extrabold uppercase tracking-[0.04em] sm:text-2xl">{title}</h2>
-        {subtitle && <p className="mt-1 font-sans text-xs font-medium text-ink/65">{subtitle}</p>}
+        {subtitle && <p className="mt-1 font-sans text-xs font-medium text-muted">{subtitle}</p>}
       </div>
       {action}
     </div>
@@ -112,11 +115,12 @@ export function Badge({
   className,
 }: {
   children: ReactNode;
-  tone?: "neutral" | "lime" | "dark" | "red" | "amber" | "green";
+  tone?: "neutral" | "lime" | "dark" | "red" | "amber" | "green" | "on-dark";
   className?: string;
 }) {
   const tones = {
-    neutral: "border border-ink/15 bg-ink/5 text-ink/80",
+    neutral: "border border-line bg-field text-muted",
+    "on-dark": "border border-white/30 bg-white/10 text-white",
     lime: "border border-coal/20 bg-lime text-coal",
     dark: "border border-ink bg-ink text-surface",
     red: "border border-red-300 bg-red-100 text-red-700",
@@ -126,7 +130,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-1 font-display text-[10px] font-bold uppercase tracking-[0.08em]",
+        "inline-flex max-w-full items-center gap-1 rounded-full px-3 py-1 font-display text-[10px] font-bold uppercase leading-relaxed tracking-[0.06em] [&>svg]:shrink-0",
         tones[tone],
         className,
       )}
@@ -138,7 +142,7 @@ export function Badge({
 
 export function Spinner({ label = "Cargando" }: { label?: string }) {
   return (
-    <div className="flex items-center justify-center gap-2 py-16 font-display text-xs font-bold uppercase tracking-[0.08em] text-ink/60" role="status">
+    <div className="flex items-center justify-center gap-2 py-16 font-display text-xs font-bold uppercase tracking-[0.08em] text-muted" role="status">
       <Loader2 className="size-4 animate-spin" aria-hidden />
       {label}…
     </div>
@@ -147,10 +151,10 @@ export function Spinner({ label = "Cargando" }: { label?: string }) {
 
 export function EmptyState({ icon, title, text, action }: { icon?: ReactNode; title: string; text?: string; action?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center rounded-3xl border-2 border-dashed border-ink/15 bg-surface/60 px-6 py-10 text-center">
+    <div className="flex flex-col items-center rounded-3xl border-2 border-dashed border-line bg-surface px-6 py-10 text-center">
       {icon && <div className="mb-3 grid size-12 place-items-center rounded-full border-2 border-coal/15 bg-lime text-coal">{icon}</div>}
       <p className="font-display text-lg font-extrabold uppercase tracking-[0.04em]">{title}</p>
-      {text && <p className="mt-1 max-w-sm font-sans text-xs font-medium leading-relaxed text-ink/65">{text}</p>}
+      {text && <p className="mt-1 max-w-sm font-sans text-xs font-medium leading-relaxed text-muted">{text}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
   );
@@ -177,14 +181,14 @@ export function Field({
         {label}
       </label>
       {children}
-      {hint && !error && <p className="font-sans text-[11px] font-medium text-ink/55">{hint}</p>}
+      {hint && !error && <p className="font-sans text-[11px] font-medium text-muted">{hint}</p>}
       {error && <p className="font-sans text-[11px] font-semibold text-red-600">{error}</p>}
     </div>
   );
 }
 
 const inputBase =
-  "w-full rounded-2xl border-2 border-ink/15 bg-paper px-4 py-3 font-sans text-base font-medium text-ink placeholder:text-ink/40 outline-none transition focus:border-ink focus:bg-surface sm:text-sm";
+  "w-full min-w-0 rounded-2xl border-2 border-control bg-field px-4 py-3 font-sans text-base font-medium text-ink placeholder:text-muted outline-none transition focus:border-ink focus:bg-surface disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm";
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input(
   { className, ...props },
@@ -219,7 +223,7 @@ export function Toggle({
         <label htmlFor={id} className="block font-display text-xs font-bold uppercase tracking-[0.06em]">
           {label}
         </label>
-        {description && <p className="mt-0.5 font-sans text-[11px] font-medium text-ink/60">{description}</p>}
+        {description && <p className="mt-0.5 font-sans text-[11px] font-medium text-muted">{description}</p>}
       </div>
       <button
         id={id}
@@ -229,13 +233,13 @@ export function Toggle({
         disabled={disabled}
         onClick={() => onChange(!checked)}
         className={cn(
-          "relative h-7 w-12 shrink-0 rounded-full transition disabled:opacity-50",
-          checked ? "bg-ink dark:bg-lime" : "bg-ink/15",
+          "relative h-11 w-14 shrink-0 rounded-full border-2 transition disabled:opacity-50",
+          checked ? "border-ink bg-ink dark:border-lime dark:bg-lime" : "border-muted bg-muted",
         )}
       >
         <span
           className={cn(
-            "absolute top-1 size-5 rounded-full shadow-sm transition-all",
+            "absolute top-2 size-6 rounded-full shadow-sm transition-all",
             checked ? "left-6 bg-lime dark:bg-coal" : "left-1 bg-white",
           )}
         />
@@ -245,6 +249,18 @@ export function Toggle({
 }
 
 /* ---------- Pestañas ---------- */
+
+function navigateOptions(event: KeyboardEvent<HTMLButtonElement>, role: "tab" | "radio") {
+  const keys = ["ArrowLeft", "ArrowRight", "Home", "End"];
+  if (!keys.includes(event.key)) return;
+  const options = Array.from(event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(`[role="${role}"]:not(:disabled)`) ?? []);
+  if (!options.length) return;
+  const current = options.indexOf(event.currentTarget);
+  const next = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1 : (current + (event.key === "ArrowRight" ? 1 : -1) + options.length) % options.length;
+  event.preventDefault();
+  options[next].focus();
+  options[next].click();
+}
 
 export function Tabs<T extends string>({
   tabs,
@@ -256,24 +272,26 @@ export function Tabs<T extends string>({
   onChange: (id: T) => void;
 }) {
   return (
-    <div className="no-scrollbar -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0" role="tablist">
-      <div className="inline-flex gap-1.5 rounded-full border-2 border-ink/15 bg-paper p-1">
+    <div className="min-w-0 max-w-full overflow-x-auto pb-2" role="tablist">
+      <div className="inline-flex gap-1.5 rounded-2xl border border-line bg-surface p-1.5 shadow-xs">
         {tabs.map((t) => (
           <button
             key={t.id}
             role="tab"
             type="button"
             aria-selected={value === t.id}
+            tabIndex={value === t.id ? 0 : -1}
+            onKeyDown={(e) => navigateOptions(e, "tab")}
             onClick={(e) => {
               onChange(t.id);
               // En celular, desplaza la pestaña elegida a la vista
               e.currentTarget.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
             }}
             className={cn(
-              "flex min-h-10 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 font-display text-xs font-bold uppercase tracking-[0.08em] transition",
+              "flex min-h-11 items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 font-display text-xs font-bold uppercase tracking-[0.06em] transition-shadow",
               value === t.id
-                ? "bg-[#0b1536] text-white ring-1 ring-inset ring-white/80 shadow-xs dark:bg-[#162a66] dark:text-white dark:ring-white/40"
-                : "text-ink/70 hover:text-ink",
+                ? "bg-ink text-surface shadow-sm"
+                : "text-muted hover:bg-field hover:text-ink",
             )}
           >
             {t.label}
@@ -305,20 +323,22 @@ export function Segmented<T extends string>({
   disabled?: boolean;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-1.5 rounded-full border-2 border-ink/15 bg-paper p-1">
+    <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-1.5 rounded-2xl border border-line bg-field p-1.5">
       {options.map((o) => (
         <button
           key={o.id}
           type="button"
           role="radio"
           aria-checked={value === o.id}
+          tabIndex={value === o.id ? 0 : -1}
+          onKeyDown={(e) => navigateOptions(e, "radio")}
           disabled={disabled}
           onClick={() => onChange(o.id)}
           className={cn(
-            "min-h-10 flex-1 whitespace-nowrap rounded-full px-3.5 py-2 font-display text-[11px] font-bold uppercase tracking-[0.06em] transition disabled:opacity-50",
+            "min-h-11 flex-1 rounded-xl px-3.5 py-2 font-display text-[11px] font-bold uppercase tracking-[0.06em] transition-shadow disabled:opacity-50",
             value === o.id
-              ? "bg-[#0b1536] text-white ring-1 ring-inset ring-white/80 shadow-xs dark:bg-[#162a66] dark:text-white dark:ring-white/40"
-              : "text-ink/70 hover:text-ink",
+              ? "bg-ink text-surface shadow-sm"
+              : "text-muted hover:bg-surface hover:text-ink",
           )}
         >
           {o.label}
@@ -354,11 +374,11 @@ export function Modal({
       ref={ref}
       onClose={onClose}
       onClick={(e) => e.target === ref.current && onClose()}
-      className="m-auto w-[calc(100%-2rem)] max-w-lg rounded-3xl bg-surface p-0 text-ink backdrop:bg-black/55 backdrop:backdrop-blur-sm max-sm:mb-0 max-sm:w-full max-sm:max-w-none max-sm:rounded-b-none"
+      className="ui-panel m-auto w-[calc(100%-2rem)] max-w-lg rounded-3xl p-0 text-ink backdrop:bg-black/55 backdrop:backdrop-blur-sm max-sm:mb-0 max-sm:w-full max-sm:max-w-none max-sm:rounded-b-none"
     >
-      <div className="flex items-center justify-between border-b border-ink/5 px-5 py-4">
+      <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
         <h2 className="font-display text-lg font-bold">{title}</h2>
-        <button onClick={onClose} className="grid size-9 place-items-center rounded-lg hover:bg-ink/5" aria-label="Cerrar">
+        <button onClick={onClose} className="grid size-11 shrink-0 place-items-center rounded-lg hover:bg-ink/5" aria-label="Cerrar">
           <X className="size-4" />
         </button>
       </div>

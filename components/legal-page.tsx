@@ -35,21 +35,21 @@ export function LegalPage({ documentKey }: { documentKey: LegalDocumentKey | "ve
       </header>
 
       <main id="contenido" className="mx-auto w-full max-w-6xl flex-1 px-4 pb-16 sm:px-8">
-        <Link href="/" className="inline-flex min-h-11 items-center gap-2 font-mono text-xs text-ink/55 hover:text-ink">
+        <Link href="/" className="inline-flex min-h-11 items-center gap-2 font-mono text-xs text-muted hover:text-ink">
           <ArrowLeft className="size-4" aria-hidden /> Volver a {APP_NAME}
         </Link>
 
-        <div className="mt-2 rounded-[2rem] bg-surface p-7 sm:p-10">
-          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink/50">
+        <div className="mt-2 ui-panel rounded-[2rem] p-7 sm:p-10">
+          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
             {doc ? "Información del servicio · México" : "Evolución del producto"}
           </p>
           <h1 className="mt-4 max-w-3xl font-display text-[2.1rem] font-bold leading-[1.08] tracking-tight sm:text-5xl">
             {doc ? doc.title : `Versiones de ${APP_NAME}`}
           </h1>
-          <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-ink/70">
+          <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-muted">
             {doc ? doc.intro : "Las mejoras que llegan a tus eventos, versión por versión."}
           </p>
-          <div className="mt-6 flex flex-wrap gap-2 font-mono text-[11px] text-ink/65">
+          <div className="mt-6 flex flex-wrap gap-2 font-mono text-[11px] text-muted">
             {doc ? (
               <>
                 <span className="rounded-full bg-ink/5 px-3 py-1.5">Actualizado · {LEGAL_UPDATED_LABEL}</span>
@@ -66,9 +66,9 @@ export function LegalPage({ documentKey }: { documentKey: LegalDocumentKey | "ve
         {doc ? <DocumentBody doc={doc} deviceLink={documentKey === "cookies"} /> : <ReleaseList />}
       </main>
 
-      <footer className="border-t border-ink/5 px-4 pb-[max(2rem,calc(env(safe-area-inset-bottom)+1.25rem))] pt-6">
+      <footer className="border-t border-line px-4 pb-[max(2rem,calc(env(safe-area-inset-bottom)+1.25rem))] pt-6">
         <LegalLinks />
-        <p className="mt-2 text-center font-mono text-[10px] text-ink/40">{APP_TAGLINE} · Evaluación de proyectos</p>
+        <p className="mt-2 text-center font-mono text-[10px] text-muted">{APP_TAGLINE} · Evaluación de proyectos</p>
       </footer>
     </div>
   );
@@ -77,14 +77,14 @@ export function LegalPage({ documentKey }: { documentKey: LegalDocumentKey | "ve
 function DocumentBody({ doc, deviceLink }: { doc: LegalDocument; deviceLink: boolean }) {
   return (
     <div className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-14">
-      <nav aria-label="Contenido del documento" className="border-b border-ink/10 pb-4 lg:sticky lg:top-6 lg:self-start lg:border-0 lg:pb-0">
-        <p className="font-mono text-[11px] text-ink/45">En esta página</p>
+      <nav aria-label="Contenido del documento" className="border-b border-line pb-4 lg:sticky lg:top-6 lg:self-start lg:border-0 lg:pb-0">
+        <p className="font-mono text-[11px] text-muted">En esta página</p>
         <ul className="mt-2 lg:mt-3">
           {doc.sections.map((section) => (
             <li key={section.id}>
               <a
                 href={`#${section.id}`}
-                className="flex min-h-11 items-center font-mono text-xs leading-snug text-ink/60 hover:text-ink lg:min-h-0 lg:py-1.5"
+                className="flex min-h-11 items-center font-mono text-xs leading-snug text-muted hover:text-ink lg:min-h-0 lg:py-1.5"
               >
                 {section.title}
               </a>
@@ -99,7 +99,7 @@ function DocumentBody({ doc, deviceLink }: { doc: LegalDocument; deviceLink: boo
             key={section.id}
             id={section.id}
             aria-labelledby={`${section.id}-titulo`}
-            className="scroll-mt-6 border-b border-ink/10 py-7 first:pt-0 last:border-0"
+            className="scroll-mt-6 border-b border-line py-7 first:pt-0 last:border-0"
           >
             <h2 id={`${section.id}-titulo`} className="font-display text-xl font-bold sm:text-2xl">
               {section.title}
@@ -113,7 +113,7 @@ function DocumentBody({ doc, deviceLink }: { doc: LegalDocument; deviceLink: boo
               <a
                 key={link.href}
                 href={link.href}
-                className="mt-2 inline-flex min-h-11 max-w-full items-center font-mono text-xs font-medium underline underline-offset-4 [overflow-wrap:anywhere] hover:text-ink/70"
+                className="mt-2 inline-flex min-h-11 max-w-full items-center font-mono text-xs font-medium underline underline-offset-4 [overflow-wrap:anywhere] hover:text-muted"
               >
                 {link.label}
               </a>
@@ -125,13 +125,13 @@ function DocumentBody({ doc, deviceLink }: { doc: LegalDocument; deviceLink: boo
           <Link
             href="/panel/privacidad"
             prefetch={false}
-            className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-xl border border-ink/15 bg-surface px-4 py-2.5 font-mono text-xs font-medium hover:border-ink/40"
+            className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-xl border border-line bg-surface px-4 py-2.5 font-mono text-xs font-medium hover:border-ink/40"
           >
             Administrar datos de este dispositivo <ArrowUpRight className="size-4 shrink-0" aria-hidden />
           </Link>
         )}
 
-        <section aria-labelledby="referencias-titulo" className="mt-10 border-t border-ink/10 pt-6">
+        <section aria-labelledby="referencias-titulo" className="mt-10 border-t border-line pt-6">
           <h2 id="referencias-titulo" className="font-mono text-xs font-medium">
             Referencias
           </h2>
@@ -142,7 +142,7 @@ function DocumentBody({ doc, deviceLink }: { doc: LegalDocument; deviceLink: boo
                   href={ref.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex min-h-11 items-center gap-1 font-mono text-[11px] text-ink/60 underline underline-offset-2 hover:text-ink"
+                  className="inline-flex min-h-11 items-center gap-1 font-mono text-[11px] text-muted underline underline-offset-2 hover:text-ink"
                 >
                   {ref.label} <ArrowUpRight className="size-3" aria-hidden />
                   <span className="sr-only">(se abre en otra pestaña)</span>
@@ -162,14 +162,14 @@ function ReleaseList() {
       {RELEASES.map((release, i) => (
         <li
           key={release.version}
-          className="grid grid-cols-[minmax(0,1fr)] gap-4 border-t border-ink/10 py-8 first:border-0 first:pt-0 sm:grid-cols-[180px_minmax(0,1fr)] sm:gap-10"
+          className="grid grid-cols-[minmax(0,1fr)] gap-4 border-t border-line py-8 first:border-0 first:pt-0 sm:grid-cols-[180px_minmax(0,1fr)] sm:gap-10"
         >
           <div className="flex flex-wrap items-center gap-2 sm:flex-col sm:items-start">
             <span className={cn("rounded-full px-3 py-1 font-mono text-sm font-bold", i === 0 ? "bg-lime text-coal" : "bg-ink/5")}>
               v{release.version}
             </span>
-            <span className="font-mono text-[11px] text-ink/50">{release.date}</span>
-            {i === 0 && <span className="font-mono text-[10px] uppercase tracking-wider text-ink/45">Versión actual</span>}
+            <span className="font-mono text-[11px] text-muted">{release.date}</span>
+            {i === 0 && <span className="font-mono text-[10px] uppercase tracking-wider text-muted">Versión actual</span>}
           </div>
           <div className="min-w-0">
             <h2 className="font-display text-xl font-bold sm:text-2xl">{release.title}</h2>

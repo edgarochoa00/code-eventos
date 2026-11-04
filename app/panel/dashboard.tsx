@@ -20,12 +20,19 @@ import {
 } from "@/components/ui";
 import { useAccess } from "@/lib/access";
 import { useAuth } from "@/lib/auth";
-import { findEventByCode, qJudgeEvents, qMyProjects, qOpenEvents, qOrganizerEvents } from "@/lib/data";
-import { useCollection } from "@/lib/hooks";
+import { eventRef, findEventByCode, qJudgeEvents, qMyProjects, qOpenEvents, qOrganizerEvents } from "@/lib/data";
+import { useCollection, useDocument } from "@/lib/hooks";
 import type { EventDoc, ProjectDoc } from "@/lib/types";
 import { rolesInEvent } from "@/lib/utils";
 
 const GRID = "grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-[repeat(2,minmax(0,1fr))] lg:grid-cols-[repeat(3,minmax(0,1fr))]";
+
+function ProjectDeliveryBadges({ project }: { project: ProjectDoc }) {
+  const event = useDocument<EventDoc>(eventRef(project.eventId), `project-event:${project.eventId}`);
+  if (event.loading) return <span className="font-mono text-xs text-muted">Consultando entregas…</span>;
+  if (!event.data) return <Badge>Evento no disponible</Badge>;
+  return <SubmissionBadges project={project} event={event.data} />;
+}
 
 export function Dashboard() {
   const { user } = useAuth();
@@ -73,7 +80,7 @@ export function Dashboard() {
   const projectEvents = new Set(projects.data.map((p) => p.eventId));
   const discover = open.data.filter((e) => !mine.has(e.id) && !projectEvents.has(e.id));
 
-  let intro = "Registra tu proyecto con el código que te dio tu organizador y entrega tu prototipo y producto final.";
+  let intro = "Registra tu proyecto con el código que te dio tu organizador y presenta las entregas que definió para tu evento.";
   if (access.isAdmin) intro = "Administras la plataforma: crea eventos, revisa todos en Administración y asigna jueces y permisos.";
   else if (isStaff) intro = "Crea tus eventos, invita jueces y sigue el avance de los equipos.";
   else if (organizesSomething) intro = "Administras los eventos donde te agregaron como organizador.";
@@ -85,7 +92,7 @@ export function Dashboard() {
       <div>
         <Ticket className="size-6" />
         <h2 className="mt-3 font-display text-xl font-bold">{isParticipant ? "¿Tienes un código?" : "Ir a un evento"}</h2>
-        <p className="mt-1 font-mono text-[11px] text-ink/70">
+        <p className="mt-1 font-mono text-[11px] text-muted">
           {isParticipant
             ? "Tu organizador lo comparte para registrar tu proyecto."
             : "Escribe el código de 6 letras de un evento para abrirlo."}
@@ -98,7 +105,7 @@ export function Dashboard() {
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
           maxLength={8}
-          className="border-ink/20 bg-surface font-mono uppercase tracking-[0.3em]"
+          className="bg-surface font-mono uppercase tracking-[0.3em]"
           autoCapitalize="characters"
         />
         <Button type="submit" variant="dark" loading={joining}>
@@ -118,16 +125,16 @@ export function Dashboard() {
             <Link
               key={p.id}
               href={`/eventos/${p.eventId}/proyectos/${p.id}`}
-              className="min-w-0 rounded-3xl bg-surface p-5 transition hover:-translate-y-0.5"
+              className="min-w-0 ui-panel ui-interactive rounded-3xl p-5 transition hover:-translate-y-0.5"
             >
               <div className="flex items-center justify-between gap-2">
                 <FolderKanban className="size-5 shrink-0" />
                 {p.category && <Badge>{p.category}</Badge>}
               </div>
               <h3 className="mt-4 break-words font-display text-lg font-bold">{p.title}</h3>
-              <p className="mt-1 line-clamp-2 font-mono text-[11px] text-ink/55">{p.summary}</p>
+              <p className="mt-1 line-clamp-2 font-mono text-[11px] text-muted">{p.summary}</p>
               <div className="mt-4">
-                <SubmissionBadges project={p} />
+                <ProjectDeliveryBadges project={p} />
               </div>
             </Link>
           ))}
@@ -189,9 +196,9 @@ export function Dashboard() {
       <section className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[1.4fr_1fr]">
         <Card className="flex flex-col justify-between gap-6 sm:p-8">
           <div>
-            <p className="font-mono text-xs text-ink/50">Panel</p>
+            <p className="font-mono text-xs text-muted">Panel</p>
             <h1 className="mt-1 font-display text-3xl font-bold sm:text-4xl">Hola{firstName ? `, ${firstName}` : ""}</h1>
-            <p className="mt-2 max-w-md font-mono text-xs leading-relaxed text-ink/60">{intro}</p>
+            <p className="mt-2 max-w-md font-mono text-xs leading-relaxed text-muted">{intro}</p>
           </div>
           {(access.canCreateEvents || access.isAdmin) && (
             <div className="flex flex-wrap gap-2">
@@ -236,7 +243,7 @@ export function Dashboard() {
         </>
       )}
 
-      <p className="flex items-center justify-center gap-1.5 font-mono text-[10px] text-ink/40">
+      <p className="flex items-center justify-center gap-1.5 font-mono text-[10px] text-muted">
         <Sparkles className="size-3" /> Todo se actualiza en tiempo real
       </p>
     </div>

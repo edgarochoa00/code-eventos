@@ -99,7 +99,7 @@ export function ProjectForm({
             id="category"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="h-11 w-full rounded-xl border border-ink/10 bg-paper px-3 text-sm outline-none focus:border-ink/40"
+            className="h-11 w-full min-w-0 rounded-xl border-2 border-control bg-field px-3 text-base outline-none focus:border-ink sm:text-sm"
           >
             {availableCategories.map((c) => (
               <option key={c}>{c}</option>
@@ -129,7 +129,7 @@ export function ProjectForm({
           <UserRound className="size-4 shrink-0" />
           <div className="min-w-0">
             <p className="truncate text-sm font-medium">{leader.name || "Tú"} · Líder</p>
-            <p className="truncate font-mono text-[11px] text-ink/55">{leader.email}</p>
+            <p className="truncate font-mono text-[11px] text-muted">{leader.email}</p>
           </div>
         </div>
         {!canManageMembers &&
@@ -138,12 +138,12 @@ export function ProjectForm({
               <UserRound className="size-4 shrink-0" />
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{m.name || "Integrante"}</p>
-                <p className="truncate font-mono text-[11px] text-ink/55">{m.email}</p>
+                <p className="truncate font-mono text-[11px] text-muted">{m.email}</p>
               </div>
             </div>
           ))}
         {canManageMembers && members.map((m, i) => (
-          <div key={i} className="grid gap-2 rounded-xl border border-ink/10 p-2 sm:grid-cols-[1fr_1.3fr_auto]">
+          <div key={i} className="grid gap-2 rounded-xl border border-line p-2 sm:grid-cols-[1fr_1.3fr_auto]">
             <Input
               aria-label={`Nombre del integrante ${i + 2}`}
               placeholder="Nombre"
@@ -176,7 +176,7 @@ export function ProjectForm({
             <Plus className="size-4" /> Agregar integrante
           </Button>
         )}
-        <p className="font-mono text-[11px] text-ink/50">
+        <p className="font-mono text-[11px] text-muted">
           {canManageMembers
             ? "Cada integrante verá el proyecto al entrar con ese correo y podrá editar las entregas. Los jueces y organizadores del evento no pueden ser integrantes."
             : "Solo el líder del equipo puede agregar o quitar integrantes."}

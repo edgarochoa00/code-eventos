@@ -20,7 +20,7 @@ export function Logo({
   return (
     <Link
       href={href}
-      className="group inline-flex items-center gap-2.5"
+      className="group inline-flex min-w-0 items-center gap-2 sm:gap-2.5"
       aria-label={`${APP_NAME} · ${APP_SUBTITLE}`}
     >
       <span
@@ -39,10 +39,10 @@ export function Logo({
           priority
         />
       </span>
-      <span className="flex flex-col leading-none">
+      <span className="flex min-w-0 flex-col leading-none">
         <span
           className={cn(
-            "font-display text-sm font-extrabold uppercase tracking-[0.06em] sm:text-base",
+            "truncate font-display text-xs font-extrabold uppercase tracking-[0.06em] sm:text-base",
             light ? "text-white" : "text-ink",
           )}
         >
@@ -50,8 +50,8 @@ export function Logo({
         </span>
         <span
           className={cn(
-            "mt-1 font-display text-[10px] font-bold uppercase tracking-[0.12em]",
-            light ? "text-white/75" : "text-ink/70",
+            "mt-1 truncate font-display text-[9px] font-bold uppercase tracking-[0.08em] sm:text-[10px] sm:tracking-[0.12em]",
+            light ? "text-white/75" : "text-muted",
           )}
         >
           TECNM CULIACÁN

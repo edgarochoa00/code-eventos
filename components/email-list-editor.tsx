@@ -64,12 +64,12 @@ export function EmailListEditor({
           <Plus className="size-4" /> Agregar
         </Button>
       </form>
-      <ul className="mt-5 divide-y divide-ink/5">
+      <ul className="mt-5 divide-y divide-line">
         {emails.map((email) => (
           <li key={email} className="flex items-center justify-between gap-3 py-3">
             <div className="min-w-0">
               <p className="truncate text-sm">{email}</p>
-              {progress && <p className="font-mono text-[10px] text-ink/50">{progress(email)}</p>}
+              {progress && <p className="font-mono text-[10px] text-muted">{progress(email)}</p>}
             </div>
             {locked.includes(email) ? (
               <Badge>Creador</Badge>
@@ -85,7 +85,7 @@ export function EmailListEditor({
             )}
           </li>
         ))}
-        {!emails.length && <li className="py-3 font-mono text-xs text-ink/50">Nadie todavía.</li>}
+        {!emails.length && <li className="py-3 font-mono text-xs text-muted">Nadie todavía.</li>}
       </ul>
     </Card>
   );

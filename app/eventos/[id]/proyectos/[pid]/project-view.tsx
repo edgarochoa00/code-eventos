@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { EvaluationForm } from "@/components/evaluation-form";
+import { getPhaseDetails, getPhaseLabel } from "@/lib/event-config";
 import { MatchList, NotEnoughData, SimilarityBadge, SubmissionBadges } from "@/components/project-bits";
 import { ProjectForm } from "@/components/project-form";
 import { SubmissionEditor, SubmissionView } from "@/components/submission";
@@ -37,7 +38,6 @@ import { useCollection, useDocument, useFingerprints } from "@/lib/hooks";
 import { analysisState, findMatches } from "@/lib/similarity";
 import { query, where } from "firebase/firestore";
 import {
-  PHASE_LABEL,
   PHASES,
   type EvaluationDoc,
   type EventDoc,
@@ -149,7 +149,7 @@ function ProjectBody({
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "info", label: "Información" },
-    ...phases.map((p) => ({ id: p as Tab, label: PHASE_LABEL[p] })),
+    ...phases.map((p) => ({ id: p as Tab, label: getPhaseLabel(event, p) })),
     ...(isJudge ? [{ id: "evaluate" as Tab, label: "Evaluar" }] : []),
     ...(seeOriginality ? [{ id: "originality" as Tab, label: "Originalidad" }] : []),
     ...(isOrganizer ? [{ id: "scores" as Tab, label: "Calificaciones" }] : []),
@@ -158,12 +158,12 @@ function ProjectBody({
 
   return (
     <div className="space-y-6">
-      <Link href={`/eventos/${event.id}`} className="inline-flex items-center gap-1.5 font-mono text-xs text-ink/60 hover:text-ink">
+      <Link href={`/eventos/${event.id}`} className="inline-flex items-center gap-1.5 font-mono text-xs text-muted hover:text-ink">
         <ArrowLeft className="size-3.5" /> {event.name}
       </Link>
       {isMember && !canParticipate && <p className="rounded-2xl bg-amber-50 p-5 text-sm text-amber-900">Tu correo figura en este equipo y también tiene un rol de administración o juez. Puedes consultar el proyecto, pero ese rol impide editarlo o entregar archivos como integrante. La administración debe corregir la incompatibilidad.</p>}
 
-      <section className="rounded-3xl bg-surface p-6 sm:p-8">
+      <section className="ui-panel rounded-3xl p-6 sm:p-8">
         <div className="flex flex-wrap items-center gap-1.5">
           {project.category && <Badge tone="dark">{project.category}</Badge>}
           <SubmissionBadges project={project} event={event} />
@@ -179,7 +179,7 @@ function ProjectBody({
               </span>
               <span className="text-xs">
                 {m.name || m.email}
-                {m.email === project.leaderEmail && <span className="font-mono text-[10px] text-ink/50"> · líder</span>}
+                {m.email === project.leaderEmail && <span className="font-mono text-[10px] text-muted"> · líder</span>}
               </span>
             </li>
           ))}
@@ -236,7 +236,7 @@ function ProjectBody({
                 <InfoBlock label="Solución" text={project.solution} />
                 {project.technologies.length > 0 && (
                   <div>
-                    <dt className="font-mono text-[11px] text-ink/50">Tecnologías</dt>
+                    <dt className="font-mono text-[11px] text-muted">Tecnologías</dt>
                     <dd className="mt-2 flex flex-wrap gap-1.5">
                       {project.technologies.map((t) => (
                         <Badge key={t}>{t}</Badge>
@@ -256,17 +256,19 @@ function ProjectBody({
             <Card key={phase}>
               {canParticipate && !event.resultsPublished && event.submissions[phase] && (editingPhase === phase || !project[phase]) ? (
                 <>
-                  <SectionTitle title={`Entrega: ${PHASE_LABEL[phase]}`} />
+                  <SectionTitle title={`Entrega: ${getPhaseLabel(event, phase)}`} />
                   <SubmissionEditor
                     eventId={event.id}
                     projectId={project.id}
                     phase={phase}
+                    label={getPhaseLabel(event, phase)}
+                    instructions={getPhaseDetails(event, phase).description}
                     initial={project[phase]}
                     userEmail={normalizeEmail(user?.email ?? "")}
                     onCancel={project[phase] ? () => setEditingPhase(null) : undefined}
                     onSave={async (submission) => {
                       await saveSubmission(event, project, phase, submission);
-                      toast(`${PHASE_LABEL[phase]} guardado.`);
+                      toast(`Entrega guardada: ${getPhaseLabel(event, phase)}.`);
                       setEditingPhase(null);
                     }}
                   />
@@ -274,7 +276,8 @@ function ProjectBody({
               ) : (
                 <>
                   <SectionTitle
-                    title={`Entrega: ${PHASE_LABEL[phase]}`}
+                    title={`Entrega: ${getPhaseLabel(event, phase)}`}
+                    subtitle={getPhaseDetails(event, phase).description}
                     action={
                       canParticipate && !event.resultsPublished &&
                       project[phase] &&
@@ -287,10 +290,10 @@ function ProjectBody({
                   />
                   {isMember && !event.submissions[phase] && !project[phase] && (
                     <p className="mb-4 flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-2.5 font-mono text-[11px] text-amber-800">
-                      <Lock className="size-3.5" /> Las entregas de {PHASE_LABEL[phase].toLowerCase()} están cerradas por ahora.
+                      <Lock className="size-3.5" /> La recepción de esta entrega está cerrada: {getPhaseLabel(event, phase)}.
                     </p>
                   )}
-                  <SubmissionView submission={project[phase]} phase={phase} />
+                  <SubmissionView submission={project[phase]} label={getPhaseLabel(event, phase)} />
                 </>
               )}
             </Card>
@@ -299,10 +302,10 @@ function ProjectBody({
 
       {tab === "evaluate" && isJudge && user && (
         <Card>
-          <SectionTitle title="Tu calificación" subtitle="Califica cada etapa por separado." />
+          <SectionTitle title="Tu calificación" subtitle="Usa los criterios que el organizador definió para este evento." />
           {phases.length > 1 && (
             <div className="mb-5">
-              <Tabs tabs={phases.map((p) => ({ id: p, label: PHASE_LABEL[p] }))} value={evalPhase} onChange={setEvalPhase} />
+              <Tabs tabs={phases.map((p) => ({ id: p, label: getPhaseLabel(event, p) }))} value={evalPhase} onChange={setEvalPhase} />
             </div>
           )}
           {evaluations.loading ? (
@@ -310,9 +313,8 @@ function ProjectBody({
           ) : (
             <>
               {!project[evalPhase] && (
-                <p className="mb-4 rounded-xl bg-paper px-3 py-2.5 font-mono text-[11px] text-ink/60">
-                  El equipo aún no entrega su {PHASE_LABEL[evalPhase].toLowerCase()}. Puedes calificar si lo presentaron en
-                  vivo.
+                <p className="mb-4 rounded-xl bg-paper px-3 py-2.5 font-mono text-[11px] text-muted">
+                  El equipo aún no ha enviado esta entrega: {getPhaseLabel(event, evalPhase)}. Puedes calificar si la presentaron en vivo.
                 </p>
               )}
               <EvaluationForm
@@ -357,7 +359,7 @@ function ProjectBody({
           ) : (
             <MatchList matches={matches.slice(0, 8)} currentEventId={event.id} anonymous={teamView} />
           )}
-          <p className="mt-5 font-mono text-[10px] leading-relaxed text-ink/45">
+          <p className="mt-5 font-mono text-[10px] leading-relaxed text-muted">
             El porcentaje es una señal, no un veredicto. Combina frases y vocabulario en común, enlaces compartidos
             (repositorio, video, Drive) y archivos idénticos.
             {teamView ? " Si crees que hay un error, habla con el organizador." : " Revisa el caso antes de tomar una decisión."}
@@ -384,7 +386,7 @@ function ProjectBody({
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <p className="text-sm font-medium">{e.judgeName || e.judgeEmail}</p>
-                        <p className="font-mono text-[10px] text-ink/50">{PHASE_LABEL[e.phase]}</p>
+                        <p className="font-mono text-[10px] text-muted">{getPhaseLabel(event, e.phase)}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <p className="font-display text-2xl font-bold tabular-nums">{currentTotal.toFixed(1)}</p>
@@ -395,7 +397,7 @@ function ProjectBody({
                             aria-label={`Descartar calificación de ${e.judgeName || e.judgeEmail}`}
                             onClick={() => setEvalToDelete(e)}
                           >
-                            <Trash2 className="size-4 text-ink/55 hover:text-red-600" />
+                            <Trash2 className="size-4 text-muted hover:text-red-600" />
                           </Button>
                         )}
                       </div>
@@ -413,13 +415,13 @@ function ProjectBody({
               })}
             </div>
           ) : (
-            <p className="font-mono text-xs text-ink/50">Ningún juez ha calificado este proyecto.</p>
+            <p className="font-mono text-xs text-muted">Ningún juez ha calificado este proyecto.</p>
           )}
         </Card>
       )}
 
       <Modal open={confirmDeleteProject} onClose={() => setConfirmDeleteProject(false)} title="¿Eliminar proyecto?">
-        <p className="font-mono text-xs leading-relaxed text-ink/70">
+        <p className="font-mono text-xs leading-relaxed text-muted">
           Se eliminará el proyecto «{project.title}» y sus entregas de este evento. Esta acción no se puede deshacer.
         </p>
         <div className="mt-6 flex justify-end gap-2">
@@ -449,9 +451,9 @@ function ProjectBody({
       <Modal open={!!evalToDelete} onClose={() => setEvalToDelete(null)} title="¿Descartar calificación?">
         {evalToDelete && (
           <>
-            <p className="font-mono text-xs leading-relaxed text-ink/70">
+            <p className="font-mono text-xs leading-relaxed text-muted">
               Se eliminará la calificación de {evalToDelete.judgeName || evalToDelete.judgeEmail} en{" "}
-              {PHASE_LABEL[evalToDelete.phase].toLowerCase()}. El juez podrá volver a calificar si la evaluación sigue abierta.
+              {getPhaseLabel(event, evalToDelete.phase)}. El juez podrá volver a calificar si la evaluación sigue abierta.
             </p>
             <div className="mt-6 flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setEvalToDelete(null)}>
@@ -490,10 +492,10 @@ function ProjectBody({
                 <Card key={p}>
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="font-mono text-[11px] text-ink/50">{PHASE_LABEL[p]}</p>
+                      <p className="font-mono text-[11px] text-muted">{getPhaseLabel(event, p)}</p>
                       <p className="mt-1 font-display text-4xl font-bold tabular-nums">
                         {fb.score.toFixed(1)}
-                        <span className="text-base font-normal text-ink/40">/100</span>
+                        <span className="text-base font-normal text-muted">/100</span>
                       </p>
                     </div>
                     <span className="flex items-center gap-1.5 rounded-2xl bg-lime px-3 py-2 font-mono text-xs font-bold">
@@ -515,7 +517,7 @@ function ProjectBody({
                   </div>
                   {fb.comments.length > 0 && (
                     <div className="mt-6 space-y-2">
-                      <p className="flex items-center gap-1.5 font-mono text-[11px] text-ink/50">
+                      <p className="flex items-center gap-1.5 font-mono text-[11px] text-muted">
                         <MessageSquareQuote className="size-3.5" /> Comentarios de los jueces
                       </p>
                       {fb.comments.map((c, i) => (
@@ -537,7 +539,7 @@ function ProjectBody({
 function InfoBlock({ label, text }: { label: string; text: string }) {
   return (
     <div>
-      <dt className="font-mono text-[11px] text-ink/50">{label}</dt>
+      <dt className="font-mono text-[11px] text-muted">{label}</dt>
       <dd className="mt-1 whitespace-pre-line text-sm leading-relaxed">{text}</dd>
     </div>
   );

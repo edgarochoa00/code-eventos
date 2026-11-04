@@ -25,12 +25,12 @@ export function LegalLinks({
         <Link
           key={item.href}
           href={item.href}
-          className="inline-flex min-h-11 items-center text-ink/55 underline-offset-2 hover:text-ink hover:underline sm:min-h-0 sm:py-1"
+          className="inline-flex min-h-11 items-center text-muted underline-offset-2 hover:text-ink hover:underline sm:min-h-0 sm:py-1"
         >
           {item.label}
         </Link>
       ))}
-      {showVersion && <span className="text-[10px] text-ink/40">v{PRODUCT_VERSION}</span>}
+      {showVersion && <span className="text-[10px] text-muted">v{PRODUCT_VERSION}</span>}
     </nav>
   );
 }

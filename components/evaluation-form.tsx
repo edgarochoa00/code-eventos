@@ -53,17 +53,29 @@ export function EvaluationForm({
         </p>
       )}
 
+      <div className="sticky top-[calc(4rem+env(safe-area-inset-top)+0.75rem)] z-10 flex items-center justify-between gap-3 rounded-2xl bg-night p-3 pl-4 text-white shadow-xl ring-1 ring-white/5 sm:pl-5">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] text-white/75">Total ponderado</p>
+          <p className="font-display text-2xl font-bold tabular-nums">
+            {total.toFixed(1)} <span className="text-sm font-normal text-white/75">/100</span>
+          </p>
+        </div>
+        <Button type="submit" variant="accent" loading={busy} disabled={locked}>
+          {initial ? "Actualizar" : "Guardar"}
+        </Button>
+      </div>
+
       <div className="space-y-4">
         {criteria.map((c) => {
           const value = scores[c.id] ?? 0;
           return (
-            <div key={c.id} className="rounded-2xl bg-paper p-4">
+            <div key={c.id} className="ui-inset rounded-2xl p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <label htmlFor={`score-${c.id}`} className="font-medium">
                     {c.name}
                   </label>
-                  <p className="font-mono text-[11px] text-ink/55">
+                  <p className="font-mono text-[11px] text-muted">
                     {c.description && `${c.description} · `}Peso {Math.round((c.weight / totalWeight) * 100)}%
                   </p>
                 </div>
@@ -76,7 +88,7 @@ export function EvaluationForm({
                   type="button"
                   disabled={locked || value <= 0}
                   onClick={() => set(c.id, value - STEP)}
-                  className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface text-ink transition hover:bg-ink/5 disabled:opacity-40"
+                  className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-surface text-ink transition hover:bg-ink/5 disabled:opacity-40"
                   aria-label={`Bajar ${c.name}`}
                 >
                   <Minus className="size-4" />
@@ -94,7 +106,7 @@ export function EvaluationForm({
                     className="score-range w-full"
                     style={{ "--fill": `${value * 10}%` } as React.CSSProperties}
                   />
-                  <div className="mt-1 flex justify-between font-mono text-[10px] text-ink/40" aria-hidden>
+                  <div className="mt-1 flex justify-between font-mono text-[10px] text-muted" aria-hidden>
                     <span>0</span>
                     <span>5</span>
                     <span>10</span>
@@ -104,7 +116,7 @@ export function EvaluationForm({
                   type="button"
                   disabled={locked || value >= 10}
                   onClick={() => set(c.id, value + STEP)}
-                  className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface text-ink transition hover:bg-ink/5 disabled:opacity-40"
+                  className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-surface text-ink transition hover:bg-ink/5 disabled:opacity-40"
                   aria-label={`Subir ${c.name}`}
                 >
                   <Plus className="size-4" />
@@ -118,18 +130,6 @@ export function EvaluationForm({
       <Field label="Comentarios para el equipo" htmlFor="comment" hint="Se muestran al equipo cuando se publiquen los resultados (sin tu nombre).">
         <Textarea id="comment" value={comment} disabled={locked} onChange={(e) => setComment(e.target.value)} maxLength={2000} />
       </Field>
-
-      <div className="sticky bottom-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center justify-between gap-3 rounded-2xl bg-night p-3 pl-4 text-white shadow-xl ring-1 ring-white/5 sm:pl-5">
-        <div className="min-w-0">
-          <p className="font-mono text-[10px] text-white/60">Total ponderado</p>
-          <p className="font-display text-2xl font-bold tabular-nums">
-            {total.toFixed(1)} <span className="text-sm font-normal text-white/50">/100</span>
-          </p>
-        </div>
-        <Button type="submit" loading={busy} disabled={locked}>
-          {initial ? "Actualizar" : "Guardar"}
-        </Button>
-      </div>
     </form>
   );
 }

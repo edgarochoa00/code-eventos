@@ -7,7 +7,8 @@ import { Badge, EmptyState, ErrorNote, Input, SectionTitle, Spinner, Tabs } from
 import { useAuth } from "@/lib/auth";
 import { projectsCol, qMyEvaluations } from "@/lib/data";
 import { useCollection } from "@/lib/hooks";
-import { PHASE_LABEL, PHASES, type EvaluationDoc, type EventDoc, type ProjectDoc } from "@/lib/types";
+import { getPhaseLabel } from "@/lib/event-config";
+import { PHASES, type EvaluationDoc, type EventDoc, type ProjectDoc } from "@/lib/types";
 import {
   effectiveEvaluationTotal,
   hasJudgeAssignment,
@@ -59,10 +60,10 @@ export function JudgeView({ event }: { event: EventDoc }) {
         <div className="rounded-3xl bg-night p-6 text-white">
           <div className="flex items-end justify-between">
             <div>
-              <p className="font-mono text-[11px] text-white/60">Tu avance</p>
+              <p className="font-mono text-[11px] text-white/75">Tu avance</p>
               <p className="font-display text-4xl font-bold">
                 {done}
-                <span className="text-lg font-normal text-white/50">/{tasks.length}</span>
+                <span className="text-lg font-normal text-white/75">/{tasks.length}</span>
               </p>
             </div>
             <span className="font-mono text-sm text-lime">{pct}%</span>
@@ -71,7 +72,7 @@ export function JudgeView({ event }: { event: EventDoc }) {
             <div className="h-full rounded-full bg-lime transition-all" style={{ width: `${pct}%` }} />
           </div>
           {hasCustom && (
-            <p className="mt-3 font-mono text-[11px] text-white/60">
+            <p className="mt-3 font-mono text-[11px] text-white/75">
               Asignado a {assignedProjects.length} proyecto(s)
               {assignmentCategories.length > 0 ? ` · ${assignmentCategories.join(", ")}` : ""}
             </p>
@@ -100,7 +101,7 @@ export function JudgeView({ event }: { event: EventDoc }) {
             onChange={setFilter}
           />
           <div className="relative sm:w-64">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink/40" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
             <Input aria-label="Buscar proyecto" placeholder="Buscar" value={search} onChange={(e) => setSearch(e.target.value)} className="bg-surface pl-9" />
           </div>
         </div>
@@ -111,12 +112,12 @@ export function JudgeView({ event }: { event: EventDoc }) {
               <li key={p.id}>
                 <Link
                   href={`/eventos/${event.id}/proyectos/${p.id}`}
-                  className="group flex h-full flex-col justify-between gap-4 rounded-3xl bg-surface p-5 transition hover:-translate-y-0.5"
+                  className="group flex h-full flex-col justify-between gap-4 ui-panel ui-interactive rounded-3xl p-5 transition hover:-translate-y-0.5"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <h3 className="truncate font-display text-lg font-bold">{p.title}</h3>
-                      <p className="line-clamp-2 font-mono text-[11px] text-ink/55">{p.summary}</p>
+                      <h3 className="break-words font-display text-lg font-bold leading-tight">{p.title}</h3>
+                      <p className="line-clamp-2 font-mono text-[11px] text-muted">{p.summary}</p>
                     </div>
                     <ArrowUpRight className="size-5 shrink-0 opacity-40 group-hover:opacity-100" />
                   </div>
@@ -125,14 +126,14 @@ export function JudgeView({ event }: { event: EventDoc }) {
                     {!isProjectAssignedToJudge(event, p, email) && <Badge>Solo consulta</Badge>}
                     {phases.map((ph) => {
                       const ev = evaluated(p, ph);
-                      if (!p[ph]) return <Badge key={ph}>{PHASE_LABEL[ph]}: sin entrega</Badge>;
+                      if (!p[ph]) return <Badge key={ph}>{getPhaseLabel(event, ph)}: sin entrega</Badge>;
                       return ev ? (
                         <Badge key={ph} tone="green">
-                          {PHASE_LABEL[ph]}: {effectiveEvaluationTotal(event.criteria, ev).toFixed(1)}
+                          {getPhaseLabel(event, ph)}: {effectiveEvaluationTotal(event.criteria, ev).toFixed(1)}
                         </Badge>
                       ) : (
                         <Badge key={ph} tone={isProjectAssignedToJudge(event, p, email) ? "lime" : "neutral"}>
-                          {PHASE_LABEL[ph]}: {isProjectAssignedToJudge(event, p, email) ? "por evaluar" : "sin asignación"}
+                          {getPhaseLabel(event, ph)}: {isProjectAssignedToJudge(event, p, email) ? "por evaluar" : "sin asignación"}
                         </Badge>
                       );
                     })}
@@ -156,7 +157,7 @@ export function JudgeView({ event }: { event: EventDoc }) {
               !projects.data.length
                 ? "Cuando los equipos se registren aparecerán aquí."
                 : filter === "pending" && !tasks.length
-                  ? "Los equipos todavía no suben su prototipo ni su producto final. Puedes revisar los proyectos en «Todos»."
+                  ? "Los equipos todavía no suben las entregas de este evento. Puedes revisar los proyectos en «Todos»."
                   : filter === "pending"
                     ? "Ya calificaste todas las entregas disponibles."
                     : "Prueba con otra búsqueda."

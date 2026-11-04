@@ -8,7 +8,6 @@ import {
   Gavel,
   Lock,
   Search,
-  ShieldCheck,
   Trash2,
   UserCog,
   Users,
@@ -150,12 +149,8 @@ export function AdminView() {
     <div className="space-y-6">
       <section className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[1.2fr_1fr]">
         <div className="rounded-3xl bg-night p-6 text-white sm:p-8">
-          <Badge tone="lime">
-            {access.isSuperadmin ? <Crown className="size-3" /> : <ShieldCheck className="size-3" />}
-            {GLOBAL_ROLE_LABEL[access.role]}
-          </Badge>
-          <h1 className="mt-4 font-display text-3xl font-bold sm:text-4xl">Administración</h1>
-          <p className="mt-2 max-w-md font-mono text-[11px] leading-relaxed text-white/60">
+          <h1 className="font-display text-3xl font-bold sm:text-4xl">Administración</h1>
+          <p className="mt-2 max-w-md font-mono text-[11px] leading-relaxed text-white/75">
             {access.isSuperadmin
               ? "Controlas quién es admin u organizador, suspendes cuentas y asignas jueces en cualquier evento."
               : "Administras todos los eventos y sus jueces. Solo el superadmin cambia permisos de la plataforma."}
@@ -199,10 +194,10 @@ function roleOrder(role: GlobalRole) {
 
 function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
   return (
-    <div className="rounded-3xl bg-surface p-5">
-      <span className="text-ink/50">{icon}</span>
+    <div className="ui-panel rounded-3xl p-5">
+      <span className="text-muted">{icon}</span>
       <p className="mt-2 font-display text-3xl font-bold tabular-nums">{value}</p>
-      <p className="font-mono text-[11px] text-ink/55">{label}</p>
+      <p className="font-mono text-[11px] text-muted">{label}</p>
     </div>
   );
 }
@@ -240,7 +235,7 @@ function PeopleTab({ people, events }: { people: Person[]; events: EventDoc[] })
   return (
     <div className="space-y-4">
       <div className="relative">
-        <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink/40" />
+        <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
         <Input
           aria-label="Buscar usuario"
           placeholder="Buscar por nombre o correo"
@@ -269,12 +264,12 @@ function PeopleTab({ people, events }: { people: Person[]; events: EventDoc[] })
               <button
                 type="button"
                 onClick={() => setSelected(p.email)}
-                className="flex h-full w-full items-start gap-3 rounded-3xl bg-surface p-4 text-left transition hover:-translate-y-0.5 sm:p-5"
+                className="flex h-full w-full items-start gap-3 ui-panel ui-interactive rounded-3xl p-4 text-left transition hover:-translate-y-0.5 sm:p-5"
               >
                 <span
                   className={cn(
                     "grid size-11 shrink-0 place-items-center rounded-full font-mono text-xs font-bold",
-                    p.role === "blocked" ? "bg-red-100 text-red-700" : p.user ? "bg-lime text-coal" : "bg-ink/5 text-ink/50",
+                    p.role === "blocked" ? "bg-red-100 text-red-700" : p.user ? "bg-lime text-coal" : "bg-ink/5 text-muted",
                   )}
                   aria-hidden
                 >
@@ -282,7 +277,7 @@ function PeopleTab({ people, events }: { people: Person[]; events: EventDoc[] })
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">{p.user?.displayName || "Sin nombre"}</span>
-                  <span className="block truncate font-mono text-[11px] text-ink/55">{p.email}</span>
+                  <span className="block truncate font-mono text-[11px] text-muted">{p.email}</span>
                   <span className="mt-2 flex flex-wrap gap-1.5">
                     <Badge tone={ROLE_TONE[p.role]}>
                       {p.role === "superadmin" && <Crown className="size-3" />}
@@ -298,12 +293,12 @@ function PeopleTab({ people, events }: { people: Person[]; events: EventDoc[] })
                     {!p.user && <Badge tone="amber">Sin registrarse</Badge>}
                   </span>
                   {p.user?.lastLoginAt && (
-                    <span className="mt-2 block font-mono text-[10px] text-ink/45">
+                    <span className="mt-2 block font-mono text-[10px] text-muted">
                       Último acceso: {formatDate(p.user.lastLoginAt)}
                     </span>
                   )}
                 </span>
-                <UserCog className="size-5 shrink-0 text-ink/40" />
+                <UserCog className="size-5 shrink-0 text-muted" />
               </button>
             </li>
           ))}
@@ -350,7 +345,7 @@ function PersonPanel({ person, events }: { person: Person; events: EventDoc[] })
         </span>
         <div className="min-w-0">
           <p className="truncate font-display text-lg font-bold">{person.user?.displayName || "Sin nombre"}</p>
-          <p className="truncate font-mono text-[11px] text-ink/55">{person.email}</p>
+          <p className="truncate font-mono text-[11px] text-muted">{person.email}</p>
           {!person.user && (
             <p className="font-mono text-[10px] text-amber-700">Aún no crea su cuenta. Los permisos se aplican al registrarse.</p>
           )}
@@ -360,7 +355,7 @@ function PersonPanel({ person, events }: { person: Person; events: EventDoc[] })
       <section className="space-y-2">
         <p className="text-sm font-medium">Permiso en la plataforma</p>
         {isSuper ? (
-          <p className="rounded-2xl bg-paper p-3 font-mono text-[11px] text-ink/65">
+          <p className="rounded-2xl bg-paper p-3 font-mono text-[11px] text-muted">
             Superadmin fijo de la plataforma. No se puede cambiar ni suspender.
           </p>
         ) : access.isSuperadmin ? (
@@ -379,10 +374,10 @@ function PersonPanel({ person, events }: { person: Person; events: EventDoc[] })
                 { id: "blocked", label: "Suspendido" },
               ]}
             />
-            <p className="font-mono text-[11px] leading-relaxed text-ink/55">{ROLE_HELP[staffValue]}</p>
+            <p className="font-mono text-[11px] leading-relaxed text-muted">{ROLE_HELP[staffValue]}</p>
           </>
         ) : (
-          <p className="rounded-2xl bg-paper p-3 font-mono text-[11px] text-ink/65">
+          <p className="rounded-2xl bg-paper p-3 font-mono text-[11px] text-muted">
             {GLOBAL_ROLE_LABEL[person.role]}. Solo el superadmin puede cambiar permisos.
           </p>
         )}
@@ -390,8 +385,8 @@ function PersonPanel({ person, events }: { person: Person; events: EventDoc[] })
 
       <section>
         <p className="text-sm font-medium">Juez en eventos</p>
-        <p className="font-mono text-[11px] text-ink/55">Activa los eventos donde esta persona calificará. Admins, superadmin y organizadores del evento no califican.</p>
-        <div className="mt-2 divide-y divide-ink/5 rounded-2xl bg-paper px-4">
+        <p className="font-mono text-[11px] text-muted">Activa los eventos donde esta persona calificará. Admins, superadmin y organizadores del evento no califican.</p>
+        <div className="mt-2 divide-y divide-line rounded-2xl bg-paper px-4">
           {sortedEvents.map((e) => (
             <Toggle
               key={e.id}
@@ -404,14 +399,14 @@ function PersonPanel({ person, events }: { person: Person; events: EventDoc[] })
               }
             />
           ))}
-          {!sortedEvents.length && <p className="py-3 font-mono text-xs text-ink/50">No hay eventos.</p>}
+          {!sortedEvents.length && <p className="py-3 font-mono text-xs text-muted">No hay eventos.</p>}
         </div>
       </section>
 
       <section>
         <p className="text-sm font-medium">Organizador en eventos</p>
-        <p className="font-mono text-[11px] text-ink/55">Puede administrar ese evento aunque no sea admin global.</p>
-        <div className="mt-2 divide-y divide-ink/5 rounded-2xl bg-paper px-4">
+        <p className="font-mono text-[11px] text-muted">Puede administrar ese evento aunque no sea admin global.</p>
+        <div className="mt-2 divide-y divide-line rounded-2xl bg-paper px-4">
           {sortedEvents.map((e) => {
             const owner = e.ownerEmail === person.email;
             return (
@@ -454,32 +449,33 @@ function EventsTab({ events, projects }: { events: EventDoc[]; projects: Project
   }
 
   return (
-    <>
+    <div className="space-y-4">
+      <SectionTitle title="Eventos" subtitle="Consulta los proyectos de cada evento y gestiona a sus jueces y organizadores." />
       <ul className="grid grid-cols-[minmax(0,1fr)] gap-3 md:grid-cols-[repeat(2,minmax(0,1fr))]">
         {sorted.map((e) => {
           const count = projects.filter((p) => p.eventId === e.id).length;
           const canDelete = access.isSuperadmin || (Boolean(user?.uid) && user?.uid === e.ownerId);
           return (
-            <li key={e.id} className="flex flex-col gap-4 rounded-3xl bg-surface p-5">
+            <li key={e.id} className="ui-panel flex min-w-0 flex-col gap-4 rounded-3xl p-5 sm:p-6">
               <div className="min-w-0">
                 <EventStatus event={e} />
                 <h3 className="mt-3 break-words font-display text-lg font-bold leading-tight">{e.name}</h3>
-                <p className="mt-0.5 font-mono text-[11px] text-ink/55">{e.institution || "Sin institución"}</p>
-                <p className="truncate font-mono text-[10px] text-ink/45">Creado por {e.ownerEmail}</p>
+                <p className="mt-0.5 font-mono text-[11px] text-muted">{e.institution || "Sin institución"}</p>
+                <p className="truncate font-mono text-[10px] text-muted">Creado por {e.ownerEmail}</p>
               </div>
               <div className="grid grid-cols-[repeat(3,minmax(0,1fr))] gap-2 text-center">
                 <MiniStat label="Proyectos" value={count} />
                 <MiniStat label="Jueces" value={e.judgeEmails.length} />
                 <MiniStat label="Organiz." value={e.organizerEmails.length} />
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap gap-2">
+              <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4">
+                <div className="flex min-w-0 flex-wrap gap-2">
                   <Button variant="outline" size="sm" onClick={() => setTeam(e.id)}>
                     <Gavel className="size-3.5" /> Jueces y organizadores
                   </Button>
                   <Link
                     href={`/eventos/${e.id}`}
-                    className="inline-flex h-9 items-center gap-1.5 rounded-xl px-3 font-mono text-xs hover:bg-ink/5"
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 font-mono text-xs font-semibold underline underline-offset-4 hover:bg-ink/5"
                   >
                     Abrir <ArrowUpRight className="size-3.5" />
                   </Link>
@@ -524,7 +520,7 @@ function EventsTab({ events, projects }: { events: EventDoc[]; projects: Project
       <Modal open={!!toDelete} onClose={() => setToDelete(null)} title="¿Eliminar evento?">
         {toDelete && (
           <>
-            <p className="font-mono text-xs leading-relaxed text-ink/70">
+            <p className="font-mono text-xs leading-relaxed text-muted">
               Se eliminará «{toDelete.name}» junto con todos sus proyectos y calificaciones. Esta acción no se puede
               deshacer.
             </p>
@@ -554,15 +550,15 @@ function EventsTab({ events, projects }: { events: EventDoc[]; projects: Project
           </>
         )}
       </Modal>
-    </>
+    </div>
   );
 }
 
 function MiniStat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl bg-paper px-2 py-2.5">
+    <div className="ui-inset min-w-0 rounded-2xl px-2 py-3">
       <p className="font-display text-xl font-bold tabular-nums">{value}</p>
-      <p className="font-mono text-[10px] text-ink/50">{label}</p>
+      <p className="font-mono text-[10px] text-muted">{label}</p>
     </div>
   );
 }
@@ -626,25 +622,25 @@ function RolesTab({ people }: { people: Person[] }) {
                   { id: "blocked", label: "Suspendido" },
                 ]}
               />
-              <p className="font-mono text-[11px] leading-relaxed text-ink/55">{ROLE_HELP[role]}</p>
+              <p className="font-mono text-[11px] leading-relaxed text-muted">{ROLE_HELP[role]}</p>
             </div>
             <Button type="submit" loading={busy} className="w-full sm:w-auto">
               Guardar permiso
             </Button>
           </form>
         ) : (
-          <p className="rounded-2xl bg-paper p-3 font-mono text-[11px] text-ink/65">Solo el superadmin puede dar permisos.</p>
+          <p className="rounded-2xl bg-paper p-3 font-mono text-[11px] text-muted">Solo el superadmin puede dar permisos.</p>
         )}
       </Card>
 
       <Card>
         <SectionTitle title="Con permisos especiales" subtitle="Todos los demás son usuarios normales." />
-        <ul className="divide-y divide-ink/5">
+        <ul className="divide-y divide-line">
           {withRoles.map((p) => (
             <li key={p.email} className="flex items-center justify-between gap-3 py-3">
               <div className="min-w-0">
                 <p className="truncate text-sm">{p.user?.displayName || p.email}</p>
-                {p.user?.displayName && <p className="truncate font-mono text-[10px] text-ink/50">{p.email}</p>}
+                {p.user?.displayName && <p className="truncate font-mono text-[10px] text-muted">{p.email}</p>}
               </div>
               <div className="flex shrink-0 items-center gap-1">
                 <Badge tone={ROLE_TONE[p.role]}>{GLOBAL_ROLE_LABEL[p.role]}</Badge>

@@ -2,19 +2,23 @@
 
 import { Plus, RotateCcw, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
-import type { NewEventInput } from "@/lib/data";
-import type { Phase } from "@/lib/types";
+import type { EventSettingsInput } from "@/lib/data";
+import { criteriaError, deliverySettingsError, getPhaseDetails } from "@/lib/event-config";
+import { PHASES, type Criterion, type Phase, type PhaseDetails } from "@/lib/types";
 import { DEFAULT_CATEGORIES } from "@/lib/utils";
+import { CriteriaEditor } from "./criteria-editor";
 import { Button, Field, Input, Textarea, Toggle } from "./ui";
 
 export function EventSettingsForm({
   initial,
   submitLabel,
   onSubmit,
+  rubric,
 }: {
-  initial?: Partial<NewEventInput>;
+  initial?: Partial<EventSettingsInput>;
   submitLabel: string;
-  onSubmit: (input: NewEventInput) => Promise<void>;
+  onSubmit: (input: EventSettingsInput) => Promise<void>;
+  rubric?: { criteria: Criterion[]; onChange: (criteria: Criterion[]) => void };
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [institution, setInstitution] = useState(initial?.institution ?? "");
@@ -22,9 +26,13 @@ export function EventSettingsForm({
   const [startDate, setStartDate] = useState(initial?.startDate ?? "");
   const [endDate, setEndDate] = useState(initial?.endDate ?? "");
   const [maxTeamSize, setMaxTeamSize] = useState(initial?.maxTeamSize ?? 5);
-  const [phases, setPhases] = useState<Record<Phase, boolean>>(initial?.phases ?? { prototype: true, final: true });
+  const [phases, setPhases] = useState<Record<Phase, boolean>>(initial?.phases ?? { prototype: true, final: false });
+  const [phaseDetails, setPhaseDetails] = useState<Record<Phase, PhaseDetails>>(() => ({
+    prototype: initial ? getPhaseDetails(initial, "prototype") : { name: "", description: "" },
+    final: initial ? getPhaseDetails(initial, "final") : { name: "", description: "" },
+  }));
   const [categories, setCategories] = useState<string[]>(
-    initial?.categories?.length ? initial.categories : DEFAULT_CATEGORIES,
+    initial?.categories?.length ? initial.categories : initial ? DEFAULT_CATEGORIES : ["General"],
   );
   const [newCategory, setNewCategory] = useState("");
   const [error, setError] = useState("");
@@ -46,7 +54,12 @@ export function EventSettingsForm({
     e.preventDefault();
     setError("");
     if (name.trim().length < 3) return setError("Escribe el nombre del evento.");
-    if (!phases.prototype && !phases.final) return setError("Activa al menos una etapa: prototipo o producto final.");
+    const deliveryError = deliverySettingsError({ phases, phaseDetails });
+    if (deliveryError) return setError(deliveryError);
+    if (rubric) {
+      const rubricError = criteriaError(rubric.criteria);
+      if (rubricError) return setError(rubricError);
+    }
     if (!categories.length) return setError("El evento necesita al menos una categoría.");
     if (startDate && endDate && endDate < startDate) return setError("La fecha de cierre es antes de la de inicio.");
     setBusy(true);
@@ -59,6 +72,10 @@ export function EventSettingsForm({
         endDate,
         maxTeamSize: Math.min(15, Math.max(1, maxTeamSize)),
         phases,
+        phaseDetails: Object.fromEntries(PHASES.map((phase) => [phase, {
+          name: phaseDetails[phase].name.trim(),
+          description: phaseDetails[phase].description.trim(),
+        }])) as Record<Phase, PhaseDetails>,
         categories,
       });
     } catch {
@@ -71,7 +88,7 @@ export function EventSettingsForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       <Field label="Nombre del evento" htmlFor="ev-name">
-        <Input id="ev-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Expo Proyectos 2026" maxLength={100} />
+        <Input id="ev-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej. Carteles o Prototipos" maxLength={100} />
       </Field>
       <Field label="Institución" htmlFor="ev-inst">
         <Input
@@ -103,20 +120,48 @@ export function EventSettingsForm({
           />
         </Field>
       </div>
-      <div className="divide-y divide-ink/5 rounded-2xl bg-paper px-4">
-        <Toggle
-          label="Prototipo"
-          description="Los equipos entregan un avance que se evalúa por separado."
-          checked={phases.prototype}
-          onChange={(v) => setPhases((p) => ({ ...p, prototype: v }))}
-        />
-        <Toggle
-          label="Producto final"
-          description="La entrega terminada. Puede convivir con el prototipo en el mismo proyecto."
-          checked={phases.final}
-          onChange={(v) => setPhases((p) => ({ ...p, final: v }))}
-        />
+      <div className="space-y-3">
+        <div>
+          <h2 className="font-display text-lg font-bold">Entregas del evento</h2>
+          <p className="mt-1 font-mono text-xs leading-relaxed text-muted">
+            Tú defines qué presentan los equipos y cómo se llama su entrega. Si Carteles y Prototipos son eventos distintos,
+            crea cada uno con sus propias entregas y rúbrica.
+          </p>
+        </div>
+        {PHASES.map((phase, index) => (
+          <div key={phase} className="rounded-2xl bg-paper px-4">
+            <Toggle label={index === 0 ? "Primera entrega" : "Segunda entrega (opcional)"}
+              checked={phases[phase]} onChange={(value) => setPhases((current) => ({ ...current, [phase]: value }))} />
+            {phases[phase] && (
+              <div className="space-y-3 pb-4">
+                <Field label="Nombre de la entrega" htmlFor={`ev-delivery-${phase}`}>
+                  <Input id={`ev-delivery-${phase}`} value={phaseDetails[phase].name} maxLength={80}
+                    placeholder="Ej. Cartel, prototipo o presentación"
+                    onChange={(e) => setPhaseDetails((current) => ({ ...current, [phase]: { ...current[phase], name: e.target.value } }))} />
+                </Field>
+                <Field label="Instrucciones para los equipos" htmlFor={`ev-instructions-${phase}`}
+                  hint="Opcional. Explica qué deben presentar en este evento.">
+                  <Textarea id={`ev-instructions-${phase}`} value={phaseDetails[phase].description} maxLength={2000} rows={3}
+                    onChange={(e) => setPhaseDetails((current) => ({ ...current, [phase]: { ...current[phase], description: e.target.value } }))} />
+                </Field>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
+
+      {rubric && (
+        <div className="space-y-3">
+          <div>
+            <h2 className="font-display text-lg font-bold">Criterios de evaluación</h2>
+            <p className="mt-1 font-mono text-xs leading-relaxed text-muted">
+              Define los criterios y sus pesos para este evento. Cada criterio se califica de 0 a 10 y el total se calcula sobre 100.
+              Después podrás ajustarlos en Rúbrica.
+            </p>
+          </div>
+          <CriteriaEditor criteria={rubric.criteria} onChange={rubric.onChange} />
+        </div>
+      )}
 
       <div className="space-y-2.5">
         <div className="flex items-center justify-between gap-2">
@@ -126,11 +171,12 @@ export function EventSettingsForm({
           <button
             type="button"
             onClick={() => setCategories(DEFAULT_CATEGORIES)}
-            className="inline-flex items-center gap-1 font-mono text-[11px] text-ink/55 hover:text-ink"
+            className="inline-flex items-center gap-1 font-mono text-[11px] text-muted hover:text-ink"
           >
-            <RotateCcw className="size-3" /> Predeterminadas
+            <RotateCcw className="size-3" /> Usar ejemplos
           </button>
         </div>
+        <p className="font-mono text-xs text-muted">Define tus categorías o usa General si no necesitas dividir los proyectos.</p>
         <div className="flex flex-wrap gap-1.5 rounded-2xl bg-paper p-3">
           {categories.map((cat) => (
             <span
@@ -143,7 +189,7 @@ export function EventSettingsForm({
                   type="button"
                   aria-label={`Quitar categoría ${cat}`}
                   onClick={() => setCategories((prev) => prev.filter((c) => c !== cat))}
-                  className="rounded-full p-0.5 text-ink/50 hover:bg-ink/10 hover:text-ink"
+                  className="rounded-full p-0.5 text-muted hover:bg-ink/10 hover:text-ink"
                 >
                   <X className="size-3" />
                 </button>

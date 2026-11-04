@@ -3,22 +3,23 @@
 import { AlertTriangle, CheckCircle2, Circle, Clock, ExternalLink, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { MIN_TOKENS, type AnalysisState, type SimilarityLevel, type SimilarityMatch } from "@/lib/similarity";
-import { PHASE_LABEL, PHASES, type EventDoc, type ProjectDoc } from "@/lib/types";
+import { getPhaseLabel } from "@/lib/event-config";
+import { PHASES, type EventDoc, type ProjectDoc } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Badge } from "./ui";
 
-export function SubmissionBadges({ project, event }: { project: ProjectDoc; event?: EventDoc }) {
-  const phases = PHASES.filter((p) => !event || event.phases[p]);
+export function SubmissionBadges({ project, event, onDark = false }: { project: ProjectDoc; event: EventDoc; onDark?: boolean }) {
+  const phases = PHASES.filter((p) => event.phases[p]);
   return (
     <div className="flex flex-wrap gap-1.5">
       {phases.map((phase) =>
         project[phase] ? (
           <Badge key={phase} tone="green">
-            <CheckCircle2 className="size-3" /> {PHASE_LABEL[phase]}
+            <CheckCircle2 className="size-3" /> {getPhaseLabel(event, phase)}
           </Badge>
         ) : (
-          <Badge key={phase}>
-            <Circle className="size-3" /> {PHASE_LABEL[phase]}
+          <Badge key={phase} tone={onDark ? "on-dark" : "neutral"}>
+            <Circle className="size-3" /> {getPhaseLabel(event, phase)}
           </Badge>
         ),
       )}
@@ -61,8 +62,8 @@ export function SimilarityBadge({ match, state = "ready" }: { match: SimilarityM
 export function NotEnoughData({ state }: { state: AnalysisState }) {
   return (
     <div className="flex items-start gap-3 rounded-2xl bg-paper p-4">
-      <Clock className="mt-0.5 size-5 shrink-0 text-ink/50" />
-      <p className="font-mono text-xs leading-relaxed text-ink/70">
+      <Clock className="mt-0.5 size-5 shrink-0 text-muted" />
+      <p className="font-mono text-xs leading-relaxed text-muted">
         {state === "empty"
           ? "Este proyecto todavía no tiene análisis. Se genera en cuanto el equipo guarda su información."
           : `Aún hay muy poca información para comparar con confianza (menos de ${MIN_TOKENS} palabras útiles y sin enlaces ni archivos). El análisis se actualiza solo cuando el equipo agrega su descripción y entregas.`}
@@ -99,7 +100,7 @@ export function MatchList({
         const title = anonymous ? `Proyecto ${i + 1}` : m.other.title || "Sin título";
         const where = sameEvent ? "Este mismo evento" : anonymous ? "Otro evento" : m.other.eventName;
         return (
-          <li key={m.other.projectId} className="flex gap-3 rounded-2xl border border-ink/5 bg-paper p-3 sm:gap-4 sm:p-4">
+          <li key={m.other.projectId} className="flex gap-3 rounded-2xl border border-line bg-paper p-3 sm:gap-4 sm:p-4">
             <div
               className={cn(
                 "grid size-12 shrink-0 place-items-center rounded-xl font-mono text-sm font-bold sm:size-14",
@@ -113,7 +114,7 @@ export function MatchList({
                 <p className="break-words font-display font-bold">{title}</p>
                 <Badge tone={LEVEL_STYLE[m.level].tone}>{LEVEL_STYLE[m.level].label}</Badge>
               </div>
-              <p className="mt-0.5 font-mono text-[11px] text-ink/55">
+              <p className="mt-0.5 font-mono text-[11px] text-muted">
                 {where} · {m.other.year}
               </p>
               <ul className="mt-2 space-y-1">
