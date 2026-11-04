@@ -1,30 +1,35 @@
 import {
-  addDoc,
   collection,
   collectionGroup,
   deleteDoc,
+  deleteField,
   doc,
+  FieldPath,
+  getDoc,
   getDocs,
   limit,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   updateDoc,
   where,
   writeBatch,
+  type Transaction,
 } from "firebase/firestore";
-import { deleteObject, getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage";
 import type { User } from "firebase/auth";
-import { db, storage } from "./firebase";
+import { auth, db } from "./firebase";
+import { validateSubmissionFiles } from "./submission-files";
+import { removeSubmissionFile, verifySubmissionFiles } from "./submission-storage";
 import { buildFingerprint } from "./similarity";
 import type {
   Criterion,
   EvaluationDoc,
   EventDoc,
-  FileItem,
   FingerprintDoc,
   Phase,
   PhaseFeedback,
+  ParticipantRoster,
   ProjectDoc,
   ResultRow,
   StaffRole,
@@ -35,6 +40,7 @@ import {
   DEFAULT_CATEGORIES,
   DEFAULT_CRITERIA,
   effectiveEvaluationTotal,
+  isProjectAssignedToJudge,
   normalizeEmail,
   randomCode,
 } from "./utils";
@@ -45,6 +51,7 @@ export const eventRef = (id: string) => doc(db, "events", id);
 export const projectsCol = (eventId: string) => collection(db, "events", eventId, "projects");
 export const projectRef = (eventId: string, projectId: string) => doc(db, "events", eventId, "projects", projectId);
 export const evaluationsCol = (eventId: string) => collection(db, "events", eventId, "evaluations");
+export const participantRosterRef = (eventId: string) => doc(db, "events", eventId, "access", "participants");
 
 export const evaluationId = (judgeId: string, projectId: string, phase: Phase) => `${judgeId}_${projectId}_${phase}`;
 
@@ -90,7 +97,71 @@ export function setEventMembership(
   const id = normalizeEmail(email);
   const current = event[list];
   const next = add ? Array.from(new Set([...current, id])) : current.filter((e) => e !== id);
-  return updateDoc(eventRef(event.id), { [list]: next });
+  return saveEventEmails(event, list, next);
+}
+
+/**
+ * Guarda la lista completa de jueces u organizadores de un evento.
+ * Quien concursa en el evento (integrante de un proyecto) no puede ser juez ni organizador.
+ */
+export async function saveEventEmails(event: EventDoc, list: "judgeEmails" | "organizerEmails", emails: string[]) {
+  const requested = Array.from(new Set(emails.map(normalizeEmail).filter(Boolean)));
+  const removed = event[list].filter((email) => !requested.includes(email));
+  const added = requested.filter((email) => !event[list].includes(email));
+  await runTransaction(db, async (tx) => {
+    const [eventSnap, rosterSnap] = await Promise.all([tx.get(eventRef(event.id)), tx.get(participantRosterRef(event.id))]);
+    if (!eventSnap.exists()) throw new Error("El evento ya no existe.");
+    if (!rosterSnap.exists()) throw new Error("El superadmin debe actualizar los permisos de este evento antes de cambiar sus roles.");
+    const current = eventSnap.data() as EventDoc;
+    // Aplica solo el cambio solicitado; conserva invitaciones concurrentes.
+    const next = Array.from(new Set([...current[list].filter((email) => !removed.includes(email)), ...added]));
+    const other = list === "judgeEmails" ? current.organizerEmails : current.judgeEmails;
+    const overlap = next.find((email) => other.includes(email));
+    if (overlap) throw new Error(`${overlap} ya es ${list === "judgeEmails" ? "organizador" : "juez"}. Quita ese rol antes de asignarle otro.`);
+    const members = (rosterSnap.data() as ParticipantRoster).members;
+    const contestant = next.find((email) => members[email]);
+    if (contestant) throw new Error(`${contestant} participa en un equipo y no puede administrar ni calificar este evento.`);
+    if (list === "organizerEmails" && !next.includes(current.ownerEmail)) throw new Error("No se puede quitar al creador del evento.");
+    tx.update(eventRef(event.id), { [list]: next });
+  });
+}
+
+/** Actualización única de eventos antiguos. No cambia proyectos, roles ni calificaciones. */
+export async function prepareEventAccess(eventId: string) {
+  await runTransaction(db, async (tx) => {
+    const event = await tx.get(eventRef(eventId));
+    if (!event.exists()) throw new Error("El evento ya no existe.");
+    if (event.data().accessVersion === 1) return;
+    // Las reglas impiden cambiar equipos de eventos antiguos hasta crear esta proyección.
+    const projects = await getDocs(projectsCol(eventId));
+    const members: Record<string, true> = {};
+    for (const project of projects.docs) {
+      for (const email of (project.data() as ProjectDoc).memberEmails) {
+        if (members[email]) throw new Error(`${email} está en varios equipos. Corrige esa duplicidad antes de actualizar los permisos.`);
+        members[email] = true;
+      }
+    }
+    tx.set(participantRosterRef(eventId), { members, projectId: "" } satisfies ParticipantRoster);
+    tx.update(eventRef(eventId), { accessVersion: 1 });
+  });
+}
+
+/** Actualiza las claves sin leer ni revelar el registro privado al equipo. */
+function syncParticipants(tx: Transaction, eventId: string, projectId: string, before: string[], after: string[]) {
+  const fields: unknown[] = [];
+  for (const email of before) if (!after.includes(email)) fields.push(new FieldPath("members", email), deleteField());
+  for (const email of after) if (!before.includes(email)) fields.push(new FieldPath("members", email), true);
+  tx.update(participantRosterRef(eventId), "projectId", projectId, ...fields);
+}
+
+/** Lanza un error si alguno de los correos es juez u organizador del evento. */
+function assertNotEventStaff(event: EventDoc, memberEmails: string[]) {
+  const staff = new Set([...event.organizerEmails, ...event.judgeEmails].map(normalizeEmail));
+  const conflict = memberEmails.find((e) => staff.has(normalizeEmail(e)));
+  if (conflict) {
+    const role = event.judgeEmails.map(normalizeEmail).includes(conflict) ? "juez" : "organizador";
+    throw new Error(`${conflict} es ${role} de este evento y no puede formar parte de un equipo.`);
+  }
 }
 
 /* ---------- Usuarios ---------- */
@@ -136,6 +207,7 @@ export async function createEvent(input: NewEventInput, user: User) {
   const code = await generateUniqueEventCode();
   const data: Omit<EventDoc, "id"> = {
     ...input,
+    accessVersion: 1,
     categories: input.categories?.length ? input.categories : DEFAULT_CATEGORIES,
     code,
     ownerId: user.uid,
@@ -151,41 +223,42 @@ export async function createEvent(input: NewEventInput, user: User) {
     originality: DEFAULT_ORIGINALITY,
     createdAt: null,
   };
-  const created = await addDoc(collection(db, "events"), { ...data, createdAt: serverTimestamp() });
+  const created = doc(collection(db, "events"));
+  const batch = writeBatch(db);
+  batch.set(created, { ...data, createdAt: serverTimestamp() });
+  batch.set(participantRosterRef(created.id), { members: {}, projectId: "" } satisfies ParticipantRoster);
+  await batch.commit();
   return created.id;
 }
 
 export function updateEvent(
   eventId: string,
-  patch: Partial<Omit<EventDoc, "id" | "ownerId" | "ownerEmail" | "createdAt">>,
+  patch: Partial<Omit<EventDoc, "id" | "ownerId" | "ownerEmail" | "createdAt" | "accessVersion" | "judgeEmails" | "organizerEmails">>,
 ) {
   return updateDoc(eventRef(eventId), patch);
 }
 
 export async function deleteEvent(eventId: string) {
-  // Primero se borran las subcolecciones mientras el evento aún existe (para que isOrganizer(eid) en las reglas sea válido).
-  try {
-    const [projSnap, evalSnap] = await Promise.all([
-      getDocs(projectsCol(eventId)),
-      getDocs(evaluationsCol(eventId)),
-    ]);
-    const files: FileItem[] = [];
-    for (const d of projSnap.docs) {
-      const p = d.data() as ProjectDoc;
-      if (p.prototype?.files?.length) files.push(...p.prototype.files);
-      if (p.final?.files?.length) files.push(...p.final.files);
-    }
-    await Promise.all(files.map(removeSubmissionFile));
-    const refs = [...evalSnap.docs.map((d) => d.ref), ...projSnap.docs.map((d) => d.ref)];
-    for (let i = 0; i < refs.length; i += 400) {
-      const batch = writeBatch(db);
-      refs.slice(i, i + 400).forEach((r) => batch.delete(r));
-      await batch.commit();
-    }
-  } catch {
-    // Si alguna lectura/borrado de subcolección falla, continúa con el borrado del evento.
+  const event = await getDoc(eventRef(eventId));
+  if (!event.exists()) return;
+  const user = auth.currentUser;
+  if (!user || (user.uid !== event.data().ownerId && normalizeEmail(user.email ?? "") !== SUPERADMIN_EMAIL)) {
+    throw new Error("Solo el creador o el superadmin pueden eliminar el evento.");
   }
-  await deleteDoc(eventRef(eventId));
+  if (event.data().resultsPublished) throw new Error("Oculta los resultados antes de eliminar el evento.");
+  if (event.data().accessVersion !== 1) throw new Error("Actualiza los permisos del evento antes de eliminarlo.");
+  const projects = await getDocs(projectsCol(eventId));
+  for (const project of projects.docs) await deleteProject(eventId, { ...project.data(), id: project.id } as ProjectDoc, true);
+  const evaluations = await getDocs(evaluationsCol(eventId));
+  for (let i = 0; i < evaluations.docs.length; i += 400) {
+    const batch = writeBatch(db);
+    evaluations.docs.slice(i, i + 400).forEach((evaluation) => batch.delete(evaluation.ref));
+    await batch.commit();
+  }
+  const batch = writeBatch(db);
+  batch.delete(participantRosterRef(eventId));
+  batch.delete(eventRef(eventId));
+  await batch.commit();
 }
 
 export async function findEventByCode(code: string) {
@@ -209,43 +282,11 @@ async function writeFingerprint(project: ProjectDoc, event: EventDoc) {
   await setDoc(doc(db, "fingerprints", project.id), { ...fp, updatedAt: serverTimestamp() });
 }
 
-async function assertNoDuplicateMembersInEvent(
-  eventId: string,
-  memberEmails: string[],
-  selfEmail?: string,
-  excludeProjectId?: string,
-) {
-  if (selfEmail) {
-    const ownSnap = await getDocs(qMyEventProject(eventId, selfEmail));
-    const otherOwn = ownSnap.docs.find((d) => d.id !== excludeProjectId);
-    if (otherOwn) {
-      const otherTitle = (otherOwn.data() as ProjectDoc).title;
-      throw new Error(`Ya perteneces al proyecto «${otherTitle}» en este evento.`);
-    }
-  }
-  for (let i = 0; i < memberEmails.length; i += 10) {
-    const chunk = memberEmails.slice(i, i + 10);
-    if (!chunk.length) continue;
-    try {
-      const snap = await getDocs(query(projectsCol(eventId), where("memberEmails", "array-contains-any", chunk)));
-      const conflictDoc = snap.docs.find((d) => d.id !== excludeProjectId);
-      if (conflictDoc) {
-        const other = conflictDoc.data() as ProjectDoc;
-        const dup = chunk.find((em) => other.memberEmails?.includes(em)) ?? chunk[0];
-        throw new Error(`El correo ${dup} ya pertenece al proyecto «${other.title}» en este evento.`);
-      }
-    } catch (err) {
-      if ((err as { code?: string })?.code === "permission-denied") continue;
-      throw err;
-    }
-  }
-}
-
 export async function createProject(event: EventDoc, input: ProjectInfoInput, user: User) {
   const leaderEmail = normalizeEmail(user.email ?? "");
   const members = dedupeMembers([{ name: user.displayName ?? "", email: leaderEmail }, ...input.members]);
   const memberEmails = members.map((m) => m.email);
-  await assertNoDuplicateMembersInEvent(event.id, memberEmails, leaderEmail);
+  assertNotEventStaff(event, memberEmails);
   const ref = doc(projectsCol(event.id));
   const project: ProjectDoc = {
     ...input,
@@ -262,58 +303,70 @@ export async function createProject(event: EventDoc, input: ProjectInfoInput, us
   };
   const { id: _id, ...data } = project;
   void _id;
-  await setDoc(ref, { ...data, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  await runTransaction(db, async (tx) => {
+    const currentEvent = await tx.get(eventRef(event.id));
+    if (!currentEvent.exists()) throw new Error("El evento ya no existe.");
+    if (currentEvent.data().accessVersion !== 1) throw new Error("El superadmin debe actualizar los permisos de este evento antes de registrar equipos.");
+    assertNotEventStaff(currentEvent.data() as EventDoc, memberEmails);
+    tx.set(ref, { ...data, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+    syncParticipants(tx, event.id, ref.id, [], memberEmails);
+  });
   await writeFingerprint(project, event);
   return ref.id;
 }
 
-export async function updateProjectInfo(event: EventDoc, project: ProjectDoc, input: ProjectInfoInput) {
-  const members = dedupeMembers(input.members);
-  if (!members.some((m) => m.email === project.leaderEmail)) {
-    members.unshift(project.members.find((m) => m.email === project.leaderEmail) ?? { name: "", email: project.leaderEmail });
-  }
-  const memberEmails = members.map((m) => m.email);
-  await assertNoDuplicateMembersInEvent(event.id, memberEmails, undefined, project.id);
-  const patch = { ...input, members, memberEmails };
-  await updateDoc(projectRef(event.id, project.id), { ...patch, updatedAt: serverTimestamp() });
-  await writeFingerprint({ ...project, ...patch }, event);
+export async function updateProjectInfo(event: EventDoc, project: ProjectDoc, input: ProjectInfoInput, user: User) {
+  const updated = await runTransaction(db, async (tx) => {
+    const [projectSnap, eventSnap] = await Promise.all([tx.get(projectRef(event.id, project.id)), tx.get(eventRef(event.id))]);
+    if (!projectSnap.exists() || !eventSnap.exists()) throw new Error("El proyecto ya no existe.");
+    const current = { ...projectSnap.data(), id: project.id } as ProjectDoc;
+    const isLeader = user.uid === current.leaderId;
+    // Solo el líder administra a los integrantes; los demás conservan la lista actual.
+    const members = isLeader ? dedupeMembers(input.members) : [...current.members];
+    if (!members.some((m) => m.email === current.leaderEmail)) {
+      members.unshift(current.members.find((m) => m.email === current.leaderEmail) ?? { name: "", email: current.leaderEmail });
+    }
+    const memberEmails = members.map((m) => m.email);
+    assertNotEventStaff(eventSnap.data() as EventDoc, memberEmails);
+    const changedMembers = memberEmails.length !== current.memberEmails.length || memberEmails.some((email, index) => current.memberEmails[index] !== email);
+    if (changedMembers && eventSnap.data().accessVersion !== 1) throw new Error("El superadmin debe actualizar los permisos de este evento antes de cambiar integrantes.");
+    const patch = isLeader ? { ...input, members, memberEmails } : { ...input, members: current.members };
+    tx.update(projectRef(event.id, project.id), { ...patch, updatedAt: serverTimestamp() });
+    if (changedMembers) syncParticipants(tx, event.id, project.id, current.memberEmails, memberEmails);
+    return { ...current, ...patch };
+  });
+  await writeFingerprint(updated, event);
 }
 
 export async function deleteProject(eventId: string, project: ProjectDoc, asOrganizer = false) {
+  const event = await getDoc(eventRef(eventId));
+  if (!event.exists()) throw new Error("El evento ya no existe.");
+  if (event.data().resultsPublished) throw new Error("Oculta los resultados antes de eliminar proyectos.");
+  if (event.data().accessVersion !== 1) throw new Error("El superadmin debe actualizar los permisos antes de eliminar proyectos.");
+  const evaluations = asOrganizer ? (await getDocs(query(evaluationsCol(eventId), where("projectId", "==", project.id)))).docs : [];
   const files = [...(project.prototype?.files ?? []), ...(project.final?.files ?? [])];
-  await Promise.all(files.map(removeSubmissionFile));
-  if (asOrganizer) {
-    try {
-      const evalSnap = await getDocs(query(evaluationsCol(eventId), where("projectId", "==", project.id)));
-      if (!evalSnap.empty) {
-        const batch = writeBatch(db);
-        evalSnap.docs.forEach((d) => batch.delete(d.ref));
-        await batch.commit();
-      }
-    } catch {
-      // Continúa con el borrado del proyecto.
-    }
-  }
-  await deleteDoc(projectRef(eventId, project.id));
+  await Promise.all(files.map(file => removeSubmissionFile(file)));
+  await runTransaction(db, async (tx) => {
+    const current = await tx.get(projectRef(eventId, project.id));
+    if (!current.exists()) return;
+    tx.delete(current.ref);
+    syncParticipants(tx, eventId, project.id, (current.data() as ProjectDoc).memberEmails, []);
+    evaluations.forEach((evaluation) => tx.delete(evaluation.ref));
+  });
 }
 
 export async function saveSubmission(event: EventDoc, project: ProjectDoc, phase: Phase, submission: Submission) {
+  validateSubmissionFiles(event.id, project.id, phase, submission.files);
+  if (submission.links.length) throw new Error("Las entregas se realizan con archivos subidos directamente.");
+  await verifySubmissionFiles(submission.files);
   await updateDoc(projectRef(event.id, project.id), {
     [phase]: { ...submission, submittedAt: serverTimestamp() },
     updatedAt: serverTimestamp(),
   });
-  await writeFingerprint({ ...project, [phase]: submission }, event);
-}
-
-export async function uploadSubmissionFile(eventId: string, projectId: string, phase: Phase, file: File) {
-  const path = `events/${eventId}/projects/${projectId}/${phase}/${Date.now()}_${file.name.replace(/[^\w.\-]+/g, "_")}`;
-  const ref = storageRef(storage, path);
-  await uploadBytes(ref, file, { contentType: file.type || "application/octet-stream" });
-  return { path, url: await getDownloadURL(ref) };
-}
-
-export async function removeSubmissionFile(file: FileItem) {
-  if (file.path) await deleteObject(storageRef(storage, file.path)).catch(() => undefined);
+  // Un fallo posterior no debe presentar como fallida una entrega que Firestore ya guardó.
+  await writeFingerprint({ ...project, [phase]: submission }, event).catch(() => undefined);
+  const removed = (project[phase]?.files ?? []).filter(file => file.path && !submission.files.some(current => current.path === file.path));
+  await Promise.allSettled(removed.map(file => removeSubmissionFile(file)));
 }
 
 function dedupeMembers(members: { name: string; email: string }[]) {
@@ -341,6 +394,13 @@ export async function saveEvaluation(
   total: number,
   comment: string,
 ) {
+  const [eventSnap, projectSnap] = await Promise.all([getDoc(eventRef(event.id)), getDoc(projectRef(event.id, projectId))]);
+  if (!eventSnap.exists() || !projectSnap.exists()) throw new Error("El proyecto ya no existe.");
+  const current = { ...eventSnap.data(), id: event.id } as EventDoc;
+  if (current.accessVersion !== 1 || !current.judgingOpen || current.resultsPublished) throw new Error("La evaluación está cerrada.");
+  if (!current.phases[phase] || !isProjectAssignedToJudge(current, { ...projectSnap.data(), id: projectId } as ProjectDoc, user.email ?? "")) {
+    throw new Error("Este proyecto o etapa no está asignado a tu evaluación.");
+  }
   const id = evaluationId(user.uid, projectId, phase);
   const data: Omit<EvaluationDoc, "id" | "updatedAt"> = {
     eventId: event.id,

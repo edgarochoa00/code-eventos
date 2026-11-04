@@ -15,6 +15,7 @@ export function ProjectForm({
   maxTeamSize,
   categories = CATEGORIES,
   submitLabel,
+  canManageMembers = true,
   onSubmit,
   onCancel,
 }: {
@@ -23,6 +24,8 @@ export function ProjectForm({
   maxTeamSize: number;
   categories?: string[];
   submitLabel: string;
+  /** Solo el líder agrega o quita integrantes. */
+  canManageMembers?: boolean;
   onSubmit: (input: ProjectInfoInput) => Promise<void>;
   onCancel?: () => void;
 }) {
@@ -129,7 +132,17 @@ export function ProjectForm({
             <p className="truncate font-mono text-[11px] text-ink/55">{leader.email}</p>
           </div>
         </div>
-        {members.map((m, i) => (
+        {!canManageMembers &&
+          members.map((m) => (
+            <div key={m.email} className="flex items-center gap-3 rounded-xl bg-paper px-3.5 py-3">
+              <UserRound className="size-4 shrink-0" />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{m.name || "Integrante"}</p>
+                <p className="truncate font-mono text-[11px] text-ink/55">{m.email}</p>
+              </div>
+            </div>
+          ))}
+        {canManageMembers && members.map((m, i) => (
           <div key={i} className="grid gap-2 rounded-xl border border-ink/10 p-2 sm:grid-cols-[1fr_1.3fr_auto]">
             <Input
               aria-label={`Nombre del integrante ${i + 2}`}
@@ -158,13 +171,15 @@ export function ProjectForm({
             </Button>
           </div>
         ))}
-        {canAdd && (
+        {canManageMembers && canAdd && (
           <Button type="button" variant="outline" size="sm" onClick={() => setMembers((l) => [...l, { name: "", email: "" }])}>
             <Plus className="size-4" /> Agregar integrante
           </Button>
         )}
         <p className="font-mono text-[11px] text-ink/50">
-          Cada integrante verá el proyecto al entrar con ese correo y podrá editar las entregas.
+          {canManageMembers
+            ? "Cada integrante verá el proyecto al entrar con ese correo y podrá editar las entregas. Los jueces y organizadores del evento no pueden ser integrantes."
+            : "Solo el líder del equipo puede agregar o quitar integrantes."}
         </p>
       </div>
 

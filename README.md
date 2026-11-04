@@ -2,7 +2,7 @@
 
 Web app pensada primero para celular para organizar eventos de proyectos. Los equipos registran su proyecto y suben su prototipo y su producto final, los jueces califican con una rúbrica y el organizador publica los resultados. Incluye detección de similitud contra todos los proyectos históricos, modo claro y oscuro, y un panel de superadmin.
 
-Stack: Next.js 16 (App Router) · React 19 · Tailwind 4 · Firebase (Auth + Firestore) · proyecto `code-94fbe`.
+Stack: Next.js 16 (App Router) · React 19 · Tailwind 4 · Firebase (Auth + Firestore, proyecto `code-94fbe`) · Supabase Storage (archivos).
 
 ## Arranque
 
@@ -11,15 +11,28 @@ npm install
 npm run dev            # http://localhost:3000
 ```
 
-Las variables están en `.env.local` (plantilla en `.env.example`). En Vercel se configuran como variables de entorno del proyecto.
+Las variables locales están en `.env.local` (plantilla en `.env.example`). En Firebase App Hosting se configuran en `apphosting.yaml`; la clave privada de Supabase se referencia desde Secret Manager.
 
 | Script | Para qué |
 | --- | --- |
+| `npm run test:storage` | Prueba permisos y límites de archivos con servicios simulados, sin datos reales |
 | `npm run test:rules` | Prueba `firestore.rules` en el emulador (necesita Java) |
 | `npm run emulators` + `npm run dev:emulators` | App local contra Auth/Firestore simulados, sin tocar datos reales |
 | `npm run deploy:rules` | Publica reglas e índices en `code-94fbe` |
 
-Storage es opcional y requiere el plan Blaze. Si lo activas, corre `firebase deploy --only storage` y pon `NEXT_PUBLIC_ENABLE_STORAGE=true`. Sin Storage solo se guarda la huella SHA-256 de cada archivo, y los equipos comparten sus archivos con enlaces.
+Las entregas nuevas requieren archivos subidos directamente: hasta **30 MB por archivo y 10 archivos por entrega**. No se aceptan enlaces externos. Firebase conserva las cuentas y los datos; Supabase Storage guarda los archivos en un bucket privado. Consulta [la configuración de archivos](docs/SUPABASE_STORAGE.md) para conectar el proyecto. Los archivos antiguos de Firebase Storage conservan compatibilidad de descarga.
+
+## Publicar en Firebase
+
+El backend de App Hosting es `feria2027`, en el proyecto `code-94fbe`. `firebase.json` también conecta `feria2027.web.app` con su servicio de Cloud Run.
+
+```bash
+npx -y firebase-tools@15 deploy --only apphosting --project code-94fbe
+npm run deploy:rules
+npx -y firebase-tools@15 deploy --only hosting --project code-94fbe
+```
+
+Usa una cuenta de Firebase con acceso al proyecto (`--account CORREO` si tienes varias sesiones). El secreto `SUPABASE_SERVICE_ROLE_KEY` debe existir y permitir acceso al backend. `.env.local` no se publica. Al actualizar los permisos, sigue también la [puesta en marcha de eventos existentes](docs/PERMISOS.md#puesta-en-marcha).
 
 ## Permisos
 
@@ -27,8 +40,8 @@ Storage es opcional y requiere el plan Blaze. Si lo activas, corre `firebase dep
 
 | Permiso | Quién | Qué puede hacer |
 | --- | --- | --- |
-| Superadmin | `edgarochoa0173@gmail.com` (fijo en `lib/types.ts` y `firestore.rules`) | Todo. Es el único que da o quita permisos y suspende cuentas |
-| Admin | Lo asigna el superadmin | Administra todos los eventos, jueces y organizadores, y ve a todos los usuarios |
+| Superadmin | `edgarochoa0173@gmail.com` (fijo en `lib/types.ts` y `firestore.rules`) | Administra la plataforma; es el único que da o quita permisos y suspende cuentas. No concursa ni califica |
+| Admin | Lo asigna el superadmin | Administra todos los eventos y ve a todos los usuarios. No concursa ni califica mientras tenga este permiso |
 | Organizador | Lo asigna el superadmin | Puede crear sus propios eventos |
 | Usuario | Todos los demás | Registra proyectos y califica si lo agregan como juez |
 | Suspendido | Lo asigna el superadmin | No puede usar la app |
@@ -40,8 +53,19 @@ Los permisos se guardan en `staff/{correo}` y funcionan aunque la persona todav�
 | Rol | Cómo se obtiene | Qué puede hacer |
 | --- | --- | --- |
 | Organizador | Crea el evento, lo agregan en «Jueces → Organizadores» o es admin | Abre y cierra etapas, invita jueces, edita la rúbrica, ve calificaciones y originalidad, publica resultados |
-| Juez | Su correo está en la lista de jueces | Califica de 0 a 10 por criterio con comentario |
-| Alumno | Entra con el código o un compañero lo agrega | Registra su proyecto, entrega prototipo y producto final mientras la etapa esté abierta, ve su resultado |
+| Juez | Su correo está en la lista de jueces, sin administrar ni concursar en ese evento | Califica de 0 a 10 por criterio con comentario, únicamente en sus categorías o proyectos asignados y etapas habilitadas |
+| Alumno | Entra con el código o un compañero lo agrega | Registra su proyecto, entrega prototipo y producto final mientras la etapa esté abierta, ve su resultado. Solo el líder agrega o quita integrantes |
+
+Conflictos de interés que se bloquean (en la interfaz y en `firestore.rules`):
+
+- Quien concursa en un evento no puede ser juez ni organizador de ese evento, y viceversa.
+- Un juez nunca califica un proyecto del que forma parte.
+- El organizador no edita el contenido ni las entregas de los equipos; solo escribe la retroalimentación al publicar resultados.
+- Organizador y juez son incompatibles en el mismo evento. Los admins y el superadmin siempre actúan como administración, aunque aparezcan en una lista antigua de jueces o integrantes.
+- Con resultados publicados no se pueden cambiar calificaciones, información ni entregas, ni descartar calificaciones o borrar proyectos. Para corregirlos, primero hay que ocultar los resultados.
+- Las asignaciones de jueces también se comprueban en Firestore. Los proyectos no asignados se pueden consultar, pero no calificar. Se mantiene la evaluación de presentaciones en vivo aunque no haya archivo entregado.
+
+Los eventos nuevos crean automáticamente un registro privado en `events/{id}/access/participants`. Los eventos existentes muestran al superadmin el botón **Actualizar permisos del evento**. La actualización conserva proyectos, roles y calificaciones; prepara el registro para comprobar conflictos también al asignar un rol. Hasta actualizarlo se bloquean altas/bajas de proyectos, cambios de integrantes o roles y evaluación de jueces. Las entregas existentes siguen disponibles. Consulta [la política y puesta en marcha](docs/PERMISOS.md).
 
 ## Originalidad (`lib/similarity.ts`)
 

@@ -5,27 +5,27 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { EventStatus } from "@/components/event-card";
-import { Badge, Button, EmptyState, Spinner, Tabs } from "@/components/ui";
+import { Badge, Button, EmptyState, Spinner, firestoreErrorMessage, useToast } from "@/components/ui";
 import { useAccess } from "@/lib/access";
 import { useAuth } from "@/lib/auth";
-import { eventRef } from "@/lib/data";
-import { useDocument } from "@/lib/hooks";
-import { PHASE_LABEL, PHASES, type EventDoc, type EventRole } from "@/lib/types";
+import { eventRef, prepareEventAccess, qMyEventProject } from "@/lib/data";
+import { useCollection, useDocument } from "@/lib/hooks";
+import { PHASE_LABEL, PHASES, type EventDoc, type EventRole, type ProjectDoc } from "@/lib/types";
 import { formatDate, normalizeEmail, rolesInEvent } from "@/lib/utils";
 import { JudgeView } from "./judge-view";
 import { OrganizerView } from "./organizer-view";
 import { StudentView } from "./student-view";
-
-const VIEW_LABEL: Record<EventRole, string> = { organizer: "Organizador", judge: "Juez", student: "Participante" };
 
 export function EventView() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const access = useAccess();
   const { data: event, loading, error } = useDocument<EventDoc>(eventRef(id), `event:${id}`);
-  const [picked, setPicked] = useState<EventRole | null>(null);
+  const email = normalizeEmail(user?.email ?? "");
+  const checkTeam = !!event && !access.isAdmin && event.judgeEmails.includes(email) && !event.organizerEmails.includes(email);
+  const ownProjects = useCollection<ProjectDoc>(checkTeam ? qMyEventProject(id, email) : null, `role-team:${id}:${email}:${checkTeam}`);
 
-  if (loading) return <Spinner />;
+  if (loading || access.loading || ownProjects.loading) return <Spinner />;
   if (error || !event) {
     return (
       <EmptyState
@@ -40,8 +40,8 @@ export function EventView() {
     );
   }
 
-  const roles = rolesInEvent(event, user?.email, access.isAdmin);
-  const role = picked && roles.includes(picked) ? picked : roles[0];
+  const conflictingTeam = checkTeam && ownProjects.data.length > 0;
+  const role = conflictingTeam ? "student" : rolesInEvent(event, email, access.isAdmin)[0];
   // Admin global sin estar en la lista de organizadores del evento
   const viaAdmin = role === "organizer" && !event.organizerEmails.includes(normalizeEmail(user?.email ?? ""));
 
@@ -51,17 +51,40 @@ export function EventView() {
         <Link href="/panel" className="inline-flex items-center gap-1.5 font-mono text-xs text-ink/60 hover:text-ink">
           <ArrowLeft className="size-3.5" /> Panel
         </Link>
-        {roles.length > 1 && (
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-[11px] text-ink/50">Ver como</span>
-            <Tabs tabs={roles.map((r) => ({ id: r, label: VIEW_LABEL[r] }))} value={role} onChange={setPicked} />
-          </div>
-        )}
       </div>
       <EventHeader event={event} role={role} viaAdmin={viaAdmin} />
+      {conflictingTeam && <p className="rounded-2xl bg-amber-50 p-5 text-sm text-amber-900">Tu correo aparece en un equipo y en la lista de jueces. Pide al organizador que retire el permiso de juez para poder seguir trabajando con tu equipo. Mientras tanto puedes consultar tu proyecto.</p>}
+      {event.accessVersion !== 1 && <EventAccessNotice eventId={event.id} />}
       {role === "organizer" && <OrganizerView event={event} />}
-      {role === "judge" && <JudgeView event={event} />}
+      {role === "judge" && event.accessVersion === 1 && <JudgeView event={event} />}
       {role === "student" && <StudentView event={event} />}
+    </div>
+  );
+}
+
+function EventAccessNotice({ eventId }: { eventId: string }) {
+  const access = useAccess();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="space-y-3 rounded-2xl bg-amber-50 p-5 text-amber-900">
+      <p className="text-sm">
+        Este evento necesita una actualización de permisos por el superadmin para registrar equipos, cambiar integrantes o roles y habilitar a los jueces.
+        Los proyectos, entregas y calificaciones existentes se conservan.
+      </p>
+      {access.isSuperadmin && (
+        <Button loading={busy} size="sm" onClick={async () => {
+          setBusy(true);
+          try {
+            await prepareEventAccess(eventId);
+            toast("Permisos actualizados.");
+          } catch (err) {
+            toast(firestoreErrorMessage(err), "error");
+          } finally {
+            setBusy(false);
+          }
+        }}>Actualizar permisos del evento</Button>
+      )}
     </div>
   );
 }

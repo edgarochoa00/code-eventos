@@ -1,6 +1,7 @@
 import type { Timestamp } from "firebase/firestore";
 import {
   DEFAULT_ORIGINALITY,
+  SUPERADMIN_EMAIL,
   type Criterion,
   type EvaluationDoc,
   type EventDoc,
@@ -70,17 +71,14 @@ export function formatBytes(bytes: number) {
 }
 
 /**
- * Roles que tiene un usuario en un evento, en orden de prioridad.
- * Los admins globales administran cualquier evento aunque no estén en la lista de organizadores.
+ * Un solo rol efectivo por evento. Administrar tiene prioridad incluso si hay
+ * listas antiguas con roles mezclados o si un juez recibe permiso de admin.
  */
 export function rolesInEvent(event: EventDoc, email: string | null | undefined, isAdmin = false): EventRole[] {
   const me = normalizeEmail(email ?? "");
-  const roles: EventRole[] = [];
-  if (event.organizerEmails.includes(me)) roles.push("organizer");
-  if (event.judgeEmails.includes(me)) roles.push("judge");
-  if (isAdmin && !roles.includes("organizer")) roles.push("organizer");
-  if (!roles.length) roles.push("student");
-  return roles;
+  if (isAdmin || me === SUPERADMIN_EMAIL || me === event.ownerEmail || event.organizerEmails.includes(me)) return ["organizer"];
+  if (event.judgeEmails.includes(me)) return ["judge"];
+  return ["student"];
 }
 
 export function originalitySettings(event: EventDoc): OriginalitySettings {
@@ -145,8 +143,11 @@ export function hasJudgeAssignment(event: EventDoc, judgeEmail: string): boolean
   return Boolean((a?.categories && a.categories.length > 0) || (a?.projectIds && a.projectIds.length > 0));
 }
 
-export function isProjectAssignedToJudge(event: EventDoc, project: ProjectDoc, judgeEmail: string): boolean {
+export function isProjectAssignedToJudge(event: EventDoc, project: ProjectDoc, judgeEmail: string, isAdmin = false): boolean {
   const email = normalizeEmail(judgeEmail);
+  if (!rolesInEvent(event, email, isAdmin).includes("judge")) return false;
+  // Un juez nunca califica un proyecto del que forma parte.
+  if (project.memberEmails?.includes(email)) return false;
   if (!hasJudgeAssignment(event, email)) return true;
   const a = event.judgeAssignments?.[email];
   const byCat = Boolean(project.category && a?.categories?.includes(project.category));

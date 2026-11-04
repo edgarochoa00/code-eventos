@@ -40,21 +40,20 @@ service cloud.firestore {
       return /databases/$(database)/documents/staff/$(myEmail());
     }
 
-    function hasStaffRole(roles) {
-      return authed() && exists(staffPath()) && get(staffPath()).data.role in roles;
-    }
-
     // Usuario con correo verificado y sin suspensión
     function verified() {
-      return authed() && (isSuperadmin() || !hasStaffRole(['blocked']));
+      return authed() && (myEmail() == 'edgarochoa0173@gmail.com'
+        || !exists(staffPath()) || get(staffPath()).data.role != 'blocked');
     }
 
     function isAdmin() {
-      return isSuperadmin() || hasStaffRole(['admin']);
+      return authed() && (myEmail() == 'edgarochoa0173@gmail.com'
+        || (exists(staffPath()) && get(staffPath()).data.role == 'admin'));
     }
 
     function canCreateEvents() {
-      return isSuperadmin() || hasStaffRole(['admin', 'organizer']);
+      return authed() && (myEmail() == 'edgarochoa0173@gmail.com'
+        || (exists(staffPath()) && get(staffPath()).data.role in ['admin', 'organizer']));
     }
 
     // ---------- Eventos ----------
@@ -63,12 +62,28 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/events/$(eid)).data;
     }
 
+    function rosterPath(eid) {
+      return /databases/$(database)/documents/events/$(eid)/access/participants;
+    }
+
+    function hasRoster(eid) {
+      return eventData(eid).get('accessVersion', 0) == 1 && exists(rosterPath(eid));
+    }
+
     function isOrganizer(eid) {
       return verified() && (isAdmin() || myEmail() in eventData(eid).organizerEmails);
     }
 
     function isJudge(eid) {
-      return verified() && myEmail() in eventData(eid).judgeEmails;
+      return verified() && !isAdmin() && !(myEmail() in eventData(eid).organizerEmails)
+        && myEmail() in eventData(eid).judgeEmails
+        && hasRoster(eid)
+        && !(myEmail() in get(rosterPath(eid)).data.members);
+    }
+
+    function canParticipate(eid) {
+      return verified() && !isAdmin() && !(myEmail() in eventData(eid).organizerEmails)
+        && !(myEmail() in eventData(eid).judgeEmails);
     }
 
     function changed(keys) {
@@ -102,9 +117,11 @@ service cloud.firestore {
 
     // ---------- Eventos ----------
     match /events/{eid} {
-      allow read: if signedIn();
+      allow read: if verified();
 
       allow create: if canCreateEvents()
+        && request.resource.data.accessVersion == 1
+        && getAfter(rosterPath(eid)).data.members == {}
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.ownerEmail == myEmail()
         && request.resource.data.organizerEmails == [myEmail()]
@@ -125,12 +142,74 @@ service cloud.firestore {
         && resource.data.ownerEmail in request.resource.data.organizerEmails
         && validEmailList(request.resource.data.organizerEmails, 20)
         && validEmailList(request.resource.data.judgeEmails, 100)
+        // Las listas antiguas se pueden corregir sin bloquear los demás ajustes.
+        && (!changed(['organizerEmails', 'judgeEmails']) || (
+          hasRoster(eid)
+          && !request.resource.data.organizerEmails.hasAny(request.resource.data.judgeEmails)
+          && !get(rosterPath(eid)).data.members.keys().hasAny(request.resource.data.organizerEmails)
+          && !get(rosterPath(eid)).data.members.keys().hasAny(request.resource.data.judgeEmails)
+        ))
+        && (!changed(['accessVersion']) || (
+          isSuperadmin() && resource.data.get('accessVersion', 0) != 1
+          && request.resource.data.accessVersion == 1
+          && getAfter(rosterPath(eid)).data.members is map
+        ))
         && request.resource.data.maxTeamSize is int
         && request.resource.data.maxTeamSize >= 1
         && request.resource.data.maxTeamSize <= 15
         && validCriteria(request.resource.data.criteria);
 
-      allow delete: if isSuperadmin() || (verified() && resource.data.ownerId == request.auth.uid);
+      allow delete: if (isSuperadmin() || (verified() && resource.data.ownerId == request.auth.uid))
+        && hasRoster(eid) && get(rosterPath(eid)).data.members.size() == 0;
+
+      // Índice privado: los equipos solo pueden sincronizarlo junto con su proyecto.
+      // No pueden leer correos de otros equipos, ni omitir el índice en una escritura directa.
+      match /access/{accessId} {
+        function projectPath(pid) {
+          return /databases/$(database)/documents/events/$(eid)/projects/$(pid);
+        }
+
+        function beforeTeam(pid) {
+          return exists(projectPath(pid)) ? get(projectPath(pid)).data.memberEmails : [];
+        }
+
+        function afterTeam(pid) {
+          return existsAfter(projectPath(pid)) ? getAfter(projectPath(pid)).data.memberEmails : [];
+        }
+
+        function validSync() {
+          let before = beforeTeam(request.resource.data.projectId);
+          let after = afterTeam(request.resource.data.projectId);
+          return (myEmail() in before || myEmail() in after || isOrganizer(eid))
+            && request.resource.data.members.keys().toSet()
+              == resource.data.members.keys().toSet().difference(before.toSet()).union(after.toSet());
+        }
+
+        allow read: if accessId == 'participants' && isOrganizer(eid);
+        allow create: if accessId == 'participants' && verified()
+          && request.resource.data.keys().hasOnly(['members', 'projectId'])
+          && request.resource.data.projectId == ''
+          && request.resource.data.members is map
+          && request.resource.data.members.values().hasOnly([true])
+          && getAfter(/databases/$(database)/documents/events/$(eid)).data.accessVersion == 1
+          && (
+            (!exists(/databases/$(database)/documents/events/$(eid))
+              && getAfter(/databases/$(database)/documents/events/$(eid)).data.ownerId == request.auth.uid
+              && request.resource.data.members == {})
+            || (isSuperadmin() && eventData(eid).get('accessVersion', 0) != 1)
+          );
+        allow update: if accessId == 'participants' && verified() && hasRoster(eid)
+          && request.resource.data.keys().hasOnly(['members', 'projectId'])
+          && request.resource.data.projectId is string
+          && request.resource.data.projectId.size() > 0
+          && request.resource.data.members is map
+          && request.resource.data.members.values().hasOnly([true])
+          && validSync();
+        allow delete: if accessId == 'participants' && verified()
+          && (isSuperadmin() || eventData(eid).ownerId == request.auth.uid)
+          && resource.data.members.size() == 0
+          && !existsAfter(/databases/$(database)/documents/events/$(eid));
+      }
 
       // ---------- Proyectos ----------
       match /projects/{pid} {
@@ -139,16 +218,26 @@ service cloud.firestore {
         }
 
         function editingOpen() {
-          return ev().registrationOpen == true
+          return ev().resultsPublished != true && (ev().registrationOpen == true
             || ev().submissions.prototype == true
-            || ev().submissions.final == true;
+            || ev().submissions.final == true);
         }
 
         function validTeam(data) {
           return data.memberEmails is list
             && data.memberEmails.size() >= 1
             && data.memberEmails.size() <= ev().maxTeamSize
+            && data.memberEmails.toSet().size() == data.memberEmails.size()
             && data.leaderEmail in data.memberEmails;
+        }
+
+        function syncedTeam(before, after) {
+          let roster = get(rosterPath(eid)).data.members.keys().toSet();
+          let next = getAfter(rosterPath(eid)).data;
+          return hasRoster(eid)
+            && next.projectId == pid
+            && roster.intersection(after.toSet().difference(before.toSet())).size() == 0
+            && next.members.keys().toSet() == roster.difference(before.toSet()).union(after.toSet());
         }
 
         function validInfo(data) {
@@ -169,46 +258,80 @@ service cloud.firestore {
           || isJudge(eid)
           || (verified() && myEmail() in resource.data.memberEmails);
 
-        allow create: if verified()
+        // El equipo no puede incluir a organizadores ni jueces del evento
+        function noStaffInTeam(data) {
+          return !data.memberEmails.hasAny(ev().organizerEmails)
+            && !data.memberEmails.hasAny(ev().judgeEmails);
+        }
+
+        allow create: if canParticipate(eid)
           && ev().registrationOpen == true
+          && ev().resultsPublished != true
           && request.resource.data.eventId == eid
           && request.resource.data.leaderId == request.auth.uid
           && request.resource.data.leaderEmail == myEmail()
           && validTeam(request.resource.data)
+          && noStaffInTeam(request.resource.data)
+          && syncedTeam([], request.resource.data.memberEmails)
           && validInfo(request.resource.data)
           && request.resource.data.prototype == null
           && request.resource.data.final == null
           && !('feedback' in request.resource.data);
 
-        allow update: if isOrganizer(eid)
+        // El organizador solo puede escribir la retroalimentación, no el contenido del proyecto
+        allow update: if (
+            isOrganizer(eid)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['feedback'])
+          )
           || (
-            verified()
+            canParticipate(eid)
             && myEmail() in resource.data.memberEmails
             && editingOpen()
             && !changed(['feedback', 'leaderId', 'leaderEmail', 'eventId', 'createdAt'])
             && validTeam(request.resource.data)
             && validInfo(request.resource.data)
-            && (!changed(['prototype']) || ev().submissions.prototype == true)
-            && (!changed(['final']) || ev().submissions.final == true)
+            && (!changed(['prototype']) || (ev().phases.prototype == true && ev().submissions.prototype == true))
+            && (!changed(['final']) || (ev().phases.final == true && ev().submissions.final == true))
+            // Solo el líder administra el equipo
+            && (!changed(['members', 'memberEmails']) || resource.data.leaderId == request.auth.uid)
+            // No se puede agregar a jueces ni organizadores como integrantes
+            && (!changed(['memberEmails']) || noStaffInTeam(request.resource.data))
+            && (!changed(['memberEmails']) || syncedTeam(resource.data.memberEmails, request.resource.data.memberEmails))
           );
 
-        allow delete: if isOrganizer(eid)
-          || (verified() && resource.data.leaderId == request.auth.uid && ev().registrationOpen == true);
+        // Con resultados publicados el organizador ya no puede borrar proyectos
+        allow delete: if ev().resultsPublished != true
+          && (isOrganizer(eid) || (canParticipate(eid) && resource.data.leaderId == request.auth.uid && ev().registrationOpen == true))
+          && syncedTeam(resource.data.memberEmails, []);
       }
 
       // ---------- Evaluaciones ----------
       match /evaluations/{evid} {
+        function assignedProject(data) {
+          let project = get(/databases/$(database)/documents/events/$(eid)/projects/$(data.projectId)).data;
+          let assignment = eventData(eid).get('judgeAssignments', {}).get(myEmail(), {});
+          let categories = assignment.get('categories', []);
+          let projectIds = assignment.get('projectIds', []);
+          return !(myEmail() in project.memberEmails)
+            && ((categories.size() == 0 && projectIds.size() == 0)
+              || project.get('category', '') in categories || data.projectId in projectIds);
+        }
+
         allow read: if isOrganizer(eid)
           || (verified() && resource.data.judgeId == request.auth.uid);
 
         allow create, update: if isJudge(eid)
           && eventData(eid).judgingOpen == true
+          && eventData(eid).resultsPublished != true
           && request.resource.data.judgeId == request.auth.uid
           && request.resource.data.judgeEmail == myEmail()
           && request.resource.data.eventId == eid
           && request.resource.data.phase in ['prototype', 'final']
+          && eventData(eid).phases[request.resource.data.phase] == true
           && evid == request.auth.uid + '_' + request.resource.data.projectId + '_' + request.resource.data.phase
           && exists(/databases/$(database)/documents/events/$(eid)/projects/$(request.resource.data.projectId))
+          // Un juez no puede calificar un proyecto del que es integrante
+          && assignedProject(request.resource.data)
           && request.resource.data.scores is map
           && request.resource.data.total is number
           && request.resource.data.total >= 0
@@ -216,7 +339,8 @@ service cloud.firestore {
           && request.resource.data.comment is string
           && request.resource.data.comment.size() <= 2000;
 
-        allow delete: if isOrganizer(eid);
+        // Con resultados publicados las evaluaciones ya no se pueden borrar
+        allow delete: if isOrganizer(eid) && eventData(eid).resultsPublished != true;
       }
     }
 

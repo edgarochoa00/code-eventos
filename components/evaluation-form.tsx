@@ -16,11 +16,13 @@ export function EvaluationForm({
   criteria,
   initial,
   locked,
+  lockReason,
   onSave,
 }: {
   criteria: Criterion[];
   initial: EvaluationDoc | null;
   locked: boolean;
+  lockReason?: string;
   onSave: (scores: Record<string, number>, total: number, comment: string) => Promise<void>;
 }) {
   const [scores, setScores] = useState<Record<string, number>>(
@@ -47,8 +49,7 @@ export function EvaluationForm({
     <form onSubmit={handleSubmit} className="space-y-6">
       {locked && (
         <p className="flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-2.5 font-mono text-[11px] text-amber-800">
-          <Lock className="size-3.5 shrink-0" /> La evaluación está cerrada por el organizador. Puedes ver tu calificación
-          pero no cambiarla.
+          <Lock className="size-3.5 shrink-0" /> {lockReason ?? "La evaluación está cerrada por el organizador. Puedes ver tu calificación pero no cambiarla."}
         </p>
       )}
 

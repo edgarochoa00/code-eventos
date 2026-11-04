@@ -72,7 +72,7 @@ export function StudentView({ event }: { event: EventDoc }) {
             </span>
           </Link>
         </>
-      ) : event.registrationOpen ? (
+      ) : event.registrationOpen && !event.resultsPublished && event.accessVersion === 1 ? (
         <Card className="sm:p-8">
           <SectionTitle title="Registra tu proyecto" subtitle="Solo una persona del equipo lo registra y agrega a los demás." />
           <ProjectForm
@@ -95,7 +95,7 @@ export function StudentView({ event }: { event: EventDoc }) {
       ) : (
         <EmptyState
           icon={<Lock className="size-5" />}
-          title="El registro está cerrado"
+          title={event.accessVersion !== 1 ? "Registro pendiente de actualización" : "El registro está cerrado"}
           text="Si tu equipo ya se registró, pide al líder que confirme que tu correo esté en la lista de integrantes."
         />
       )}

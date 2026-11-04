@@ -52,6 +52,7 @@ import {
   projectsCol,
   publishResults,
   saveCriteria,
+  saveEventEmails,
   unpublishResults,
   updateEvent,
 } from "@/lib/data";
@@ -206,8 +207,9 @@ function Summary({
           ))}
           <Toggle
             label="Evaluación de jueces"
-            description={event.judgeEmails.length ? "Los jueces pueden calificar." : "Primero invita jueces."}
+            description={event.resultsPublished ? "Oculta los resultados antes de reabrir la evaluación." : event.judgeEmails.length ? "Los jueces pueden calificar." : "Primero invita jueces."}
             checked={event.judgingOpen}
+            disabled={event.resultsPublished || event.accessVersion !== 1}
             onChange={(v) => toggle({ judgingOpen: v })}
           />
         </div>
@@ -614,20 +616,21 @@ function JudgesTab({ event, evaluations, projects }: { event: EventDoc; evaluati
     <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[repeat(2,minmax(0,1fr))]">
       <EmailListEditor
         title="Jueces"
-        subtitle="Entran con este correo y verán los proyectos para calificar."
+        subtitle="Califican sus proyectos asignados. No pueden organizar ni formar parte de un equipo de este evento."
         emails={event.judgeEmails}
-        onSave={(judgeEmails) => updateEvent(event.id, { judgeEmails })}
+        onSave={(judgeEmails) => saveEventEmails(event, "judgeEmails", judgeEmails)}
         progress={(email) => {
           const n = evaluations.filter((e) => e.judgeEmail === email).length;
-          return `${n}/${judgeTasksCount(email)} evaluaciones`;
+          const conflict = event.organizerEmails.includes(email) ? " · debe quitarse de jueces: ya organiza" : "";
+          return `${n}/${judgeTasksCount(email)} evaluaciones${conflict}`;
         }}
       />
       <EmailListEditor
         title="Organizadores"
-        subtitle="Pueden administrar todo el evento, igual que tú."
+        subtitle="Administran el evento. No pueden calificar ni concursar en él."
         emails={event.organizerEmails}
         locked={[ownerEmail]}
-        onSave={(organizerEmails) => updateEvent(event.id, { organizerEmails })}
+        onSave={(organizerEmails) => saveEventEmails(event, "organizerEmails", organizerEmails)}
       />
 
       {event.judgeEmails.length > 0 && (

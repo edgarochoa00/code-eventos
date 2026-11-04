@@ -49,6 +49,7 @@ import {
   effectiveEvaluationTotal,
   eventCategories,
   judgesSeeOriginality,
+  isProjectAssignedToJudge,
   normalizeEmail,
   rolesInEvent,
   teamsSeeOriginality,
@@ -63,7 +64,7 @@ export function ProjectView() {
   const event = useDocument<EventDoc>(eventRef(id), `event:${id}`);
   const project = useDocument<ProjectDoc>(projectRef(id, pid), `project:${id}:${pid}`);
 
-  if (event.loading || project.loading) return <Spinner />;
+  if (event.loading || project.loading || access.loading) return <Spinner />;
   if (!event.data || !project.data) {
     return (
       <EmptyState
@@ -105,7 +106,11 @@ function ProjectBody({
   const toast = useToast();
   const phases = PHASES.filter((p) => event.phases[p]);
   const isOrganizer = roles.includes("organizer");
-  const isJudge = roles.includes("judge");
+  // Nadie califica un proyecto del que forma parte
+  const isJudge = roles.includes("judge") && !isMember;
+  const assigned = isJudge && isProjectAssignedToJudge(event, project, user?.email ?? "");
+  const canParticipate = isMember && roles.includes("student");
+  const isLeader = Boolean(user?.uid) && user?.uid === project.leaderId;
   const canReview = isOrganizer || isJudge;
   // Quién ve el análisis de originalidad (lo controla el organizador en Ajustes)
   const teamView = !canReview && isMember;
@@ -120,8 +125,9 @@ function ProjectBody({
   const [evalToDelete, setEvalToDelete] = useState<EvaluationDoc | null>(null);
   const [deletingEval, setDeletingEval] = useState(false);
 
-  const canEditInfo = isOrganizer || (isMember && (event.registrationOpen || phases.some((p) => event.submissions[p])));
-  const canDeleteProject = isOrganizer || (Boolean(user?.uid) && user?.uid === project.leaderId && event.registrationOpen);
+  // El contenido del proyecto es del equipo: el organizador no lo edita, solo puede retirarlo antes de publicar resultados.
+  const canEditInfo = canParticipate && !event.resultsPublished && (event.registrationOpen || phases.some((p) => event.submissions[p]));
+  const canDeleteProject = event.accessVersion === 1 && !event.resultsPublished && (isOrganizer || (canParticipate && isLeader && event.registrationOpen));
 
   // Evaluaciones: el juez ve las suyas, el organizador todas las del proyecto
   const evalQuery = isOrganizer
@@ -155,6 +161,7 @@ function ProjectBody({
       <Link href={`/eventos/${event.id}`} className="inline-flex items-center gap-1.5 font-mono text-xs text-ink/60 hover:text-ink">
         <ArrowLeft className="size-3.5" /> {event.name}
       </Link>
+      {isMember && !canParticipate && <p className="rounded-2xl bg-amber-50 p-5 text-sm text-amber-900">Tu correo figura en este equipo y también tiene un rol de administración o juez. Puedes consultar el proyecto, pero ese rol impide editarlo o entregar archivos como integrante. La administración debe corregir la incompatibilidad.</p>}
 
       <section className="rounded-3xl bg-surface p-6 sm:p-8">
         <div className="flex flex-wrap items-center gap-1.5">
@@ -183,17 +190,19 @@ function ProjectBody({
 
       {tab === "info" && (
         <Card>
-          {editingInfo ? (
+          {editingInfo && canEditInfo ? (
             <ProjectForm
               initial={project}
               leader={leader}
               maxTeamSize={event.maxTeamSize}
               categories={eventCategories(event)}
               submitLabel="Guardar"
+              canManageMembers={isLeader && event.accessVersion === 1}
               onCancel={() => setEditingInfo(false)}
               onSubmit={async (input) => {
+                if (!user) return;
                 try {
-                  await updateProjectInfo(event, project, input);
+                  await updateProjectInfo(event, project, input, user);
                   toast("Proyecto actualizado.");
                   setEditingInfo(false);
                 } catch (err) {
@@ -245,7 +254,7 @@ function ProjectBody({
         (phase) =>
           tab === phase && (
             <Card key={phase}>
-              {editingPhase === phase || (isMember && !project[phase] && event.submissions[phase]) ? (
+              {canParticipate && !event.resultsPublished && event.submissions[phase] && (editingPhase === phase || !project[phase]) ? (
                 <>
                   <SectionTitle title={`Entrega: ${PHASE_LABEL[phase]}`} />
                   <SubmissionEditor
@@ -267,9 +276,9 @@ function ProjectBody({
                   <SectionTitle
                     title={`Entrega: ${PHASE_LABEL[phase]}`}
                     action={
-                      (isMember || isOrganizer) &&
+                      canParticipate && !event.resultsPublished &&
                       project[phase] &&
-                      (event.submissions[phase] || isOrganizer) && (
+                      event.submissions[phase] && (
                         <Button variant="outline" size="sm" onClick={() => setEditingPhase(phase)}>
                           <Pencil className="size-3.5" /> Editar
                         </Button>
@@ -309,7 +318,8 @@ function ProjectBody({
               <EvaluationForm
                 key={evalPhase}
                 criteria={event.criteria}
-                locked={!event.judgingOpen}
+                locked={!assigned || !event.judgingOpen || event.resultsPublished || event.accessVersion !== 1}
+                lockReason={!assigned ? "Este proyecto no está asignado a tu evaluación. Puedes revisarlo." : event.resultsPublished ? "Los resultados están publicados. Tus calificaciones ya no se pueden cambiar." : event.accessVersion !== 1 ? "El superadmin debe actualizar los permisos de este evento antes de habilitar la evaluación." : undefined}
                 initial={evaluations.data.find((e) => e.id === evaluationId(user.uid, project.id, evalPhase)) ?? null}
                 onSave={async (scores, total, comment) => {
                   try {
@@ -357,7 +367,14 @@ function ProjectBody({
 
       {tab === "scores" && isOrganizer && (
         <Card>
-          <SectionTitle title="Calificaciones de jueces" subtitle="Solo los organizadores ven quién calificó qué." />
+          <SectionTitle
+            title="Calificaciones de jueces"
+            subtitle={
+              event.resultsPublished
+                ? "Los resultados ya se publicaron: las calificaciones no se pueden descartar."
+                : "Solo los organizadores ven quién calificó qué."
+            }
+          />
           {evaluations.data.length ? (
             <div className="space-y-3">
               {evaluations.data.map((e) => {
@@ -371,14 +388,16 @@ function ProjectBody({
                       </div>
                       <div className="flex items-center gap-2">
                         <p className="font-display text-2xl font-bold tabular-nums">{currentTotal.toFixed(1)}</p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          aria-label={`Descartar calificación de ${e.judgeName || e.judgeEmail}`}
-                          onClick={() => setEvalToDelete(e)}
-                        >
-                          <Trash2 className="size-4 text-ink/55 hover:text-red-600" />
-                        </Button>
+                        {!event.resultsPublished && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            aria-label={`Descartar calificación de ${e.judgeName || e.judgeEmail}`}
+                            onClick={() => setEvalToDelete(e)}
+                          >
+                            <Trash2 className="size-4 text-ink/55 hover:text-red-600" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-1.5">

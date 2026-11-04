@@ -3,8 +3,8 @@
  * La versión de cada documento es independiente de la versión de la app.
  */
 
-export const LEGAL_VERSION = "2026-10-20.1";
-export const LEGAL_UPDATED_LABEL = "20 de octubre de 2026";
+export const LEGAL_VERSION = "2026-11-03.1";
+export const LEGAL_UPDATED_LABEL = "3 de noviembre de 2026";
 
 export const SERVICE_CONTACT = {
   name: "Edgar Ochoa",
@@ -23,6 +23,27 @@ export type Release = { version: string; date: string; title: string; changes: s
 
 /** La primera entrada es la versión actual (debe coincidir con package.json). */
 export const RELEASES: Release[] = [
+  {
+    version: "0.4.0",
+    date: "4 de noviembre de 2026",
+    title: "Roles separados por evento",
+    changes: [
+      "Administradores y organizadores no califican ni compiten en los eventos que administran.",
+      "Las asignaciones de jueces y los conflictos con integrantes se comprueban también en las reglas de seguridad.",
+      "Publicar resultados bloquea cambios en calificaciones, proyectos y entregas.",
+      "Actualización de permisos para eventos existentes que conserva sus proyectos y calificaciones.",
+    ],
+  },
+  {
+    version: "0.3.0",
+    date: "3 de noviembre de 2026",
+    title: "Entregas con archivos privados",
+    changes: [
+      "Subida directa de archivos de hasta 30 MB a Supabase Storage, con las cuentas actuales de Firebase.",
+      "Descarga con permisos del proyecto y accesos temporales; las entregas nuevas ya no aceptan enlaces externos.",
+      "Aviso de privacidad y documentación actualizados para describir el almacenamiento de archivos.",
+    ],
+  },
   {
     version: "0.2.0",
     date: "20 de octubre de 2026",

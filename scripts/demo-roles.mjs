@@ -123,6 +123,7 @@ async function crear() {
     { id: "presentacion", name: "Presentación", description: "Claridad del pitch y de la documentación.", weight: 15 },
   ];
   const baseEvent = {
+    accessVersion: 1,
     institution: "Instituto Tecnológico de Culiacán (DEMO)",
     phases: { prototype: true, final: true },
     maxTeamSize: 5,
@@ -221,6 +222,10 @@ async function crear() {
   ]) {
     const { id, ...data } = p;
     await setDoc(`events/${p.eventId}/projects/${id}`, data);
+    await setDoc(`events/${p.eventId}/access/participants`, {
+      members: Object.fromEntries(p.memberEmails.map((email) => [email, true])),
+      projectId: id,
+    });
     await setDoc(`fingerprints/${id}`, await fingerprint(p, eventName, year));
   }
   console.log("  evento  DEMO · Expo de Proyectos (código DEMO26) y DEMO · Expo 2024 (histórico)");
@@ -259,6 +264,7 @@ async function borrar() {
       await delDoc(`originalityShingles/${pid}`);
     }
     for (let i = 0; i < 5; i++) await delDoc(`originalityIndex/${i === 0 ? ev : `${ev}__${i}`}`);
+    await delDoc(`events/${ev}/access/participants`);
     await delDoc(`events/${ev}`);
   }
   console.log(`Eliminadas ${ids.length} cuentas demo, sus permisos, eventos, proyectos, evaluaciones y huellas.`);

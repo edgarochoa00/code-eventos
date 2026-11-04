@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import { LegalLinks } from "@/components/legal-links";
+import { APP_NAME } from "@/components/logo";
 import { readStoredTheme, resetTheme, type Theme } from "@/components/theme-toggle";
 import { Button } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
@@ -74,7 +75,7 @@ export function PrivacyCenter() {
       id: "theme",
       icon: Palette,
       title: "Preferencia de tema",
-      text: "Guarda si prefieres modo claro u oscuro en este navegador (clave theme). Al restablecerla se usa la configuración de tu sistema.",
+      text: "Guarda si prefieres modo claro u oscuro en este navegador (clave theme). Al restablecerla se usa el modo claro.",
       status:
         storedTheme === undefined
           ? "Comprobando…"
@@ -107,7 +108,7 @@ export function PrivacyCenter() {
         <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink/50">Tu cuenta</p>
         <h1 className="mt-4 font-display text-[2.1rem] font-bold leading-[1.08] tracking-tight sm:text-5xl">Privacidad de mi cuenta</h1>
         <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-ink/70">
-          Consulta los documentos del servicio y administra lo que C.O.D.E guarda en este navegador.
+          Consulta los documentos del servicio y administra lo que {APP_NAME} guarda en este navegador.
         </p>
       </div>
 
@@ -127,7 +128,7 @@ export function PrivacyCenter() {
           En este dispositivo
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-ink/70">
-          C.O.D.E no usa cookies. Estos controles solo afectan a este navegador y no borran nada de lo guardado en el
+          {APP_NAME} no usa cookies. Estos controles solo afectan a este navegador y no borran nada de lo guardado en el
           servicio. Para quitar todo lo que el sitio guarda, incluido el registro técnico de Firebase, borra los datos del
           sitio desde la configuración de tu navegador.
         </p>
@@ -197,7 +198,7 @@ export function PrivacyCenter() {
         {/* En el celular van a todo lo ancho y el texto puede partirse en dos líneas */}
         <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-2 sm:flex sm:flex-wrap">
           <a
-            href={`mailto:${SERVICE_CONTACT.email}?subject=${encodeURIComponent("Privacidad C.O.D.E")}`}
+            href={`mailto:${SERVICE_CONTACT.email}?subject=${encodeURIComponent(`Privacidad ${APP_NAME}`)}`}
             className={`${ACTION_LINK} bg-lime text-coal hover:brightness-95`}
           >
             Contactar por privacidad <ArrowUpRight className="size-4 shrink-0" aria-hidden />

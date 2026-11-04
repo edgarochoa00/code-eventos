@@ -36,6 +36,8 @@ export type JudgeAssignment = {
 
 export type EventDoc = {
   id: string;
+  /** Versión del registro privado de integrantes usado para separar roles. */
+  accessVersion?: 1;
   name: string;
   description: string;
   institution: string;
@@ -63,6 +65,9 @@ export type EventDoc = {
   createdAt: Timestamp | null;
 };
 
+/** Proyección privada y atómica de los integrantes activos del evento. */
+export type ParticipantRoster = { members: Record<string, true>; projectId: string };
+
 export type LinkItem = { label: string; url: string };
 
 export type FileItem = {
@@ -70,7 +75,9 @@ export type FileItem = {
   size: number;
   type: string;
   sha256: string;
-  /** Solo existe si Storage está habilitado y el archivo se subió. */
+  /** Las entregas nuevas guardan la ruta privada, sin URL pública ni firmada. */
+  storage?: "supabase";
+  /** Compatibilidad con archivos de versiones anteriores en Firebase Storage. */
   url?: string;
   path?: string;
 };

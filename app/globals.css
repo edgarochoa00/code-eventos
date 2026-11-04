@@ -4,45 +4,45 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 /*
- * Tokens de color (como variables CSS para poder cambiarlos en modo oscuro):
- *   ink     texto y elementos fuertes (se invierte en oscuro)
- *   paper   fondo de la página
- *   surface tarjetas y paneles
- *   night   tarjetas destacadas oscuras (siguen oscuras en ambos modos)
- *   coal    texto oscuro fijo sobre colores brillantes
- *   lime    acento de marca (igual en ambos modos)
+ * Tokens de color institucionales (inspirados en el logo TECNM Culiacán · Sistemas y TICs):
+ *   ink     azul marino institucional para texto y elementos fuertes (se invierte en oscuro)
+ *   paper   fondo blanco de la página (negro en modo oscuro)
+ *   surface tarjetas y paneles blancos
+ *   night   paneles destacados en azul marino profundo (siguen oscuros en ambos modos)
+ *   coal    azul marino oscuro fijo sobre acentos claros
+ *   lime    acento celeste/cobalto institucional (igual en ambos modos)
  */
 @theme {
-  --color-ink: #191314;
-  --color-paper: #f4f4f4;
+  --color-ink: #0b1536;
+  --color-paper: #ffffff;
   --color-surface: #ffffff;
-  --color-night: #191314;
-  --color-coal: #191314;
-  --color-lime: #ecf95a;
-  --color-sage: #c5c9a4;
+  --color-night: #0b1536;
+  --color-coal: #0b1536;
+  --color-lime: #cfe0ff;
+  --color-sage: #93b4e8;
 }
 
 @theme inline {
-  --font-sans: var(--font-ubuntu), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-ubuntu), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-martian), ui-monospace, monospace;
+  --font-sans: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {
   [data-theme="dark"] {
-    --color-ink: #f3f1ea;
-    --color-paper: #0e0b0c;
-    --color-surface: #1a1617;
-    --color-night: #262021;
+    --color-ink: #eef3ff;
+    --color-paper: #000000;
+    --color-surface: #171717;
+    --color-night: #15234d;
     color-scheme: dark;
   }
 
-  /* Las superficies lima son "islas claras": todo lo que contienen se ve como en modo claro */
+  /* Las superficies de acento claro son "islas claras": todo lo que contienen se ve como en modo claro */
   [data-theme="dark"] .bg-lime {
-    --color-ink: #191314;
-    --color-paper: #f4f4f4;
+    --color-ink: #0b1536;
+    --color-paper: #eef3fb;
     --color-surface: #ffffff;
-    --color-night: #191314;
+    --color-night: #0b1536;
     color: var(--color-ink);
   }
 

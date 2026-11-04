@@ -20,7 +20,6 @@ const app = firstInit ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
-export const storageEnabled = process.env.NEXT_PUBLIC_ENABLE_STORAGE === "true";
 
 // Pruebas locales: `npm run dev:emulators` (nunca toca la base real)
 if (firstInit && process.env.NEXT_PUBLIC_USE_EMULATORS === "true") {

@@ -1,0 +1,25 @@
+env:
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: "AIzaSyC7ATd1XVgOHvnGmbv7IGv7fPSu9whC4x4"
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: "code-94fbe.firebaseapp.com"
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: "code-94fbe"
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: "code-94fbe.firebasestorage.app"
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "870593638237"
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: "1:870593638237:web:7ae0375da5d8496eeb82b4"
+  - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+    value: "G-WZT8R6GQ55"
+  - variable: NEXT_PUBLIC_ENABLE_STORAGE
+    value: "false"
+  - variable: SUPABASE_URL
+    value: "https://gnkbpntekocslrgskcsb.supabase.co"
+  - variable: SUPABASE_STORAGE_BUCKET
+    value: "code-submissions"
+  - variable: SUPABASE_SERVICE_ROLE_KEY
+    secret: SUPABASE_SERVICE_ROLE_KEY
+    availability:
+      - RUNTIME

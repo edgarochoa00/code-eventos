@@ -36,7 +36,16 @@ import {
 } from "@/components/ui";
 import { useAccess } from "@/lib/access";
 import { useAuth } from "@/lib/auth";
-import { deleteEvent, qAllEvents, qAllProjects, qAllStaff, qAllUsers, setEventMembership, setStaffRole, updateEvent } from "@/lib/data";
+import {
+  deleteEvent,
+  qAllEvents,
+  qAllProjects,
+  qAllStaff,
+  qAllUsers,
+  saveEventEmails,
+  setEventMembership,
+  setStaffRole,
+} from "@/lib/data";
 import { useCollection } from "@/lib/hooks";
 import {
   GLOBAL_ROLE_LABEL,
@@ -65,7 +74,7 @@ type Person = {
 const ROLE_HELP: Record<StaffRole | "user", string> = {
   user: "Puede registrar proyectos y evaluar si un organizador lo agrega como juez.",
   organizer: "Además puede crear sus propios eventos.",
-  admin: "Administra todos los eventos, jueces y organizadores, y ve a todos los usuarios.",
+  admin: "Administra todos los eventos y ve a todos los usuarios. No puede concursar ni calificar mientras tenga este permiso.",
   blocked: "No puede usar la app hasta que le quites la suspensión.",
 };
 
@@ -381,15 +390,15 @@ function PersonPanel({ person, events }: { person: Person; events: EventDoc[] })
 
       <section>
         <p className="text-sm font-medium">Juez en eventos</p>
-        <p className="font-mono text-[11px] text-ink/55">Activa los eventos donde esta persona calificará proyectos.</p>
+        <p className="font-mono text-[11px] text-ink/55">Activa los eventos donde esta persona calificará. Admins, superadmin y organizadores del evento no califican.</p>
         <div className="mt-2 divide-y divide-ink/5 rounded-2xl bg-paper px-4">
           {sortedEvents.map((e) => (
             <Toggle
               key={e.id}
               label={e.name}
-              description={e.institution || undefined}
+              description={person.role === "admin" || isSuper ? "Administra la plataforma; no puede calificar." : e.organizerEmails.includes(person.email) ? "Ya organiza este evento; debe dejar ese rol antes de ser juez." : e.institution || undefined}
               checked={e.judgeEmails.includes(person.email)}
-              disabled={busy === `j:${e.id}`}
+              disabled={!!busy || (!e.judgeEmails.includes(person.email) && (person.role === "admin" || isSuper || e.organizerEmails.includes(person.email)))}
               onChange={(v) =>
                 run(`j:${e.id}`, () => setEventMembership(e, person.email, "judgeEmails", v), v ? "Agregado como juez." : "Quitado de jueces.")
               }
@@ -497,16 +506,16 @@ function EventsTab({ events, projects }: { events: EventDoc[]; projects: Project
           <div className="space-y-4 [&>div]:p-0">
             <EmailListEditor
               title="Jueces"
-              subtitle="Entran con este correo y ven el evento en «Para evaluar»."
+              subtitle="Califican sus proyectos asignados. No pueden organizar ni concursar en este evento."
               emails={current.judgeEmails}
-              onSave={(judgeEmails) => updateEvent(current.id, { judgeEmails })}
+              onSave={(judgeEmails) => saveEventEmails(current, "judgeEmails", judgeEmails)}
             />
             <EmailListEditor
               title="Organizadores"
-              subtitle="Administran este evento."
+              subtitle="Administran el evento; no pueden calificar ni concursar en él."
               emails={current.organizerEmails}
               locked={[current.ownerEmail]}
-              onSave={(organizerEmails) => updateEvent(current.id, { organizerEmails })}
+              onSave={(organizerEmails) => saveEventEmails(current, "organizerEmails", organizerEmails)}
             />
           </div>
         )}

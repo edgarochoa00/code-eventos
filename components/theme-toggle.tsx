@@ -3,14 +3,14 @@
 import { Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/** Script que corre antes del primer pintado: aplica el tema guardado o el del sistema. */
-export const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem("theme");if(t!=="light"&&t!=="dark"){t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}var d=document.documentElement;d.setAttribute("data-theme",t);var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",t==="dark"?"#0e0b0c":"#f4f4f4")}catch(e){}})()`;
+/** Script que corre antes del primer pintado: aplica el tema guardado o el claro. */
+export const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem("theme");if(t!=="light"&&t!=="dark"){t="light"}var d=document.documentElement;d.setAttribute("data-theme",t);var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",t==="dark"?"#000000":"#ffffff")}catch(e){}})()`;
 
 export type Theme = "light" | "dark";
 
 function paintTheme(theme: Theme) {
   document.documentElement.setAttribute("data-theme", theme);
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#0e0b0c" : "#f4f4f4");
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#000000" : "#ffffff");
 }
 
 function applyTheme(theme: Theme) {
@@ -32,14 +32,14 @@ export function readStoredTheme(): Theme | null {
   }
 }
 
-/** Borra la preferencia guardada y vuelve al tema del sistema. */
+/** Borra la preferencia guardada y vuelve al tema claro. */
 export function resetTheme() {
   try {
     localStorage.removeItem("theme");
   } catch {
     // Sin acceso a localStorage no hay nada guardado que borrar
   }
-  paintTheme(window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  paintTheme("light");
 }
 
 /**
@@ -55,7 +55,7 @@ export function ThemeToggle({ className }: { className?: string }) {
         applyTheme(current === "dark" ? "light" : "dark");
       }}
       className={cn(
-        "grid size-10 shrink-0 place-items-center rounded-xl text-ink transition hover:bg-ink/5 focus-visible:outline-2 focus-visible:outline-ink",
+        "grid size-10 shrink-0 place-items-center rounded-full border-2 border-ink/15 bg-surface text-ink transition hover:border-ink/40 hover:bg-ink/5 focus-visible:outline-2 focus-visible:outline-ink",
         className,
       )}
       aria-label="Cambiar entre modo claro y oscuro"

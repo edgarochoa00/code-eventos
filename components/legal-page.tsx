@@ -4,7 +4,7 @@ import { LEGAL_UPDATED_LABEL, LEGAL_VERSION, PRODUCT_VERSION, RELEASES } from "@
 import { LEGAL_DOCUMENTS, type LegalDocument, type LegalDocumentKey } from "@/lib/legal-content";
 import { cn } from "@/lib/utils";
 import { LegalLinks } from "./legal-links";
-import { Logo } from "./logo";
+import { APP_NAME, APP_TAGLINE, Logo } from "./logo";
 import { ThemeToggle } from "./theme-toggle";
 
 const REFERENCES = [
@@ -27,7 +27,7 @@ export function LegalPage({ documentKey }: { documentKey: LegalDocumentKey | "ve
           <Link
             href="/panel"
             prefetch={false}
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-ink px-3.5 font-mono text-xs font-medium text-surface hover:bg-ink/90"
+            className="inline-flex h-10 items-center gap-1.5 rounded-full border-2 border-[#0b1536] bg-[#0b1536] px-4 font-display text-[11px] font-bold uppercase tracking-[0.08em] text-white ring-1 ring-inset ring-white/85 hover:bg-[#142459]"
           >
             Ir a mi panel <ArrowUpRight className="size-4" aria-hidden />
           </Link>
@@ -36,7 +36,7 @@ export function LegalPage({ documentKey }: { documentKey: LegalDocumentKey | "ve
 
       <main id="contenido" className="mx-auto w-full max-w-6xl flex-1 px-4 pb-16 sm:px-8">
         <Link href="/" className="inline-flex min-h-11 items-center gap-2 font-mono text-xs text-ink/55 hover:text-ink">
-          <ArrowLeft className="size-4" aria-hidden /> Volver a C.O.D.E
+          <ArrowLeft className="size-4" aria-hidden /> Volver a {APP_NAME}
         </Link>
 
         <div className="mt-2 rounded-[2rem] bg-surface p-7 sm:p-10">
@@ -44,7 +44,7 @@ export function LegalPage({ documentKey }: { documentKey: LegalDocumentKey | "ve
             {doc ? "Información del servicio · México" : "Evolución del producto"}
           </p>
           <h1 className="mt-4 max-w-3xl font-display text-[2.1rem] font-bold leading-[1.08] tracking-tight sm:text-5xl">
-            {doc ? doc.title : "Versiones de C.O.D.E"}
+            {doc ? doc.title : `Versiones de ${APP_NAME}`}
           </h1>
           <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-ink/70">
             {doc ? doc.intro : "Las mejoras que llegan a tus eventos, versión por versión."}
@@ -68,7 +68,7 @@ export function LegalPage({ documentKey }: { documentKey: LegalDocumentKey | "ve
 
       <footer className="border-t border-ink/5 px-4 pb-[max(2rem,calc(env(safe-area-inset-bottom)+1.25rem))] pt-6">
         <LegalLinks />
-        <p className="mt-2 text-center font-mono text-[10px] text-ink/40">C.O.D.E · Evaluación de proyectos escolares</p>
+        <p className="mt-2 text-center font-mono text-[10px] text-ink/40">{APP_TAGLINE} · Evaluación de proyectos</p>
       </footer>
     </div>
   );

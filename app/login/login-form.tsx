@@ -1,10 +1,11 @@
 "use client";
 
 import { ArrowUpRight } from "lucide-react";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { LegalLinks } from "@/components/legal-links";
-import { Logo } from "@/components/logo";
+import { APP_SUBTITLE, Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button, Field, Input, Tabs, useToast } from "@/components/ui";
 import { authErrorMessage, useAuth } from "@/lib/auth";
@@ -57,38 +58,35 @@ export function LoginForm() {
   }
 
   return (
-    <div className="grid flex-1 lg:grid-cols-[repeat(2,minmax(0,1fr))]">
-      <div className="relative hidden overflow-hidden bg-lime p-12 lg:flex lg:flex-col lg:justify-between">
+    <div className="flex flex-1 flex-col px-4 py-4 sm:px-10 sm:py-6">
+      <div className="flex items-center justify-between">
         <Logo />
-        <div>
-          <h1 className="font-display text-5xl font-bold leading-[1.05]">
-            Tu evento,
-            <br />
-            tus proyectos,
-            <br />
-            una sola app.
-          </h1>
-          <p className="mt-4 max-w-sm font-mono text-xs leading-relaxed text-ink/70">
-            Usa el mismo correo con el que te invitaron como juez u organizador, o con el que tu equipo te agregó.
-          </p>
-        </div>
-        <p className="font-mono text-[11px] text-ink/60">C.O.D.E · Evaluación de proyectos</p>
+        <ThemeToggle />
       </div>
 
-      <div className="flex flex-col px-4 py-4 sm:px-10 sm:py-6">
-        <div className="flex items-center justify-between">
-          <div className="lg:invisible">
-            <Logo />
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-6 sm:py-10">
+        <div className="rounded-3xl border-2 border-ink/12 bg-surface p-6 shadow-xs sm:p-8">
+          <div className="mb-6 flex flex-col items-center text-center">
+            <span className="grid size-24 place-items-center overflow-hidden rounded-full bg-white p-1 shadow-md ring-2 ring-ink/15">
+              <Image
+                src="/logo.png"
+                alt="Logo TECNM Culiacán · Sistemas Computacionales y TICs"
+                width={92}
+                height={92}
+                className="size-full object-contain"
+                priority
+              />
+            </span>
+            <p className="mt-3 font-display text-[11px] font-bold uppercase tracking-[0.14em] text-ink/75">
+              {APP_SUBTITLE}
+            </p>
           </div>
-          <ThemeToggle />
-        </div>
-        <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-10">
-          <h2 className="font-display text-3xl font-bold">{mode === "login" ? "Bienvenido" : "Crea tu cuenta"}</h2>
-          <p className="mt-1 font-mono text-xs text-ink/60">
-            {mode === "login" ? "Entra para ver tus eventos y proyectos." : "Te tomará menos de un minuto."}
-          </p>
 
-          <div className="mt-6">
+          <h2 className="font-display text-2xl font-extrabold uppercase tracking-[0.04em] sm:text-3xl">
+            {mode === "login" ? "Iniciar sesión" : "Crear cuenta"}
+          </h2>
+
+          <div className="mt-5">
             <Tabs
               tabs={[
                 { id: "login", label: "Entrar" },
@@ -102,7 +100,7 @@ export function LoginForm() {
             />
           </div>
 
-          <form onSubmit={onSubmit} className="mt-6 space-y-4">
+          <form onSubmit={onSubmit} className="mt-5 space-y-4">
             {mode === "signup" && (
               <Field label="Nombre completo" htmlFor="name">
                 <Input id="name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} required />
@@ -132,7 +130,7 @@ export function LoginForm() {
             </Field>
 
             {error && (
-              <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 font-mono text-[11px] text-red-700">
+              <p role="alert" className="rounded-2xl bg-red-50 px-3.5 py-2.5 font-sans text-xs font-medium text-red-700">
                 {error}
               </p>
             )}
@@ -143,14 +141,17 @@ export function LoginForm() {
           </form>
 
           {mode === "login" && (
-            <button type="button" onClick={onReset} className="mt-5 font-mono text-[11px] text-ink/60 underline">
+            <button
+              type="button"
+              onClick={onReset}
+              className="mt-5 font-display text-[11px] font-bold uppercase tracking-[0.08em] text-ink/70 underline underline-offset-4 hover:text-ink"
+            >
               Olvidé mi contraseña
             </button>
           )}
         </div>
-        <LegalLinks className="mx-auto w-full max-w-sm pb-[env(safe-area-inset-bottom)]" />
       </div>
+      <LegalLinks className="mx-auto w-full max-w-md pb-[env(safe-area-inset-bottom)]" />
     </div>
   );
 }
-

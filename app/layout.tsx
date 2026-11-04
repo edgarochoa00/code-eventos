@@ -1,21 +1,25 @@
 import type { Metadata, Viewport } from "next";
-import { Martian_Mono, Ubuntu } from "next/font/google";
+import { Montserrat } from "next/font/google";
+import { APP_NAME, APP_TAGLINE } from "@/components/logo";
 import { Providers } from "@/components/providers";
 import { THEME_SCRIPT } from "@/components/theme-toggle";
 import "./globals.css";
 
-const martian = Martian_Mono({ variable: "--font-martian", subsets: ["latin", "latin-ext"] });
-const ubuntu = Ubuntu({ variable: "--font-ubuntu", subsets: ["latin", "latin-ext"], weight: ["400", "500", "700"] });
+const montserrat = Montserrat({
+  variable: "--font-montserrat",
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "500", "600", "700", "800"],
+});
 
 export const metadata: Metadata = {
-  title: "C.O.D.E · Evaluación de proyectos",
+  title: `${APP_TAGLINE} · Evaluación de proyectos`,
   description:
-    "Organiza eventos escolares de proyectos: equipos, entregas de prototipo y producto final, evaluación de jueces y resultados.",
-  appleWebApp: { capable: true, title: "C.O.D.E", statusBarStyle: "default" },
+    "Plataforma de evaluación de proyectos de Sistemas Computacionales y TICs · TECNM Campus Culiacán: registro de equipos, entregas de prototipo y producto final, evaluación de jueces y resultados.",
+  appleWebApp: { capable: true, title: APP_NAME, statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f4f4f4",
+  themeColor: "#ffffff",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -27,7 +31,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="es"
       data-theme="light"
       suppressHydrationWarning
-      className={`${martian.variable} ${ubuntu.variable} h-full antialiased`}
+      className={`${montserrat.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />

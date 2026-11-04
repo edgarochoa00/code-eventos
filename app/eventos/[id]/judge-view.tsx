@@ -21,7 +21,9 @@ export function JudgeView({ event }: { event: EventDoc }) {
   const { user } = useAuth();
   const uid = user?.uid ?? "";
   const email = normalizeEmail(user?.email ?? "");
-  const projects = useCollection<ProjectDoc>(projectsCol(event.id), `projects:${event.id}`);
+  const allProjects = useCollection<ProjectDoc>(projectsCol(event.id), `projects:${event.id}`);
+  // Un juez nunca ve para calificar un proyecto del que forma parte.
+  const projects = { ...allProjects, data: allProjects.data.filter((p) => !p.memberEmails?.includes(email)) };
   const mine = useCollection<EvaluationDoc>(qMyEvaluations(event.id, uid), `myevals:${event.id}:${uid}`);
   const [filter, setFilter] = useState<Filter>("pending");
   const [search, setSearch] = useState("");
@@ -75,12 +77,11 @@ export function JudgeView({ event }: { event: EventDoc }) {
             </p>
           )}
         </div>
-        {!event.judgingOpen && (
+        {(!event.judgingOpen || event.resultsPublished) && (
           <div className="flex max-w-sm items-start gap-3 rounded-3xl bg-amber-50 p-5 text-amber-900">
             <Info className="mt-0.5 size-4 shrink-0" />
             <p className="font-mono text-[11px] leading-relaxed">
-              La evaluación aún no está abierta. Puedes revisar los proyectos; podrás calificar cuando el organizador la
-              abra.
+              {event.resultsPublished ? "Los resultados están publicados. Tus calificaciones ya no se pueden cambiar." : "La evaluación está cerrada. Puedes revisar los proyectos y calificar cuando el organizador la abra."}
             </p>
           </div>
         )}
@@ -121,6 +122,7 @@ export function JudgeView({ event }: { event: EventDoc }) {
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {p.category && <Badge>{p.category}</Badge>}
+                    {!isProjectAssignedToJudge(event, p, email) && <Badge>Solo consulta</Badge>}
                     {phases.map((ph) => {
                       const ev = evaluated(p, ph);
                       if (!p[ph]) return <Badge key={ph}>{PHASE_LABEL[ph]}: sin entrega</Badge>;
@@ -129,8 +131,8 @@ export function JudgeView({ event }: { event: EventDoc }) {
                           {PHASE_LABEL[ph]}: {effectiveEvaluationTotal(event.criteria, ev).toFixed(1)}
                         </Badge>
                       ) : (
-                        <Badge key={ph} tone="lime">
-                          {PHASE_LABEL[ph]}: por evaluar
+                        <Badge key={ph} tone={isProjectAssignedToJudge(event, p, email) ? "lime" : "neutral"}>
+                          {PHASE_LABEL[ph]}: {isProjectAssignedToJudge(event, p, email) ? "por evaluar" : "sin asignación"}
                         </Badge>
                       );
                     })}

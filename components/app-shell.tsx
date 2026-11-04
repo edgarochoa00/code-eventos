@@ -82,8 +82,10 @@ function Header() {
             <Link
               href="/admin"
               className={cn(
-                "flex h-10 items-center gap-1.5 rounded-xl px-2.5 font-mono text-xs transition sm:px-3",
-                pathname.startsWith("/admin") ? "bg-ink text-surface" : "hover:bg-ink/5",
+                "flex h-10 items-center gap-1.5 rounded-full border-2 px-3.5 font-display text-[11px] font-bold uppercase tracking-[0.08em] transition",
+                pathname.startsWith("/admin")
+                  ? "border-[#0b1536] bg-[#0b1536] text-white ring-1 ring-inset ring-white/80"
+                  : "border-ink/15 bg-surface text-ink hover:border-ink/40",
               )}
               aria-label="Administración"
             >

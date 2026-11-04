@@ -23,6 +23,7 @@ import { useAuth } from "@/lib/auth";
 import { findEventByCode, qJudgeEvents, qMyProjects, qOpenEvents, qOrganizerEvents } from "@/lib/data";
 import { useCollection } from "@/lib/hooks";
 import type { EventDoc, ProjectDoc } from "@/lib/types";
+import { rolesInEvent } from "@/lib/utils";
 
 const GRID = "grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-[repeat(2,minmax(0,1fr))] lg:grid-cols-[repeat(3,minmax(0,1fr))]";
 
@@ -61,7 +62,9 @@ export function Dashboard() {
 
   // Qué tipo de usuario es, para mostrarle solo lo que le sirve
   const isStaff = access.canCreateEvents; // superadmin, admin u organizador global
-  const isJudge = judging.data.length > 0;
+  const contestantEvents = new Set(projects.data.map((project) => project.eventId));
+  const judgeEvents = judging.data.filter((event) => rolesInEvent(event, email, access.isAdmin).includes("judge") && !contestantEvents.has(event.id));
+  const isJudge = judgeEvents.length > 0;
   const organizesSomething = organizing.data.length > 0;
   const hasProjects = projects.data.length > 0;
   const isParticipant = !isStaff && !isJudge && !organizesSomething; // alumno
@@ -75,7 +78,7 @@ export function Dashboard() {
   else if (isStaff) intro = "Crea tus eventos, invita jueces y sigue el avance de los equipos.";
   else if (organizesSomething) intro = "Administras los eventos donde te agregaron como organizador.";
   else if (isJudge)
-    intro = `Tienes ${judging.data.length} evento${judging.data.length === 1 ? "" : "s"} para evaluar. Entra para calificar los proyectos.`;
+    intro = `Tienes ${judgeEvents.length} evento${judgeEvents.length === 1 ? "" : "s"} para evaluar. Entra para calificar los proyectos.`;
 
   const codeCard = (
     <form onSubmit={joinByCode} className="flex flex-col justify-between gap-5 rounded-3xl bg-lime p-6 sm:p-8">
@@ -143,7 +146,7 @@ export function Dashboard() {
     <section>
       <SectionTitle title="Para evaluar" subtitle="Eventos donde eres juez." />
       <div className={GRID}>
-        {judging.data.map((e) => (
+        {judgeEvents.map((e) => (
           <EventCard key={e.id} event={e} role="judge" tone="dark" />
         ))}
       </div>

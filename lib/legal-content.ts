@@ -1,5 +1,5 @@
 /**
- * Textos de Términos, Aviso de privacidad y Cookies de C.O.D.E.
+ * Textos de Términos, Aviso de privacidad y Cookies de Feria 2027.
  * Describen lo que la app hace hoy (revisado en el código, las reglas de Firestore y el navegador).
  * Si cambia el tratamiento de datos, actualiza el texto y sube LEGAL_VERSION en lib/legal.ts.
  */
@@ -24,8 +24,8 @@ const { name, address, email } = SERVICE_CONTACT;
 const mail = { href: `mailto:${email}`, label: email };
 
 const operator = [
-  `${name} opera C.O.D.E y es responsable del tratamiento de datos personales descrito en el aviso de privacidad. Domicilio señalado por el responsable: ${address}`,
-  "El domicilio corresponde a la ubicación del Instituto Tecnológico de Culiacán, indicada por el operador para estos documentos. Esta referencia no atribuye al instituto la operación, el respaldo ni la responsabilidad sobre C.O.D.E. Cada evento pertenece a quien lo organiza, y la atención del servicio se realiza por el correo indicado, no mediante los canales institucionales del instituto.",
+  `${name} opera Feria 2027 y es responsable del tratamiento de datos personales descrito en el aviso de privacidad. Domicilio señalado por el responsable: ${address}`,
+  "El domicilio corresponde a la ubicación del Instituto Tecnológico de Culiacán, indicada por el operador para estos documentos. Esta referencia no atribuye al instituto la operación, el respaldo ni la responsabilidad sobre Feria 2027. Cada evento pertenece a quien lo organiza, y la atención del servicio se realiza por el correo indicado, no mediante los canales institucionales del instituto.",
 ];
 
 export type LegalDocumentKey = "terminos" | "privacidad" | "cookies";
@@ -33,7 +33,7 @@ export type LegalDocumentKey = "terminos" | "privacidad" | "cookies";
 export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocument> = {
   terminos: {
     title: "Términos y condiciones",
-    intro: "Condiciones de uso de C.O.D.E para organizar y evaluar eventos de proyectos escolares en México.",
+    intro: "Condiciones de uso de Feria 2027 para organizar y evaluar eventos de proyectos escolares en México.",
     sections: [
       {
         id: "operador",
@@ -43,9 +43,9 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocument> = {
       },
       {
         id: "servicio",
-        title: "Uso de C.O.D.E",
+        title: "Uso de Feria 2027",
         paragraphs: [
-          "C.O.D.E permite crear eventos de proyectos, registrar equipos, recibir entregas de prototipo y producto final, calificar con una rúbrica y publicar resultados. Las calificaciones y decisiones de cada evento son responsabilidad de sus organizadores y jueces; C.O.D.E no las emite ni las valida.",
+          "Feria 2027 permite crear eventos de proyectos, registrar equipos, recibir entregas de prototipo y producto final, calificar con una rúbrica y publicar resultados. Las calificaciones y decisiones de cada evento son responsabilidad de sus organizadores y jueces; Feria 2027 no las emite ni las valida.",
           "El servicio se dirige a estudiantes, docentes, jueces y organizadores de eventos académicos en México. Si un evento registra a menores de edad, la institución u organización que lo organiza es responsable de contar con las autorizaciones que correspondan.",
         ],
       },
@@ -63,7 +63,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocument> = {
         title: "Proyectos, entregas y contenido",
         paragraphs: [
           "Registra únicamente contenido que tengas derecho a compartir: textos, enlaces y archivos de tu equipo o con permiso de sus autores. Respeta la propiedad intelectual, la confidencialidad y las reglas de tu institución, y menciona en tu proyecto las plantillas, librerías o trabajos previos que reutilices.",
-          "Conservas los derechos que te correspondan sobre tu proyecto y permites su procesamiento en la medida necesaria para guardarlo, mostrarlo a quienes tienen permiso y prestar las funciones del evento. C.O.D.E no adquiere la propiedad de los proyectos.",
+          "Conservas los derechos que te correspondan sobre tu proyecto y permites su procesamiento en la medida necesaria para guardarlo, mostrarlo a quienes tienen permiso y prestar las funciones del evento. Feria 2027 no adquiere la propiedad de los proyectos.",
           "No incluyas datos personales de personas ajenas al proyecto, información sensible ni contenido ilegal, ofensivo o que vulnere derechos de terceros.",
         ],
       },
@@ -80,7 +80,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocument> = {
         title: "Disponibilidad, costo y cierre",
         paragraphs: [
           "El servicio puede tener interrupciones, mantenimiento o cambios de funciones. No se garantiza disponibilidad ininterrumpida ni la recuperación de cualquier contenido; conserva copias de tus archivos y enlaces importantes.",
-          "Esta versión no incluye cobros por usar C.O.D.E. Cualquier modalidad de pago futura deberá informar sus condiciones y requerir una contratación separada; no se aplicará una suscripción por silencio.",
+          "Esta versión no incluye cobros por usar Feria 2027. Cualquier modalidad de pago futura deberá informar sus condiciones y requerir una contratación separada; no se aplicará una suscripción por silencio.",
           `Puedes solicitar el cierre de tu cuenta a ${email}. La atención es manual y requiere verificar tu identidad; no hay un botón de eliminación automática. Antes del cierre se revisan los eventos que organizas, los proyectos que compartes con tu equipo y las obligaciones legales aplicables.`,
         ],
         links: [mail],
@@ -99,7 +99,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocument> = {
 
   privacidad: {
     title: "Aviso de privacidad integral",
-    intro: "Quién trata tu información, para qué se utiliza y cómo ejercer tus derechos en C.O.D.E.",
+    intro: "Quién trata tu información, para qué se utiliza y cómo ejercer tus derechos en Feria 2027.",
     sections: [
       {
         id: "responsable",
@@ -111,9 +111,9 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocument> = {
         id: "datos",
         title: "Información que utiliza el servicio",
         paragraphs: [
-          "La cuenta utiliza identificador de usuario, correo, nombre, estado de verificación y, si entras con Google, la imagen de perfil cuando está disponible. Firebase Authentication gestiona las contraseñas: C.O.D.E no recibe tu contraseña de Google ni pide permisos para leer Gmail, Drive o Calendar. También se registra la fecha de tu último acceso y, si te lo asignan, tu permiso en la plataforma.",
+          "La cuenta utiliza identificador de usuario, correo, nombre, estado de verificación y, si entras con Google, la imagen de perfil cuando está disponible. Firebase Authentication gestiona las contraseñas: Feria 2027 no recibe tu contraseña de Google ni pide permisos para leer Gmail, Drive o Calendar. También se registra la fecha de tu último acceso y, si te lo asignan, tu permiso en la plataforma.",
           "De cada evento se guardan nombre, descripción, institución, fechas, código, rúbrica, etapas, resultados publicados y los correos de sus organizadores y jueces. De cada proyecto se guardan título, resumen, problema, solución, tecnologías, categoría, nombre y correo de sus integrantes y las entregas: descripción, enlaces, archivos y el correo de quien entregó.",
-          "De los archivos se guardan nombre, tamaño, tipo y su huella SHA-256; en esta versión los archivos no se suben a la nube, por eso se comparten mediante enlaces. De las evaluaciones se guardan el nombre y correo del juez, las calificaciones por criterio, el total y el comentario.",
+          "Los archivos de las entregas se suben a un almacenamiento privado de Supabase. Se guardan su nombre, tamaño, tipo, ruta y huella SHA-256. Las entregas nuevas admiten hasta 30 MB por archivo y no aceptan enlaces externos. De las evaluaciones se guardan el nombre y correo del juez, las calificaciones por criterio, el total y el comentario.",
           "Para la revisión de originalidad se calcula una huella de cada proyecto: valores numéricos derivados del texto, enlaces y archivos convertidos en códigos, junto con el título, el evento y el año. La huella no permite leer el texto ni los enlaces originales. El alojamiento y los proveedores pueden procesar dirección IP, datos del navegador, fechas y registros técnicos para prestar y proteger el servicio.",
         ],
       },
@@ -138,7 +138,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocument> = {
         id: "proveedores",
         title: "Proveedores y tratamiento fuera de México",
         paragraphs: [
-          "Google Firebase Authentication gestiona cuentas, sesiones y los correos de verificación y recuperación; Cloud Firestore almacena los datos. Vercel aloja la app y procesa solicitudes y registros técnicos. El acceso con Google utiliza el flujo y las políticas de Google.",
+          "Google Firebase Authentication gestiona cuentas, sesiones y los correos de verificación y recuperación; Cloud Firestore almacena los datos. Supabase Storage almacena los archivos de las entregas en un bucket privado; Feria 2027 comprueba los permisos y proporciona accesos temporales para subirlos y descargarlos. Los archivos de versiones anteriores pueden permanecer en Firebase Storage. Vercel aloja la app y procesa solicitudes y registros técnicos. El acceso con Google utiliza el flujo y las políticas de Google.",
           "El servicio se dirige a México, pero estos proveedores pueden procesar información en otros países. No se garantiza almacenamiento exclusivo en México; sus condiciones y prácticas de conservación también se aplican al tratamiento que realizan.",
           "No se comercializan datos ni se transfieren para publicidad. Las comunicaciones necesarias a proveedores por cuenta del responsable, a las personas del evento según sus permisos y a autoridades cuando exista una obligación válida se limitan a su finalidad. Si se incorpora una transferencia que requiera consentimiento adicional, se informará y recabará antes de efectuarla.",
         ],
@@ -147,7 +147,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocument> = {
         id: "dispositivo",
         title: "Datos en tu dispositivo",
         paragraphs: [
-          "El navegador conserva tu sesión de Firebase y la preferencia de modo claro u oscuro. C.O.D.E no usa cookies propias ni de publicidad o medición. Consulta Cookies y almacenamiento para conocer los usos y controles.",
+          "El navegador conserva tu sesión de Firebase y la preferencia de modo claro u oscuro. Feria 2027 no usa cookies propias ni de publicidad o medición. Consulta Cookies y almacenamiento para conocer los usos y controles.",
           "Cerrar sesión elimina la sesión guardada en ese navegador. La preferencia de tema permanece hasta que la restablezcas o borres los datos del sitio.",
         ],
       },
@@ -164,7 +164,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocument> = {
         id: "derechos",
         title: "Derechos ARCO y solicitudes de privacidad",
         paragraphs: [
-          `Puedes solicitar acceso, rectificación, cancelación u oposición; revocar el consentimiento; limitar el uso o divulgación; o solicitar el cierre de tu cuenta escribiendo a ${email}. Indica como asunto «Privacidad C.O.D.E» y el derecho o solicitud que deseas ejercer.`,
+          `Puedes solicitar acceso, rectificación, cancelación u oposición; revocar el consentimiento; limitar el uso o divulgación; o solicitar el cierre de tu cuenta escribiendo a ${email}. Indica como asunto «Privacidad Feria 2027» y el derecho o solicitud que deseas ejercer.`,
           "Incluye tu nombre, el correo de la cuenta, un medio para recibir respuesta, la descripción de los datos y lo que solicitas. Para rectificación, explica el cambio y su sustento. El responsable verificará tu identidad o representación con los datos mínimos necesarios antes de entregar información o hacer cambios; nunca se solicitarán contraseñas.",
           "Las solicitudes se atienden manualmente. La respuesta se comunicará dentro de veinte días hábiles desde la recepción y, si procede, se ejecutará dentro de los quince días hábiles siguientes. Una ampliación legalmente justificada se notificará; el ejercicio es gratuito, salvo costos de reproducción o envío que legalmente correspondan.",
           "La revocación no afecta tratamientos anteriores y puede impedir continuar en funciones que necesiten esos datos, como participar en un evento. La cancelación u oposición se evalúa considerando obligaciones legales y derechos de otras personas; se explicará cualquier negativa o limitación.",
@@ -175,8 +175,8 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocument> = {
         id: "cambios",
         title: "Cambios al aviso y opciones",
         paragraphs: [
-          "La versión vigente y su fecha se muestran en esta página. Los cambios se publicarán aquí y se identificarán en Versiones de C.O.D.E. Si afectan finalidades o requieren un consentimiento nuevo, se informarán mediante el servicio o el correo de la cuenta antes de aplicar el tratamiento correspondiente.",
-          "Desde Privacidad de mi cuenta puedes cerrar sesión en el navegador y restablecer la preferencia de tema. Puedes retirar el permiso de Google desde tu Cuenta de Google, pero eso no cancela automáticamente los datos de C.O.D.E.",
+          "La versión vigente y su fecha se muestran en esta página. Los cambios se publicarán aquí y se identificarán en Versiones de Feria 2027. Si afectan finalidades o requieren un consentimiento nuevo, se informarán mediante el servicio o el correo de la cuenta antes de aplicar el tratamiento correspondiente.",
+          "Desde Privacidad de mi cuenta puedes cerrar sesión en el navegador y restablecer la preferencia de tema. Puedes retirar el permiso de Google desde tu Cuenta de Google, pero eso no cancela automáticamente los datos de Feria 2027.",
           "No hay tratamientos comerciales opcionales que debas aceptar para usar el servicio. Este aviso no constituye una certificación de cumplimiento ni una aprobación de Google o del Instituto Tecnológico de Culiacán.",
         ],
       },
@@ -184,7 +184,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocument> = {
         id: "estudiantes",
         title: "Estudiantes y menores de edad",
         paragraphs: [
-          "C.O.D.E está pensado para eventos académicos. Si participan menores de edad, la institución u organización del evento es responsable de recabar las autorizaciones de madres, padres o tutores antes de registrarlos.",
+          "Feria 2027 está pensado para eventos académicos. Si participan menores de edad, la institución u organización del evento es responsable de recabar las autorizaciones de madres, padres o tutores antes de registrarlos.",
           "Registra solo los datos necesarios del equipo: nombre y correo de cada integrante. No incluyas en los proyectos información sensible de los integrantes ni de otras personas.",
         ],
       },
@@ -193,15 +193,15 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocument> = {
 
   cookies: {
     title: "Cookies y almacenamiento",
-    intro: "Cómo utiliza C.O.D.E el navegador y qué puedes controlar.",
+    intro: "Cómo utiliza Feria 2027 el navegador y qué puedes controlar.",
     technical: true,
     sections: [
       {
         id: "resumen",
-        title: "Lo que guarda C.O.D.E",
+        title: "Lo que guarda Feria 2027",
         paragraphs: [
-          "C.O.D.E no utiliza cookies propias. El navegador solo guarda tu sesión y la preferencia de tema. En la revisión hecha al publicar esta versión no se encontraron cookies del sitio, ni con sesión iniciada ni sin ella.",
-          "La app solo se comunica con su propio dominio y con los servicios de Google Firebase. Las tipografías se sirven desde el mismo sitio.",
+          "Feria 2027 no utiliza cookies propias. El navegador solo guarda tu sesión y la preferencia de tema. En la revisión hecha al publicar esta versión no se encontraron cookies del sitio, ni con sesión iniciada ni sin ella.",
+          "La app se comunica con su propio dominio, con los servicios de Google Firebase y con Supabase Storage para subir y descargar archivos. Supabase no mantiene una sesión adicional del alumno en el navegador. Las tipografías se sirven desde el mismo sitio.",
         ],
       },
       {
@@ -209,14 +209,14 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocument> = {
         title: "Acceso y sesión (necesario)",
         paragraphs: [
           "Firebase Authentication guarda la sesión en el almacenamiento IndexedDB del navegador (base firebaseLocalStorageDb) para que no tengas que entrar en cada visita. Permanece hasta que cierres sesión o borres los datos del sitio. Firebase también usa la base firebase-heartbeat-database para registrar fechas de uso de su SDK, sin datos de tus eventos ni proyectos.",
-          "El acceso con Google abre una ventana de Google con tecnologías de sesión propias, sujetas a sus políticas. Cerrar sesión en C.O.D.E no cierra tu sesión de Google.",
+          "El acceso con Google abre una ventana de Google con tecnologías de sesión propias, sujetas a sus políticas. Cerrar sesión en Feria 2027 no cierra tu sesión de Google.",
         ],
       },
       {
         id: "preferencias",
         title: "Preferencia de tema (funcional)",
         paragraphs: [
-          "La clave theme de localStorage guarda si prefieres modo claro u oscuro; si no la hay, se usa la del sistema. Permanece hasta que la restablezcas o borres los datos del sitio y no contiene datos personales.",
+          "La clave theme de localStorage guarda si prefieres modo claro u oscuro; si no la hay, se usa el modo claro. Permanece hasta que la restablezcas o borres los datos del sitio y no contiene datos personales.",
         ],
       },
       {

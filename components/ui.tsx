@@ -24,21 +24,26 @@ type Variant = "primary" | "dark" | "outline" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg";
 
 const VARIANTS: Record<Variant, string> = {
-  primary: "bg-lime text-coal hover:brightness-95 active:brightness-90",
-  dark: "bg-ink text-surface hover:bg-ink/90",
-  outline: "border border-ink/15 bg-surface text-ink hover:border-ink/40",
-  ghost: "text-ink hover:bg-ink/5",
-  danger: "bg-red-600 text-white hover:bg-red-700",
+  primary:
+    "bg-[#0b1536] text-white border-2 border-[#0b1536] ring-1 ring-inset ring-white/85 shadow-xs hover:bg-[#142459] active:bg-[#081029] dark:bg-[#162a66] dark:text-white dark:border-white/80 dark:ring-white/35 dark:hover:bg-[#1f3a8a]",
+  dark:
+    "bg-ink text-surface border-2 border-ink ring-1 ring-inset ring-surface/75 shadow-xs hover:bg-ink/90",
+  outline:
+    "border-2 border-ink bg-surface text-ink hover:bg-ink hover:text-surface",
+  ghost:
+    "border-2 border-transparent text-ink hover:border-ink/15 hover:bg-ink/5",
+  danger:
+    "bg-red-600 text-white border-2 border-red-600 ring-1 ring-inset ring-white/65 hover:bg-red-700",
 };
 
 const SIZES: Record<Size, string> = {
-  sm: "h-9 px-3 text-xs",
-  md: "h-11 px-4 text-sm",
-  lg: "h-13 px-6 text-sm",
+  sm: "h-9 px-4 text-[11px]",
+  md: "h-11 px-5 text-xs",
+  lg: "h-12 px-6 text-xs sm:text-sm",
 };
 
 const base =
-  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl font-mono font-medium transition disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink";
+  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full font-display font-bold uppercase tracking-[0.08em] transition active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant;
@@ -86,15 +91,15 @@ export function ButtonLink({
 /* ---------- Contenedores ---------- */
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
-  return <div className={cn("rounded-3xl bg-surface p-5 sm:p-6", className)}>{children}</div>;
+  return <div className={cn("rounded-3xl border-2 border-ink/10 bg-surface p-5 shadow-2xs sm:p-6", className)}>{children}</div>;
 }
 
 export function SectionTitle({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
   return (
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h2 className="font-display text-xl font-bold sm:text-2xl">{title}</h2>
-        {subtitle && <p className="mt-1 font-mono text-xs text-ink/60">{subtitle}</p>}
+        <h2 className="font-display text-xl font-extrabold uppercase tracking-[0.04em] sm:text-2xl">{title}</h2>
+        {subtitle && <p className="mt-1 font-sans text-xs font-medium text-ink/65">{subtitle}</p>}
       </div>
       {action}
     </div>
@@ -111,17 +116,17 @@ export function Badge({
   className?: string;
 }) {
   const tones = {
-    neutral: "bg-ink/5 text-ink/70",
-    lime: "bg-lime text-coal",
-    dark: "bg-ink text-surface",
-    red: "bg-red-100 text-red-700",
-    amber: "bg-amber-100 text-amber-800",
-    green: "bg-emerald-100 text-emerald-800",
+    neutral: "border border-ink/15 bg-ink/5 text-ink/80",
+    lime: "border border-coal/20 bg-lime text-coal",
+    dark: "border border-ink bg-ink text-surface",
+    red: "border border-red-300 bg-red-100 text-red-700",
+    amber: "border border-amber-300 bg-amber-100 text-amber-800",
+    green: "border border-emerald-300 bg-emerald-100 text-emerald-800",
   };
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 font-mono text-[11px] font-medium",
+        "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-1 font-display text-[10px] font-bold uppercase tracking-[0.08em]",
         tones[tone],
         className,
       )}
@@ -133,7 +138,7 @@ export function Badge({
 
 export function Spinner({ label = "Cargando" }: { label?: string }) {
   return (
-    <div className="flex items-center justify-center gap-2 py-16 font-mono text-xs text-ink/60" role="status">
+    <div className="flex items-center justify-center gap-2 py-16 font-display text-xs font-bold uppercase tracking-[0.08em] text-ink/60" role="status">
       <Loader2 className="size-4 animate-spin" aria-hidden />
       {label}…
     </div>
@@ -142,10 +147,10 @@ export function Spinner({ label = "Cargando" }: { label?: string }) {
 
 export function EmptyState({ icon, title, text, action }: { icon?: ReactNode; title: string; text?: string; action?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center rounded-3xl border border-dashed border-ink/15 bg-surface/60 px-6 py-10 text-center">
-      {icon && <div className="mb-3 grid size-12 place-items-center rounded-2xl bg-lime text-coal">{icon}</div>}
-      <p className="font-display text-lg font-bold">{title}</p>
-      {text && <p className="mt-1 max-w-sm font-mono text-xs leading-relaxed text-ink/60">{text}</p>}
+    <div className="flex flex-col items-center rounded-3xl border-2 border-dashed border-ink/15 bg-surface/60 px-6 py-10 text-center">
+      {icon && <div className="mb-3 grid size-12 place-items-center rounded-full border-2 border-coal/15 bg-lime text-coal">{icon}</div>}
+      <p className="font-display text-lg font-extrabold uppercase tracking-[0.04em]">{title}</p>
+      {text && <p className="mt-1 max-w-sm font-sans text-xs font-medium leading-relaxed text-ink/65">{text}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
   );
@@ -168,18 +173,18 @@ export function Field({
 }) {
   return (
     <div className="space-y-1.5">
-      <label htmlFor={htmlFor} className="block font-mono text-xs font-medium text-ink/80">
+      <label htmlFor={htmlFor} className="block font-display text-[11px] font-bold uppercase tracking-[0.08em] text-ink/85">
         {label}
       </label>
       {children}
-      {hint && !error && <p className="font-mono text-[11px] text-ink/50">{hint}</p>}
-      {error && <p className="font-mono text-[11px] text-red-600">{error}</p>}
+      {hint && !error && <p className="font-sans text-[11px] font-medium text-ink/55">{hint}</p>}
+      {error && <p className="font-sans text-[11px] font-semibold text-red-600">{error}</p>}
     </div>
   );
 }
 
 const inputBase =
-  "w-full rounded-xl border border-ink/10 bg-paper px-3.5 py-3 text-base text-ink placeholder:text-ink/35 outline-none transition focus:border-ink/40 focus:bg-surface sm:text-sm";
+  "w-full rounded-2xl border-2 border-ink/15 bg-paper px-4 py-3 font-sans text-base font-medium text-ink placeholder:text-ink/40 outline-none transition focus:border-ink focus:bg-surface sm:text-sm";
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input(
   { className, ...props },
@@ -211,10 +216,10 @@ export function Toggle({
   return (
     <div className="flex items-center justify-between gap-4 py-3">
       <div>
-        <label htmlFor={id} className="block text-sm font-medium">
+        <label htmlFor={id} className="block font-display text-xs font-bold uppercase tracking-[0.06em]">
           {label}
         </label>
-        {description && <p className="mt-0.5 font-mono text-[11px] text-ink/55">{description}</p>}
+        {description && <p className="mt-0.5 font-sans text-[11px] font-medium text-ink/60">{description}</p>}
       </div>
       <button
         id={id}
@@ -252,7 +257,7 @@ export function Tabs<T extends string>({
 }) {
   return (
     <div className="no-scrollbar -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0" role="tablist">
-      <div className="inline-flex gap-1 rounded-2xl bg-surface p-1">
+      <div className="inline-flex gap-1.5 rounded-full border-2 border-ink/15 bg-paper p-1">
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -265,13 +270,15 @@ export function Tabs<T extends string>({
               e.currentTarget.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
             }}
             className={cn(
-              "flex min-h-10 items-center gap-2 whitespace-nowrap rounded-xl px-3.5 py-2 font-mono text-xs transition",
-              value === t.id ? "bg-ink text-surface" : "text-ink/60 hover:text-ink",
+              "flex min-h-10 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 font-display text-xs font-bold uppercase tracking-[0.08em] transition",
+              value === t.id
+                ? "bg-[#0b1536] text-white ring-1 ring-inset ring-white/80 shadow-xs dark:bg-[#162a66] dark:text-white dark:ring-white/40"
+                : "text-ink/70 hover:text-ink",
             )}
           >
             {t.label}
             {typeof t.count === "number" && (
-              <span className={cn("rounded-md px-1.5 text-[10px]", value === t.id ? "bg-lime text-coal" : "bg-ink/5")}>
+              <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-extrabold", value === t.id ? "bg-lime text-coal" : "bg-ink/10")}>
                 {t.count}
               </span>
             )}
@@ -298,7 +305,7 @@ export function Segmented<T extends string>({
   disabled?: boolean;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-1 rounded-2xl bg-paper p-1">
+    <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-1.5 rounded-full border-2 border-ink/15 bg-paper p-1">
       {options.map((o) => (
         <button
           key={o.id}
@@ -308,8 +315,10 @@ export function Segmented<T extends string>({
           disabled={disabled}
           onClick={() => onChange(o.id)}
           className={cn(
-            "min-h-10 flex-1 whitespace-nowrap rounded-xl px-3 py-2 font-mono text-[11px] transition disabled:opacity-50",
-            value === o.id ? "bg-ink text-surface" : "text-ink/60 hover:text-ink",
+            "min-h-10 flex-1 whitespace-nowrap rounded-full px-3.5 py-2 font-display text-[11px] font-bold uppercase tracking-[0.06em] transition disabled:opacity-50",
+            value === o.id
+              ? "bg-[#0b1536] text-white ring-1 ring-inset ring-white/80 shadow-xs dark:bg-[#162a66] dark:text-white dark:ring-white/40"
+              : "text-ink/70 hover:text-ink",
           )}
         >
           {o.label}
@@ -412,7 +421,7 @@ export function firestoreErrorMessage(err: unknown) {
   const code = (err as { code?: string })?.code ?? "";
   if (code === "permission-denied") return "No tienes permiso para esta acción (o la etapa está cerrada).";
   if (code === "unavailable") return "Sin conexión con el servidor.";
-  if (code.startsWith("storage/")) return "No se pudo subir el archivo. ¿Está activado Firebase Storage?";
+  if (code.startsWith("storage/")) return "No se pudo completar la operación con el archivo. Revisa tu conexión y tus permisos.";
   if (!code && err instanceof Error && err.message) return err.message;
   return "Algo salió mal. Intenta de nuevo.";
 }
