@@ -31,5 +31,3 @@ env:
     secret: FERIA_BREVO_API_KEY
     availability:
       - RUNTIME
-  - variable: FERIA_BREVO_API_KEY
-    secret: FERIA_BREVO_API_KEY
