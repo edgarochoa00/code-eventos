@@ -2,6 +2,36 @@ import { PHASES, type EvaluationDoc, type EventDoc, type JudgeAssignment, type P
 import { isProjectAssignedToJudge, normalizeEmail } from "./utils";
 
 export const JUDGING_TIME_ZONE = "America/Mazatlan";
+
+const inputFormat = new Intl.DateTimeFormat("en-CA", {
+  timeZone: JUDGING_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit",
+  hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
+});
+
+function localTimestamp(date: Date) {
+  const parts = Object.fromEntries(inputFormat.formatToParts(date).map(part => [part.type, part.value]));
+  return `${parts.year.padStart(4, "0")}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
+}
+
+export function scheduleInputValue(iso?: string) {
+  return iso && Number.isFinite(Date.parse(iso)) ? localTimestamp(new Date(iso)).slice(0, 16) : "";
+}
+
+/** Convierte la hora del formulario usando la misma zona que la agenda. */
+export function scheduleInputToIso(raw: string) {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(raw)) return "";
+  const local = raw.length === 16 ? `${raw}:00` : raw;
+  const desired = Date.parse(`${local}Z`);
+  if (!Number.isFinite(desired)) return "";
+  let instant = desired;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const difference = desired - Date.parse(`${localTimestamp(new Date(instant))}Z`);
+    if (!difference) break;
+    instant += difference;
+  }
+  return localTimestamp(new Date(instant)) === local ? new Date(instant).toISOString() : "";
+}
+
 export function scheduleLabel(slot?: { startsAt: string; endsAt: string }) {
   if (!slot || !Number.isFinite(Date.parse(slot.startsAt)) || !Number.isFinite(Date.parse(slot.endsAt))) return "Sin horario asignado";
   const format = new Intl.DateTimeFormat("es-MX", { timeZone: JUDGING_TIME_ZONE, dateStyle: "medium", timeStyle: "short" });

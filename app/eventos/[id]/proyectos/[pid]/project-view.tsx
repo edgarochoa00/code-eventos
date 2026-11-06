@@ -1,5 +1,4 @@
 "use client";
-import { scheduleLabel } from "@/lib/judging-agenda";
 
 import { ArrowLeft, Lock, MessageSquareQuote, Pencil, ScanSearch, Trash2, Trophy, UserRound } from "lucide-react";
 import Link from "next/link";
@@ -7,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { EvaluationForm } from "@/components/evaluation-form";
 import { getCategoryCriteria, getPhaseDetails, getPhaseLabel } from "@/lib/event-config";
+import { scheduleLabel } from "@/lib/judging-agenda";
 import { MatchList, NotEnoughData, SimilarityBadge, SubmissionBadges } from "@/components/project-bits";
 import { ProjectRegistration } from "@/components/project-registration";
 import { ProjectForm } from "@/components/project-form";
@@ -232,7 +232,7 @@ function ProjectBody({
               <SectionTitle
                 title="Información"
                 action={
-                  (canEditInfo || canDeleteProject || isOrganizer) && (
+                  (canEditInfo || canDeleteProject) && (
                     <div className="flex flex-wrap items-center gap-2">
                       {canEditInfo && (
                         <Button variant="outline" size="sm" onClick={() => setEditingInfo(true)}>

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { judgeProgress, scheduleError, scheduleLabel } from "../lib/judging-agenda";
+import { judgeProgress, scheduleError, scheduleLabel, scheduleInputValue, scheduleInputToIso } from "../lib/judging-agenda";
 import type { EventDoc, ProjectDoc, EvaluationDoc } from "../lib/types";
 
 const email = "judge@example.com";
@@ -11,6 +11,23 @@ const event = { judgeEmails: [email], ownerEmail: "owner@example.com", organizer
   } } } } as unknown as EventDoc;
 const projects = ["p1", "p2", "unassigned"].map(id => ({ id, memberEmails: [], category: "Software", title: id, final: null } as unknown as ProjectDoc));
 const now = Date.parse("2026-11-05T17:40:00Z");
+test("el formulario y la agenda comparten hora de Culiacán al convertir UTC, medianoche y año", () => {
+  for (const [local, iso] of [
+    ["2026-11-06T09:00", "2026-11-06T16:00:00.000Z"],
+    ["2026-12-31T23:45", "2027-01-01T06:45:00.000Z"],
+    ["2026-11-06T00:00", "2026-11-06T07:00:00.000Z"],
+    ["2024-02-29T12:00", "2024-02-29T19:00:00.000Z"],
+  ]) {
+    assert.equal(scheduleInputToIso(local), iso);
+    assert.equal(scheduleInputValue(iso), local);
+  }
+  assert.match(scheduleLabel({ startsAt: scheduleInputToIso("2026-11-06T09:00"), endsAt: scheduleInputToIso("2026-11-06T09:30") }), /9:00/);
+});
+test("fechas vacías o inválidas no producen errores ni turnos normalizados a otra fecha", () => {
+  for (const raw of ["", "no-fecha", "2026-02-30T12:00", "2026-13-01T10:00", "2026-11-06T25:00"]) assert.equal(scheduleInputToIso(raw), "");
+  assert.equal(scheduleInputValue(), "");
+  assert.equal(scheduleInputValue("invalid"), "");
+});
 test("cuenta presentaciones en vivo sin archivos y distingue turnos y atrasos", () => {
   const row = judgeProgress(event, projects, [], email, now);
   assert.equal(row.total, 2); assert.equal(row.pending, 2);

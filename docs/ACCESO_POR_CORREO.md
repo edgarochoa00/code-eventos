@@ -1,5 +1,7 @@
 # Acceso por correo para jueces y organizadores
 
+El diseño propuesto con logo y botón está preparado en `emails/acceso.html`. Su envío todavía requiere un remitente y un proveedor para Feria 2026; véase [Correos personalizados](CORREOS_PERSONALIZADOS.md). No modifica por sí solo los correos nativos de Firebase.
+
 Al agregar jueces u organizadores desde un evento o desde Administración, primero se guarda el rol y después se solicita a Firebase Authentication el envío del acceso. El permiso global de organizador o administrador, asignado por el superadmin, utiliza el mismo flujo.
 
 Si el correo no tiene cuenta, el servidor la crea con una contraseña aleatoria que no devuelve ni muestra. La persona recibe el correo de Firebase para **establecer o restablecer su contraseña** y elige su propia contraseña en la página segura de Firebase. Este correo puede decir «restablecer» aunque sea el primer acceso. Al completar el enlace, Firebase confirma la posesión del correo. La persona vuelve a `https://feria2026.web.app/login`, inicia sesión y obtiene el rol que ya tenía asignado por su correo.

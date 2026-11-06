@@ -12,6 +12,8 @@ El organizador y el administrador no necesitan conocer los datos del proyecto ni
 
 ## Registro pendiente y permisos
 
+Desde 0.4.6, si otra sesión elimina el evento mientras está abierto el formulario de alta, se muestra un aviso y se conserva el correo escrito y cualquier acceso ya creado. Si quedan eventos puede seleccionarse otro; si desaparecen todos, el alta queda deshabilitada sin bloquear Administración. Se reprodujeron ambos casos en los emuladores de `demo-code`.
+
 El alta reserva al líder en el registro privado del evento y crea un documento con `registrationPending: true`, sin nombre de proyecto, categoría ni descripciones inventadas. No se generan huellas de similitud para ese documento, no aparece entre los proyectos del juez y no puede recibir entregas ni calificaciones ni entrar en resultados hasta completar el formulario.
 
 Solo el líder puede completar ese registro. Puede hacerlo aunque el registro público esté cerrado, pues el responsable ya lo inscribió. El formulario valida los datos completos y sincroniza los integrantes con el registro privado en una transacción. Las reglas impiden que otro usuario complete el registro o que un alumno se conceda por sí mismo un alta pendiente para eludir el cierre del registro público.

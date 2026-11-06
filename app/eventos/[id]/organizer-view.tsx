@@ -22,7 +22,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { JudgingControl } from "@/components/judging-agenda";
 import { ProjectJudgeAssignments } from "@/components/project-judge-assignment";
-import { scheduleLabel, scheduleError } from "@/lib/judging-agenda";
+import { scheduleLabel, scheduleError, scheduleInputValue, scheduleInputToIso } from "@/lib/judging-agenda";
 import { CategoryCriteriaEditor } from "@/components/category-criteria-editor";
 import { EmailListEditor } from "@/components/email-list-editor";
 import { EventSettingsForm } from "@/components/event-settings-form";
@@ -607,7 +607,6 @@ function JudgesTab({ event, projects }: { event: EventDoc; projects: ProjectDoc[
     return Array.from(set);
   }, [event, projects]);
 
-
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[repeat(2,minmax(0,1fr))]">
       <EmailListEditor
@@ -616,7 +615,6 @@ function JudgesTab({ event, projects }: { event: EventDoc; projects: ProjectDoc[
         emails={event.judgeEmails}
         invitation={{ kind: "event", eventId: event.id, role: "judge" }}
         onSave={(judgeEmails) => saveEventEmails(event, "judgeEmails", judgeEmails)}
-
       />
       <EmailListEditor
         title="Organizadores"
@@ -727,10 +725,12 @@ function JudgeAssignmentModal({
   const [scheduleMessage, setScheduleMessage] = useState("");
   const draftEvent = { ...event, judgeAssignments: { ...event.judgeAssignments, [judgeEmail]: { categories: selectedCats, projectIds: selectedProjs } } };
   const scheduledProjects = projects.filter(p => isProjectAssignedToJudge(draftEvent, p, judgeEmail));
-  const localValue = (iso?: string) => iso && Number.isFinite(Date.parse(iso)) ? new Date(Date.parse(iso) - 7 * 3600000).toISOString().slice(0,16) : "";
   function changeTime(projectId: string, field: "startsAt" | "endsAt", raw: string) {
+    const iso = scheduleInputToIso(raw);
+    if (raw && !iso) { setScheduleMessage("Revisa la fecha y hora del turno."); return; }
+    setScheduleMessage("");
     setSchedule(prev => ({ ...prev, [projectId]: { startsAt: prev[projectId]?.startsAt ?? "", endsAt: prev[projectId]?.endsAt ?? "",
-      [field]: raw ? new Date(`${raw.length === 16 ? raw + ":00" : raw}-07:00`).toISOString() : "" } }));
+      [field]: iso } }));
   }
   const [busy, setBusy] = useState(false);
 
@@ -795,7 +795,7 @@ function JudgeAssignmentModal({
           <div className="max-h-52 divide-y divide-line overflow-y-auto rounded-2xl bg-paper px-3">
             {projects.map((p) => {
               const byCat = Boolean(p.category && selectedCats.includes(p.category));
-                  const checked = p.judging ? p.judging.judgeEmails.includes(judgeEmail) : byCat || selectedProjs.includes(p.id);
+              const checked = p.judging ? p.judging.judgeEmails.includes(judgeEmail) : byCat || selectedProjs.includes(p.id);
               return (
                 <Toggle
                   key={p.id}
@@ -812,13 +812,13 @@ function JudgeAssignmentModal({
       )}
 
       <section className="space-y-3">
-        <p className="text-sm font-medium">Fecha y hora para calificar · Culiacán (UTC−7)</p>
+        <p className="text-sm font-medium">Fecha y hora para calificar · Culiacán</p>
         <p className="text-xs text-muted">Programa cada proyecto asignado. El horario organiza el turno; el interruptor de evaluación del evento controla cuándo se pueden guardar notas.</p>
         {scheduledProjects.map(p => <div key={p.id} className="space-y-2 rounded-xl bg-paper p-3">
           <p className="text-sm font-medium">{p.title}</p>
           <div className="grid gap-2 sm:grid-cols-2">
-            <Field label="Inicio" htmlFor={`start-${p.id}`}><Input id={`start-${p.id}`} type="datetime-local" value={localValue(schedule[p.id]?.startsAt)} onChange={e=>changeTime(p.id,"startsAt",e.target.value)} /></Field>
-            <Field label="Fin" htmlFor={`end-${p.id}`}><Input id={`end-${p.id}`} type="datetime-local" value={localValue(schedule[p.id]?.endsAt)} onChange={e=>changeTime(p.id,"endsAt",e.target.value)} /></Field>
+            <Field label="Inicio" htmlFor={`start-${p.id}`}><Input id={`start-${p.id}`} type="datetime-local" value={scheduleInputValue(schedule[p.id]?.startsAt)} onChange={e=>changeTime(p.id,"startsAt",e.target.value)} /></Field>
+            <Field label="Fin" htmlFor={`end-${p.id}`}><Input id={`end-${p.id}`} type="datetime-local" value={scheduleInputValue(schedule[p.id]?.endsAt)} onChange={e=>changeTime(p.id,"endsAt",e.target.value)} /></Field>
           </div>
           <p className="text-xs text-muted">{scheduleLabel(schedule[p.id])}</p>
         </div>)}

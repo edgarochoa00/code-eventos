@@ -1,6 +1,8 @@
 # Agenda y control de evaluación
 
-En Evento → Jueces → Asignar se programan fecha, inicio y fin de cada proyecto para ese juez. Las horas se capturan y muestran en hora de Culiacán (UTC−7), y se guardan como instantes UTC en `judgeAssignments[correo].schedule[projectId]`. No se permiten intervalos incompletos, invertidos o superpuestos para un mismo juez dentro del evento. Los horarios anteriores se conservan al editar; al retirar proyectos de una asignación se retiran sus turnos.
+Desde 0.4.6, `scheduleInputValue` y `scheduleInputToIso` usan `JUDGING_TIME_ZONE` tanto al editar como al mostrar turnos; el formulario no mantiene un desplazamiento UTC separado. La tarjeta del juez usa los mismos totales de `judgeProgress` que su agenda.
+
+En Evento → Jueces → Agenda por juez → Asignación y horario se programan fecha, inicio y fin de cada proyecto para ese juez. Las horas se capturan y muestran en hora de Culiacán y se guardan como instantes UTC en `judgeAssignments[correo].schedule[projectId]`. No se permiten intervalos incompletos, invertidos o superpuestos para un mismo juez dentro del evento. Los horarios anteriores se conservan al editar; al retirar proyectos de una asignación se retiran sus turnos.
 
 El juez ve su horario en las tarjetas y al abrir el proyecto. Sus pendientes se ordenan por fecha; se destaca el turno actual y el vencido. El horario es de organización: el permiso para guardar notas sigue dependiendo de la apertura de evaluación, la asignación y la publicación de resultados.
 

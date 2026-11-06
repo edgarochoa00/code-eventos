@@ -28,18 +28,22 @@ function EnrollmentForm({ events, onBusy, onClose }: {
 }) {
   const { user } = useAuth();
   const toast = useToast();
-  const [eventId, setEventId] = useState(events[0].id);
-  const event = events.find((item) => item.id === eventId)!;
+  const [eventId, setEventId] = useState(events[0]?.id ?? "");
+  const event = events.find((item) => item.id === eventId);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<TeamEnrollmentResult | null>(null);
   const [credentials, setCredentials] = useState<CreatedTeamAccount[]>([]);
-  const disabled = event.resultsPublished || event.categoryLocked || event.judgingOpen || event.accessVersion !== 1;
+  const disabled = !event || event.resultsPublished || event.categoryLocked || event.judgingOpen || event.accessVersion !== 1;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!user || busy) return;
+    if (!event) {
+      setError("El evento seleccionado ya no está disponible. Selecciona otro evento para continuar.");
+      return;
+    }
     setError("");
     setBusy(true);
     onBusy(true);
@@ -62,10 +66,14 @@ function EnrollmentForm({ events, onBusy, onClose }: {
 
   return (
     <div className="space-y-5">
+      {!event && <p role="alert" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+        {events.length ? "El evento seleccionado ya no está disponible. Selecciona otro evento para continuar."
+          : "Ya no hay eventos disponibles para dar de alta al alumno. Puedes conservar los accesos ya creados antes de cerrar."}
+      </p>}
       {result ? (
         <div className="space-y-3" role="status">
           <p className="font-display text-lg font-bold">Alumno líder registrado</p>
-          <p className="break-words text-sm text-muted">{email} · {event.name}. Al iniciar sesión y verificar su correo,
+          <p className="break-words text-sm text-muted">{email} · {event?.name ?? "Evento no disponible"}. Al iniciar sesión y verificar su correo,
             el alumno completará el formulario de su proyecto, elegirá la categoría y agregará a sus integrantes.</p>
         </div>
       ) : (
@@ -74,15 +82,16 @@ function EnrollmentForm({ events, onBusy, onClose }: {
           <fieldset disabled={busy} className="space-y-4">
             <Field label="Evento" htmlFor="enrollment-event">
               <select id="enrollment-event" className="h-11 w-full min-w-0 rounded-xl border-2 border-control bg-field px-3 text-base sm:text-sm"
-                value={eventId} disabled={events.length === 1} onChange={(e) => { setEventId(e.target.value); setError(""); }}>
+                value={event?.id ?? ""} disabled={!events.length} onChange={(e) => { setEventId(e.target.value); setError(""); }}>
+                {!event && <option value="">Selecciona un evento disponible</option>}
                 {events.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
               </select>
             </Field>
             <Field label="Correo del alumno líder" htmlFor="enrollment-email">
-              <Input id="enrollment-email" autoComplete="off" type="email" inputMode="email" required maxLength={254}
+              <Input id="enrollment-email" autoComplete="off" type="email" inputMode="email" required maxLength={254} disabled={!event}
                 value={email} onChange={(e) => setEmail(e.target.value)} />
             </Field>
-            {disabled && <p role="alert" className="text-sm text-red-600">{event.resultsPublished ? "Oculta los resultados antes de dar de alta líderes."
+            {event && disabled && <p role="alert" className="text-sm text-red-600">{event.resultsPublished ? "Oculta los resultados antes de dar de alta líderes."
               : event.categoryLocked || event.judgingOpen ? "La evaluación ya comenzó; no se pueden dar de alta nuevos líderes."
                 : "El superadmin debe actualizar los permisos del evento."}</p>}
             <Button type="submit" loading={busy} disabled={Boolean(disabled)}>Dar de alta líder</Button>

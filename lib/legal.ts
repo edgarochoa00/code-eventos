@@ -22,6 +22,11 @@ export type Release = { version: string; date: string; title: string; changes: s
 
 /** La primera entrada es la versión actual (debe coincidir con package.json). */
 export const RELEASES: Release[] = [
+  { version: "0.4.6", date: "6 de noviembre de 2026", title: "Estabilidad de Administración y agenda unificada", changes: [
+    "El formulario de alta de alumnos conserva sus datos y muestra un aviso si desaparece el evento seleccionado.",
+    "Sesión estable de autenticación, avance de jueces calculado una sola vez y eliminación de controles vacíos.",
+    "Edición y visualización de turnos usan la misma zona horaria de Culiacán.",
+  ] },
   { version: "0.4.5", date: "6 de noviembre de 2026", title: "Jueces elegidos por proyecto", changes: [
     "El organizador define el máximo de jueces de cada proyecto y elige quiénes lo califican.",
     "La selección por proyecto se refleja en la agenda y las estadísticas y se comprueba al guardar calificaciones.",

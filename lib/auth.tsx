@@ -12,7 +12,7 @@ import {
   updateProfile,
   type User,
 } from "firebase/auth";
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { auth } from "./firebase";
 import { upsertUserProfile } from "./data";
 
@@ -32,14 +32,13 @@ type AuthState = {
 const AuthContext = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  // Firebase muta el mismo User al recargarlo; una nueva sesión propaga esos cambios.
+  const [session, setSession] = useState<{ user: User | null }>({ user: null });
   const [loading, setLoading] = useState(true);
-  // Fuerza re-render tras user.reload(), que muta el mismo objeto
-  const [, setVersion] = useState(0);
 
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => {
-      setUser(u);
+      setSession({ user: u });
       setLoading(false);
       if (u) upsertUserProfile(u).catch(() => undefined);
     });
@@ -55,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     auth.languageCode = "es";
     await sendEmailVerification(cred.user);
     await upsertUserProfile(cred.user);
-    setVersion((v) => v + 1);
+    setSession({ user: cred.user });
   }, []);
 
   const signInGoogle = useCallback(async () => {
@@ -84,8 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await auth.currentUser.reload();
     // Renueva el token para que las reglas vean email_verified = true
     await auth.currentUser.getIdToken(true);
-    setUser(auth.currentUser);
-    setVersion((v) => v + 1);
+    setSession({ user: auth.currentUser });
     return auth.currentUser.emailVerified;
   }, []);
 
@@ -95,11 +93,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!auth.currentUser) throw new Error("Inicia sesión para guardar tu nombre.");
     await updateProfile(auth.currentUser, { displayName: name.trim() });
     await upsertUserProfile(auth.currentUser);
-    setUser(auth.currentUser);
-    setVersion((v) => v + 1);
+    setSession({ user: auth.currentUser });
   }, []);
 
-  const value: AuthState = { user, loading, signInEmail, signUpEmail, signInGoogle, resetPassword, resendVerification, refreshUser, updateName, signOut };
+  const value = useMemo<AuthState>(() => ({ user: session.user, loading, signInEmail, signUpEmail, signInGoogle,
+    resetPassword, resendVerification, refreshUser, updateName, signOut }),
+  [session, loading, signInEmail, signUpEmail, signInGoogle, resetPassword, resendVerification, refreshUser, updateName, signOut]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

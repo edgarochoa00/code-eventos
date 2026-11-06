@@ -1,17 +1,15 @@
 "use client";
 
-import { useAgendaClock } from "@/components/judging-agenda";
-import { judgeProgress, scheduleLabel } from "@/lib/judging-agenda";
-import { getCategoryCriteria } from "@/lib/event-config";
-
 import { ArrowUpRight, Info, Search } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { useAgendaClock } from "@/components/judging-agenda";
 import { Badge, EmptyState, ErrorNote, Input, SectionTitle, Spinner, Tabs } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { projectsCol, qMyEvaluations } from "@/lib/data";
 import { useCollection } from "@/lib/hooks";
-import { getPhaseLabel } from "@/lib/event-config";
+import { getCategoryCriteria, getPhaseLabel } from "@/lib/event-config";
+import { judgeProgress, scheduleLabel } from "@/lib/judging-agenda";
 import { PHASES, type EvaluationDoc, type EventDoc, type ProjectDoc } from "@/lib/types";
 import {
   effectiveEvaluationTotal,
@@ -43,10 +41,7 @@ export function JudgeView({ event }: { event: EventDoc }) {
   const hasCustom = hasJudgeAssignment(event, email) || projects.data.some(p => !!p.judging);
   const assignedProjects = projects.data.filter((p) => isProjectAssignedToJudge(event, p, email));
 
-  // Incluye las evaluaciones de presentaciones en vivo, aunque no haya archivo.
-  const tasks = assignedProjects.flatMap((p) => phases.map((ph) => ({ p, ph })));
-  const done = tasks.filter(({ p, ph }) => evaluated(p, ph)).length;
-  const pct = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
+  const agenda = judgeProgress(event, projects.data, mine.data, email, now ?? 0);
 
   const q = search.trim().toLowerCase();
   const sourceProjects = filter === "all" ? projects.data : assignedProjects;
@@ -60,7 +55,6 @@ export function JudgeView({ event }: { event: EventDoc }) {
       return (left - right) || a.title.localeCompare(b.title);
     });
 
-  const agenda = judgeProgress(event, projects.data, mine.data, email, now ?? 0);
   const assignmentCategories = event.judgeAssignments?.[email]?.categories ?? [];
 
   return (
@@ -73,14 +67,14 @@ export function JudgeView({ event }: { event: EventDoc }) {
             <div>
               <p className="font-mono text-[11px] text-white/75">Tu avance</p>
               <p className="font-display text-4xl font-bold">
-                {done}
-                <span className="text-lg font-normal text-white/75">/{tasks.length}</span>
+                {agenda.done}
+                <span className="text-lg font-normal text-white/75">/{agenda.total}</span>
               </p>
             </div>
-            <span className="font-mono text-sm text-lime">{pct}%</span>
+            <span className="font-mono text-sm text-lime">{agenda.percent}%</span>
           </div>
           <div className="mt-4 h-2 rounded-full bg-white/10">
-            <div className="h-full rounded-full bg-lime transition-all" style={{ width: `${pct}%` }} />
+            <div className="h-full rounded-full bg-lime transition-all" style={{ width: `${agenda.percent}%` }} />
           </div>
           {hasCustom && (
             <p className="mt-3 font-mono text-[11px] text-white/75">
@@ -107,7 +101,7 @@ export function JudgeView({ event }: { event: EventDoc }) {
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Tabs
             tabs={[
-              { id: "pending", label: "Pendientes", count: tasks.length - done },
+              { id: "pending", label: "Pendientes", count: agenda.pending },
               ...(hasCustom ? [{ id: "assigned" as Filter, label: "Asignados", count: assignedProjects.length }] : []),
               { id: "all", label: "Todos", count: projects.data.length },
             ]}
@@ -163,8 +157,8 @@ export function JudgeView({ event }: { event: EventDoc }) {
             title={
               !projects.data.length
                 ? "Aún no hay proyectos"
-                : filter === "pending" && !tasks.length
-                  ? "Aún no hay entregas"
+                : filter === "pending" && !agenda.total
+                  ? "Sin tareas asignadas"
                   : filter === "pending"
                     ? "Nada pendiente"
                     : "Sin resultados"
@@ -172,8 +166,8 @@ export function JudgeView({ event }: { event: EventDoc }) {
             text={
               !projects.data.length
                 ? "Cuando los equipos se registren aparecerán aquí."
-                : filter === "pending" && !tasks.length
-                  ? "Los equipos todavía no suben las entregas de este evento. Puedes revisar los proyectos en «Todos»."
+                : filter === "pending" && !agenda.total
+                  ? "Aún no tienes proyectos o etapas por evaluar. Puedes consultar los proyectos en «Todos»."
                   : filter === "pending"
                     ? "Ya calificaste todas las entregas disponibles."
                     : "Prueba con otra búsqueda."
