@@ -15,6 +15,8 @@ import {
 import Link from "next/link";
 import { useMemo, useState, type FormEvent } from "react";
 import { EmailListEditor } from "@/components/email-list-editor";
+import { AccountInvitationButton } from "@/components/account-invitation-button";
+import { TeamEnrollmentButton } from "@/components/team-enrollment";
 import { EventStatus } from "@/components/event-card";
 import {
   Badge,
@@ -35,6 +37,7 @@ import {
 } from "@/components/ui";
 import { useAccess } from "@/lib/access";
 import { useAuth } from "@/lib/auth";
+import { SavedInvitationError, type InvitationScope } from "@/lib/account-invitations";
 import {
   deleteEvent,
   qAllEvents,
@@ -173,6 +176,7 @@ export function AdminView() {
         value={tab}
         onChange={setTab}
       />
+      {!loading && <TeamEnrollmentButton events={events.data} />}
       {error && <ErrorNote code={error} />}
 
       {loading ? (
@@ -336,6 +340,11 @@ function PersonPanel({ person, events }: { person: Person; events: EventDoc[] })
 
   const staffValue: StaffRole | "user" = person.role === "superadmin" ? "admin" : person.role;
   const sortedEvents = [...events].sort((a, b) => a.name.localeCompare(b.name));
+  const invitationEvent = person.judgeIn[0] ?? person.organizerIn[0];
+  const invitationScope: InvitationScope | null = access.isSuperadmin && (person.role === "organizer" || person.role === "admin")
+    ? { kind: "staff", role: person.role }
+    : invitationEvent ? { kind: "event", eventId: invitationEvent.id,
+      role: invitationEvent.organizerEmails.includes(person.email) ? "organizer" : "judge" } : null;
 
   return (
     <div className="space-y-6">
@@ -347,10 +356,11 @@ function PersonPanel({ person, events }: { person: Person; events: EventDoc[] })
           <p className="truncate font-display text-lg font-bold">{person.user?.displayName || "Sin nombre"}</p>
           <p className="truncate font-mono text-[11px] text-muted">{displayEmail(person.email)}</p>
           {!person.user && (
-            <p className="font-mono text-[10px] text-amber-700">Aún no crea su cuenta. Los permisos se aplican al registrarse.</p>
+            <p className="font-mono text-[10px] text-amber-700">Aún no ha entrado a la plataforma. Puedes enviarle el acceso.</p>
           )}
         </div>
       </div>
+      {invitationScope && <AccountInvitationButton scope={invitationScope} email={person.email} disabled={!!busy} />}
 
       <section className="space-y-2">
         <p className="text-sm font-medium">Permiso en la plataforma</p>
@@ -504,12 +514,14 @@ function EventsTab({ events, projects }: { events: EventDoc[]; projects: Project
               title="Jueces"
               subtitle="Califican sus proyectos asignados. No pueden organizar ni concursar en este evento."
               emails={current.judgeEmails}
+              invitation={{ kind: "event", eventId: current.id, role: "judge" }}
               onSave={(judgeEmails) => saveEventEmails(current, "judgeEmails", judgeEmails)}
             />
             <EmailListEditor
               title="Organizadores"
               subtitle="Administran el evento; no pueden calificar ni concursar en él."
               emails={current.organizerEmails}
+              invitation={{ kind: "event", eventId: current.id, role: "organizer" }}
               locked={[current.ownerEmail]}
               onSave={(organizerEmails) => saveEventEmails(current, "organizerEmails", organizerEmails)}
             />
@@ -582,10 +594,11 @@ function RolesTab({ people }: { people: Person[] }) {
     setBusy(true);
     try {
       await setStaffRole(target, role, user!);
-      toast(`${target} ahora es ${GLOBAL_ROLE_LABEL[role]}.`);
+      toast(`${target} ahora es ${GLOBAL_ROLE_LABEL[role]}.${role === "organizer" || role === "admin" ? " Se envió el acceso por correo." : ""}`);
       setEmail("");
     } catch (err) {
       toast(firestoreErrorMessage(err), "error");
+      if (err instanceof SavedInvitationError) setEmail("");
     } finally {
       setBusy(false);
     }
@@ -596,7 +609,7 @@ function RolesTab({ people }: { people: Person[] }) {
       <Card className="h-fit">
         <SectionTitle
           title="Dar permiso"
-          subtitle="Funciona aunque la persona aún no tenga cuenta: se aplica cuando se registre con ese correo."
+          subtitle="Al dar permiso de organizador o admin se envía un correo para establecer su contraseña. Las cuentas existentes se conservan."
         />
         {access.isSuperadmin ? (
           <form onSubmit={grant} className="space-y-4">
@@ -644,6 +657,8 @@ function RolesTab({ people }: { people: Person[] }) {
               </div>
               <div className="flex shrink-0 items-center gap-1">
                 <Badge tone={ROLE_TONE[p.role]}>{GLOBAL_ROLE_LABEL[p.role]}</Badge>
+                {access.isSuperadmin && (p.role === "organizer" || p.role === "admin") &&
+                  <AccountInvitationButton scope={{ kind: "staff", role: p.role }} email={p.email} disabled={busy} />}
                 {access.isSuperadmin && p.role !== "superadmin" && (
                   <Button
                     variant="ghost"

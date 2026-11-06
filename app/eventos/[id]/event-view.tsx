@@ -198,7 +198,7 @@ function StatusCard({ event, role }: { event: EventDoc; role: EventRole }) {
       </ul>
       <p className="mt-3 font-mono text-[10px] text-muted">
         {role === "judge"
-          ? `Rúbrica de ${event.criteria.length} criterio${event.criteria.length === 1 ? "" : "s"} · calificas de 0 a 10`
+          ? "Rúbrica según la categoría del proyecto · calificas de 0 a 10"
           : `Equipos de hasta ${event.maxTeamSize} integrantes`}
       </p>
     </div>

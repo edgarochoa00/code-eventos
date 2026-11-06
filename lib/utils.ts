@@ -149,10 +149,12 @@ export function hasJudgeAssignment(event: EventDoc, judgeEmail: string): boolean
 }
 
 export function isProjectAssignedToJudge(event: EventDoc, project: ProjectDoc, judgeEmail: string, isAdmin = false): boolean {
+  if (project.registrationPending) return false;
   const email = normalizeEmail(judgeEmail);
   if (!rolesInEvent(event, email, isAdmin).includes("judge")) return false;
   // Un juez nunca califica un proyecto del que forma parte.
   if (project.memberEmails?.includes(email)) return false;
+  if (project.judging) return project.judging.judgeEmails.includes(email);
   if (!hasJudgeAssignment(event, email)) return true;
   const a = event.judgeAssignments?.[email];
   const byCat = Boolean(project.category && a?.categories?.includes(project.category));

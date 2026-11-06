@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { EventCard } from "@/components/event-card";
 import { SubmissionBadges } from "@/components/project-bits";
+import { ProjectRegistration } from "@/components/project-registration";
 import {
   Badge,
   Button,
@@ -32,6 +33,15 @@ function ProjectDeliveryBadges({ project }: { project: ProjectDoc }) {
   if (event.loading) return <span className="font-mono text-xs text-muted">Consultando entregas…</span>;
   if (!event.data) return <Badge>Evento no disponible</Badge>;
   return <SubmissionBadges project={project} event={event.data} />;
+}
+
+function PendingRegistration({ project }: { project: ProjectDoc }) {
+  const { user } = useAuth();
+  const event = useDocument<EventDoc>(eventRef(project.eventId), `pending-event:${project.eventId}`);
+  if (event.loading) return <Spinner />;
+  if (event.error) return <ErrorNote code={event.error} />;
+  if (!event.data || !rolesInEvent(event.data, user?.email).includes("student")) return null;
+  return <ProjectRegistration event={event.data} project={project} />;
 }
 
 export function Dashboard() {
@@ -65,6 +75,7 @@ export function Dashboard() {
   }
 
   const loading = organizing.loading || judging.loading || projects.loading;
+  const pending = access.isAdmin ? [] : projects.data.filter((project) => project.registrationPending && project.leaderId === user?.uid);
   const firstName = (user?.displayName ?? "").split(" ")[0];
 
   // Qué tipo de usuario es, para mostrarle solo lo que le sirve
@@ -131,7 +142,7 @@ export function Dashboard() {
                 <FolderKanban className="size-5 shrink-0" />
                 {p.category && <Badge>{p.category}</Badge>}
               </div>
-              <h3 className="mt-4 break-words font-display text-lg font-bold">{p.title}</h3>
+              <h3 className="mt-4 break-words font-display text-lg font-bold">{p.title || "Completa el registro de tu proyecto"}</h3>
               <p className="mt-1 line-clamp-2 font-mono text-[11px] text-muted">{p.summary}</p>
               <div className="mt-4">
                 <ProjectDeliveryBadges project={p} />
@@ -193,6 +204,7 @@ export function Dashboard() {
 
   return (
     <div className="space-y-10">
+      {pending.map((project) => <PendingRegistration key={project.id} project={project} />)}
       <section className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[1.4fr_1fr]">
         <Card className="flex flex-col justify-between gap-6 sm:p-8">
           <div>

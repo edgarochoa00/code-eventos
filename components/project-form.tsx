@@ -1,7 +1,7 @@
 "use client";
 
 import { Plus, Trash2, UserRound } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import type { ProjectInfoInput } from "@/lib/data";
 import type { Member, ProjectDoc } from "@/lib/types";
 import { DEFAULT_CATEGORIES, displayEmail, isEmail, normalizeEmail } from "@/lib/utils";
@@ -16,6 +16,7 @@ export function ProjectForm({
   categories = CATEGORIES,
   submitLabel,
   canManageMembers = true,
+  categoryLocked = false,
   onSubmit,
   onCancel,
 }: {
@@ -26,9 +27,11 @@ export function ProjectForm({
   submitLabel: string;
   /** Solo el líder agrega o quita integrantes. */
   canManageMembers?: boolean;
+  categoryLocked?: boolean;
   onSubmit: (input: ProjectInfoInput) => Promise<void>;
   onCancel?: () => void;
 }) {
+  const formId = useId();
   const availableCategories =
     initial?.category && !categories.includes(initial.category)
       ? [initial.category, ...categories]
@@ -40,7 +43,8 @@ export function ProjectForm({
   const [problem, setProblem] = useState(initial?.problem ?? "");
   const [solution, setSolution] = useState(initial?.solution ?? "");
   const [technologies, setTechnologies] = useState(initial?.technologies.join(", ") ?? "");
-  const [category, setCategory] = useState(initial?.category ?? availableCategories[0]);
+  const [category, setCategory] = useState(initial?.category || availableCategories[0]);
+  const [leaderName, setLeaderName] = useState(leader.name);
   const [members, setMembers] = useState<Member[]>(
     initial ? initial.members.filter((m) => m.email !== leader.email) : [],
   );
@@ -60,11 +64,16 @@ export function ProjectForm({
     if (summary.trim().length < 20) errs.summary = "Describe el proyecto en al menos 20 caracteres.";
     if (problem.trim().length < 20) errs.problem = "Explica el problema (mínimo 20 caracteres).";
     if (solution.trim().length < 20) errs.solution = "Explica la solución (mínimo 20 caracteres).";
+    if (canManageMembers && leaderName.trim().length < 3) errs.leaderName = "Escribe tu nombre completo (mínimo 3 caracteres).";
     const cleanMembers = members.filter((m) => m.name.trim() || m.email.trim());
     cleanMembers.forEach((m, i) => {
-      if (!isEmail(m.email)) errs[`m${i}`] = "Correo inválido";
+      if (!canManageMembers) return;
+      if (m.name.trim().length < 3) errs[`m${i}`] = "Escribe el nombre del integrante";
+      else if (!isEmail(m.email)) errs[`m${i}`] = "Correo inválido";
       else if (normalizeEmail(m.email) === leader.email) errs[`m${i}`] = "Ese correo ya es el tuyo";
+      else if (cleanMembers.some((other, index) => index < i && normalizeEmail(other.email) === normalizeEmail(m.email))) errs[`m${i}`] = "Este correo ya está en el equipo";
     });
+    if (cleanMembers.length + 1 > maxTeamSize) errs.members = `El evento admite hasta ${maxTeamSize} integrantes, incluido el líder.`;
     setErrors(errs);
     if (Object.keys(errs).length) return;
 
@@ -81,7 +90,7 @@ export function ProjectForm({
           .filter(Boolean)
           .slice(0, 15),
         category,
-        members: [leader, ...cleanMembers.map((m) => ({ name: m.name.trim(), email: normalizeEmail(m.email) }))],
+        members: [{ ...leader, name: canManageMembers ? leaderName.trim() : leader.name }, ...cleanMembers.map((m) => ({ name: m.name.trim(), email: normalizeEmail(m.email) }))],
       });
     } finally {
       setBusy(false);
@@ -91,13 +100,14 @@ export function ProjectForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-[2fr_1fr]">
-        <Field label="Nombre del proyecto" htmlFor="title" error={errors.title}>
-          <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} />
+        <Field label="Nombre del proyecto" htmlFor={`${formId}-title`} error={errors.title}>
+          <Input id={`${formId}-title`} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} />
         </Field>
-        <Field label="Categoría" htmlFor="category">
+        <Field label="Categoría" htmlFor={`${formId}-category`} hint={categoryLocked ? "La categoría queda fija al comenzar la evaluación." : undefined}>
           <select
-            id="category"
+            id={`${formId}-category`}
             value={category}
+            disabled={categoryLocked}
             onChange={(e) => setCategory(e.target.value)}
             className="h-11 w-full min-w-0 rounded-xl border-2 border-control bg-field px-3 text-base outline-none focus:border-ink sm:text-sm"
           >
@@ -108,27 +118,30 @@ export function ProjectForm({
         </Field>
       </div>
 
-      <Field label="Resumen" htmlFor="summary" hint="Una o dos frases. Es lo primero que ven los jueces." error={errors.summary}>
-        <Textarea id="summary" rows={2} value={summary} onChange={(e) => setSummary(e.target.value)} maxLength={300} />
+      <Field label="Resumen" htmlFor={`${formId}-summary`} hint="Una o dos frases. Es lo primero que ven los jueces." error={errors.summary}>
+        <Textarea id={`${formId}-summary`} rows={2} value={summary} onChange={(e) => setSummary(e.target.value)} maxLength={300} />
       </Field>
-      <Field label="Problema que resuelve" htmlFor="problem" error={errors.problem}>
-        <Textarea id="problem" value={problem} onChange={(e) => setProblem(e.target.value)} maxLength={3000} />
+      <Field label="Problema que resuelve" htmlFor={`${formId}-problem`} error={errors.problem}>
+        <Textarea id={`${formId}-problem`} value={problem} onChange={(e) => setProblem(e.target.value)} maxLength={3000} />
       </Field>
-      <Field label="Solución propuesta" htmlFor="solution" error={errors.solution}>
-        <Textarea id="solution" value={solution} onChange={(e) => setSolution(e.target.value)} maxLength={5000} />
+      <Field label="Solución propuesta" htmlFor={`${formId}-solution`} error={errors.solution}>
+        <Textarea id={`${formId}-solution`} value={solution} onChange={(e) => setSolution(e.target.value)} maxLength={5000} />
       </Field>
-      <Field label="Tecnologías" htmlFor="tech" hint="Separadas por comas. Ej: Arduino, React, Firebase">
-        <Input id="tech" value={technologies} onChange={(e) => setTechnologies(e.target.value)} />
+      <Field label="Tecnologías" htmlFor={`${formId}-tech`} hint="Separadas por comas. Ej: Arduino, React, Firebase">
+        <Input id={`${formId}-tech`} value={technologies} onChange={(e) => setTechnologies(e.target.value)} />
       </Field>
 
       <div className="space-y-2">
+        {canManageMembers && <Field label="Tu nombre completo (líder)" htmlFor={`${formId}-leader-name`} error={errors.leaderName}>
+          <Input id={`${formId}-leader-name`} autoComplete="name" value={leaderName} maxLength={100} onChange={(e) => setLeaderName(e.target.value)} />
+        </Field>}
         <p className="font-mono text-xs font-medium text-ink/80">
           Integrantes ({members.length + 1}/{maxTeamSize})
         </p>
         <div className="flex items-center gap-3 rounded-xl bg-paper px-3.5 py-3">
           <UserRound className="size-4 shrink-0" />
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium">{leader.name || "Tú"} · Líder</p>
+            <p className="truncate text-sm font-medium">{leaderName || "Tú"} · Líder</p>
             <p className="truncate font-mono text-[11px] text-muted">{displayEmail(leader.email)}</p>
           </div>
         </div>
@@ -181,6 +194,7 @@ export function ProjectForm({
             ? "Cada integrante verá el proyecto al entrar con ese correo y podrá editar las entregas. Los jueces y organizadores del evento no pueden ser integrantes."
             : "Solo el líder del equipo puede agregar o quitar integrantes."}
         </p>
+        {errors.members && <p role="alert" className="text-sm text-red-600">{errors.members}</p>}
       </div>
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

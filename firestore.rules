@@ -98,6 +98,67 @@ service cloud.firestore {
       return list is list && list.size() >= 1 && list.size() <= 20;
     }
 
+    function validCategoryRubrics(data) {
+      let rubricMap = data.get('categoryCriteria', {});
+      let rubrics = rubricMap.values();
+      return rubricMap is map && rubrics.size() <= 20
+        && (rubrics.size() <= 0 || (rubrics[0] is list && rubrics[0].size() >= 1 && rubrics[0].size() <= 20))
+        && (rubrics.size() <= 1 || (rubrics[1] is list && rubrics[1].size() >= 1 && rubrics[1].size() <= 20))
+        && (rubrics.size() <= 2 || (rubrics[2] is list && rubrics[2].size() >= 1 && rubrics[2].size() <= 20))
+        && (rubrics.size() <= 3 || (rubrics[3] is list && rubrics[3].size() >= 1 && rubrics[3].size() <= 20))
+        && (rubrics.size() <= 4 || (rubrics[4] is list && rubrics[4].size() >= 1 && rubrics[4].size() <= 20))
+        && (rubrics.size() <= 5 || (rubrics[5] is list && rubrics[5].size() >= 1 && rubrics[5].size() <= 20))
+        && (rubrics.size() <= 6 || (rubrics[6] is list && rubrics[6].size() >= 1 && rubrics[6].size() <= 20))
+        && (rubrics.size() <= 7 || (rubrics[7] is list && rubrics[7].size() >= 1 && rubrics[7].size() <= 20))
+        && (rubrics.size() <= 8 || (rubrics[8] is list && rubrics[8].size() >= 1 && rubrics[8].size() <= 20))
+        && (rubrics.size() <= 9 || (rubrics[9] is list && rubrics[9].size() >= 1 && rubrics[9].size() <= 20))
+        && (rubrics.size() <= 10 || (rubrics[10] is list && rubrics[10].size() >= 1 && rubrics[10].size() <= 20))
+        && (rubrics.size() <= 11 || (rubrics[11] is list && rubrics[11].size() >= 1 && rubrics[11].size() <= 20))
+        && (rubrics.size() <= 12 || (rubrics[12] is list && rubrics[12].size() >= 1 && rubrics[12].size() <= 20))
+        && (rubrics.size() <= 13 || (rubrics[13] is list && rubrics[13].size() >= 1 && rubrics[13].size() <= 20))
+        && (rubrics.size() <= 14 || (rubrics[14] is list && rubrics[14].size() >= 1 && rubrics[14].size() <= 20))
+        && (rubrics.size() <= 15 || (rubrics[15] is list && rubrics[15].size() >= 1 && rubrics[15].size() <= 20))
+        && (rubrics.size() <= 16 || (rubrics[16] is list && rubrics[16].size() >= 1 && rubrics[16].size() <= 20))
+        && (rubrics.size() <= 17 || (rubrics[17] is list && rubrics[17].size() >= 1 && rubrics[17].size() <= 20))
+        && (rubrics.size() <= 18 || (rubrics[18] is list && rubrics[18].size() >= 1 && rubrics[18].size() <= 20))
+        && (rubrics.size() <= 19 || (rubrics[19] is list && rubrics[19].size() >= 1 && rubrics[19].size() <= 20))
+        ;
+    }
+
+    function validScore(value) {
+      return value is number && value >= 0 && value <= 10;
+    }
+
+    function validEvaluationScores(eid, data) {
+      let event = eventData(eid);
+      let project = get(/databases/$(database)/documents/events/$(eid)/projects/$(data.projectId)).data;
+      let criteria = event.get('categoryCriteria', {}).get(project.get('category', ''), event.criteria);
+      let count = criteria.size();
+      let scores = data.scores;
+      return scores is map && validCriteria(criteria) && scores.size() == count
+        && (count <= 0 || validScore(scores[criteria[0].id]))
+        && (count <= 1 || validScore(scores[criteria[1].id]))
+        && (count <= 2 || validScore(scores[criteria[2].id]))
+        && (count <= 3 || validScore(scores[criteria[3].id]))
+        && (count <= 4 || validScore(scores[criteria[4].id]))
+        && (count <= 5 || validScore(scores[criteria[5].id]))
+        && (count <= 6 || validScore(scores[criteria[6].id]))
+        && (count <= 7 || validScore(scores[criteria[7].id]))
+        && (count <= 8 || validScore(scores[criteria[8].id]))
+        && (count <= 9 || validScore(scores[criteria[9].id]))
+        && (count <= 10 || validScore(scores[criteria[10].id]))
+        && (count <= 11 || validScore(scores[criteria[11].id]))
+        && (count <= 12 || validScore(scores[criteria[12].id]))
+        && (count <= 13 || validScore(scores[criteria[13].id]))
+        && (count <= 14 || validScore(scores[criteria[14].id]))
+        && (count <= 15 || validScore(scores[criteria[15].id]))
+        && (count <= 16 || validScore(scores[criteria[16].id]))
+        && (count <= 17 || validScore(scores[criteria[17].id]))
+        && (count <= 18 || validScore(scores[criteria[18].id]))
+        && (count <= 19 || validScore(scores[criteria[19].id]))
+        ;
+    }
+
     // ---------- Permisos globales ----------
     match /staff/{email} {
       allow read: if isAdmin() || (authed() && myEmail() == email);
@@ -134,7 +195,8 @@ service cloud.firestore {
         && request.resource.data.maxTeamSize >= 1
         && request.resource.data.maxTeamSize <= 15
         && request.resource.data.resultsPublished == false
-        && validCriteria(request.resource.data.criteria);
+        && validCriteria(request.resource.data.criteria)
+        && validCategoryRubrics(request.resource.data);
 
       allow update: if isOrganizer(eid)
         && request.resource.data.ownerId == resource.data.ownerId
@@ -149,6 +211,9 @@ service cloud.firestore {
           && !get(rosterPath(eid)).data.members.keys().hasAny(request.resource.data.organizerEmails)
           && !get(rosterPath(eid)).data.members.keys().hasAny(request.resource.data.judgeEmails)
         ))
+        && (!changed(['criteria', 'categoryCriteria']) || resource.data.resultsPublished != true)
+        && (!changed(['categoryLocked']) || resource.data.get('categoryLocked', false) != true)
+        && (!changed(['judgingOpen']) || (!resource.data.judgingOpen && !request.resource.data.judgingOpen) || request.resource.data.get('categoryLocked', false) == true)
         && (!changed(['accessVersion']) || (
           isSuperadmin() && resource.data.get('accessVersion', 0) != 1
           && request.resource.data.accessVersion == 1
@@ -157,7 +222,8 @@ service cloud.firestore {
         && request.resource.data.maxTeamSize is int
         && request.resource.data.maxTeamSize >= 1
         && request.resource.data.maxTeamSize <= 15
-        && validCriteria(request.resource.data.criteria);
+        && validCriteria(request.resource.data.criteria)
+        && (!changed(['categoryCriteria']) || validCategoryRubrics(request.resource.data));
 
       allow delete: if (isSuperadmin() || (verified() && resource.data.ownerId == request.auth.uid))
         && hasRoster(eid) && get(rosterPath(eid)).data.members.size() == 0;
@@ -217,12 +283,6 @@ service cloud.firestore {
           return eventData(eid);
         }
 
-        function editingOpen() {
-          return ev().resultsPublished != true && (ev().registrationOpen == true
-            || ev().submissions.prototype == true
-            || ev().submissions.final == true);
-        }
-
         function validTeam(data) {
           return data.memberEmails is list
             && data.memberEmails.size() >= 1
@@ -240,6 +300,12 @@ service cloud.firestore {
             && next.members.keys().toSet() == roster.difference(before.toSet()).union(after.toSet());
         }
 
+        function validProjectCategory(data) {
+          let categories = ev().get('categories', []);
+          return data.category is string && data.category.size() > 0
+            && (categories.size() == 0 || data.category in categories);
+        }
+
         function validInfo(data) {
           return data.title is string
             && data.title.size() >= 1
@@ -252,6 +318,51 @@ service cloud.firestore {
             && data.solution.size() <= 5000
             && data.technologies is list
             && data.technologies.size() <= 15;
+        }
+
+        function validLogo(data) {
+          let logo = data.get('logo', null);
+          return logo == null || (logo is map && logo.keys().hasOnly(['path', 'storage'])
+            && logo.storage == 'supabase' && logo.path is string
+            && logo.path.matches('events/' + eid + '/projects/' + pid + '/logo/[a-f0-9-]{36}[.]webp'));
+        }
+
+        function completedRegistration(event, keys) {
+          let data = request.resource.data;
+          return data.get('registrationPending', false) == false
+            && (resource.data.get('registrationPending', false) != true
+              || (resource.data.leaderId == request.auth.uid
+                && event.judgingOpen != true && event.get('categoryLocked', false) != true
+                && validProjectCategory(data)
+                && data.title.size() >= 3 && data.summary.size() >= 20
+                && data.problem.size() >= 20 && data.solution.size() >= 20
+                && data.members is list && data.members.size() == data.memberEmails.size()
+                && data.members[0].email == resource.data.leaderEmail
+                && data.members[0].name is string && data.members[0].name.size() >= 3
+                && data.members[0].name.size() <= 100
+                && !keys.hasAny(['prototype', 'final'])));
+        }
+
+        function participantUpdate() {
+          let data = request.resource.data;
+          let previous = resource.data;
+          let event = ev();
+          let keys = data.diff(previous).affectedKeys();
+          return canParticipate(eid)
+            && myEmail() in previous.memberEmails
+            && event.resultsPublished != true
+            && (event.registrationOpen == true || event.submissions.prototype == true
+              || event.submissions.final == true || previous.get('registrationPending', false) == true)
+            && !keys.hasAny(['feedback', 'judging', 'leaderId', 'leaderEmail', 'eventId', 'createdAt'])
+            && validTeam(data) && validInfo(data) && completedRegistration(event, keys)
+            && (!keys.hasAny(['logo']) || (previous.leaderId == request.auth.uid
+              && previous.get('registrationPending', false) != true && validLogo(data)))
+            && (!keys.hasAny(['category']) || (validProjectCategory(data)
+              && event.judgingOpen != true && event.get('categoryLocked', false) != true))
+            && (!keys.hasAny(['prototype']) || (event.phases.prototype == true && event.submissions.prototype == true))
+            && (!keys.hasAny(['final']) || (event.phases.final == true && event.submissions.final == true))
+            && (!keys.hasAny(['members', 'memberEmails']) || previous.leaderId == request.auth.uid)
+            && (!keys.hasAny(['memberEmails']) || (noStaffInTeam(data) && syncedTeam(previous.memberEmails, data.memberEmails)));
         }
 
         allow read: if isOrganizer(eid)
@@ -270,34 +381,36 @@ service cloud.firestore {
           && request.resource.data.eventId == eid
           && request.resource.data.leaderId == request.auth.uid
           && request.resource.data.leaderEmail == myEmail()
+          && request.resource.data.get('registrationPending', false) == false
           && validTeam(request.resource.data)
           && noStaffInTeam(request.resource.data)
           && syncedTeam([], request.resource.data.memberEmails)
           && validInfo(request.resource.data)
+          && validProjectCategory(request.resource.data)
           && request.resource.data.prototype == null
           && request.resource.data.final == null
+          && request.resource.data.get('logo', null) == null
+          && !('judging' in request.resource.data)
           && !('feedback' in request.resource.data);
 
-        // El organizador solo puede escribir la retroalimentación, no el contenido del proyecto
-        allow update: if (
-            isOrganizer(eid)
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['feedback'])
-          )
-          || (
-            canParticipate(eid)
-            && myEmail() in resource.data.memberEmails
-            && editingOpen()
-            && !changed(['feedback', 'leaderId', 'leaderEmail', 'eventId', 'createdAt'])
-            && validTeam(request.resource.data)
-            && validInfo(request.resource.data)
-            && (!changed(['prototype']) || (ev().phases.prototype == true && ev().submissions.prototype == true))
-            && (!changed(['final']) || (ev().phases.final == true && ev().submissions.final == true))
-            // Solo el líder administra el equipo
-            && (!changed(['members', 'memberEmails']) || resource.data.leaderId == request.auth.uid)
-            // No se puede agregar a jueces ni organizadores como integrantes
-            && (!changed(['memberEmails']) || noStaffInTeam(request.resource.data))
-            && (!changed(['memberEmails']) || syncedTeam(resource.data.memberEmails, request.resource.data.memberEmails))
-          );
+        function validJudging() {
+          let judging = request.resource.data.judging;
+          return judging is map && judging.keys().hasOnly(['maxJudges', 'judgeEmails'])
+            && judging.maxJudges is int && judging.maxJudges >= 1
+            && judging.judgeEmails is list
+            && judging.judgeEmails.size() <= judging.maxJudges
+            && judging.judgeEmails.toSet().size() == judging.judgeEmails.size()
+            && judging.judgeEmails.hasOnly(ev().judgeEmails)
+            && !judging.judgeEmails.hasAny(ev().organizerEmails)
+            && !judging.judgeEmails.hasAny(resource.data.memberEmails);
+        }
+
+        // El organizador gestiona retroalimentación y jueces, sin modificar el contenido del equipo.
+        allow update: if participantUpdate()
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['feedback']) && isOrganizer(eid))
+          || (isOrganizer(eid) && ev().resultsPublished != true
+            && resource.data.get('registrationPending', false) != true
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['judging']) && validJudging());
 
         // Con resultados publicados el organizador ya no puede borrar proyectos
         allow delete: if ev().resultsPublished != true
@@ -307,22 +420,31 @@ service cloud.firestore {
 
       // ---------- Evaluaciones ----------
       match /evaluations/{evid} {
-        function assignedProject(data) {
+        // Reutiliza el contexto para admitir 20 criterios sin agotar las 1000 expresiones por escritura.
+        function canEvaluate(data) {
+          let event = eventData(eid);
           let project = get(/databases/$(database)/documents/events/$(eid)/projects/$(data.projectId)).data;
-          let assignment = eventData(eid).get('judgeAssignments', {}).get(myEmail(), {});
+          let role = exists(staffPath()) ? get(staffPath()).data.role : 'user';
+          let assignment = event.get('judgeAssignments', {}).get(myEmail(), {});
           let categories = assignment.get('categories', []);
           let projectIds = assignment.get('projectIds', []);
-          return !(myEmail() in project.memberEmails)
-            && ((categories.size() == 0 && projectIds.size() == 0)
-              || project.get('category', '') in categories || data.projectId in projectIds);
+          return authed() && myEmail() != 'edgarochoa0173@gmail.com' && !(role in ['admin', 'blocked'])
+            && !(myEmail() in event.organizerEmails) && myEmail() in event.judgeEmails
+            && event.get('accessVersion', 0) == 1 && exists(rosterPath(eid))
+            && !(myEmail() in get(rosterPath(eid)).data.members)
+            && !(myEmail() in project.memberEmails)
+            && project.get('registrationPending', false) != true
+            && event.judgingOpen == true && event.resultsPublished != true
+            && (('judging' in project)
+              ? myEmail() in project.judging.judgeEmails
+              : ((categories.size() == 0 && projectIds.size() == 0)
+                || project.get('category', '') in categories || data.projectId in projectIds));
         }
 
         allow read: if isOrganizer(eid)
           || (verified() && resource.data.judgeId == request.auth.uid);
 
-        allow create, update: if isJudge(eid)
-          && eventData(eid).judgingOpen == true
-          && eventData(eid).resultsPublished != true
+        allow create, update: if canEvaluate(request.resource.data)
           && request.resource.data.judgeId == request.auth.uid
           && request.resource.data.judgeEmail == myEmail()
           && request.resource.data.eventId == eid
@@ -330,9 +452,7 @@ service cloud.firestore {
           && eventData(eid).phases[request.resource.data.phase] == true
           && evid == request.auth.uid + '_' + request.resource.data.projectId + '_' + request.resource.data.phase
           && exists(/databases/$(database)/documents/events/$(eid)/projects/$(request.resource.data.projectId))
-          // Un juez no puede calificar un proyecto del que es integrante
-          && assignedProject(request.resource.data)
-          && request.resource.data.scores is map
+          && validEvaluationScores(eid, request.resource.data)
           && request.resource.data.total is number
           && request.resource.data.total >= 0
           && request.resource.data.total <= 100
@@ -360,6 +480,7 @@ service cloud.firestore {
 
       allow create, update: if verified()
         && request.resource.data.projectId == pid
+        && projectData(request.resource.data.eventId).get('registrationPending', false) != true
         && request.resource.data.sigPhrases is list
         && request.resource.data.sigWords is list
         && request.resource.data.urls is list

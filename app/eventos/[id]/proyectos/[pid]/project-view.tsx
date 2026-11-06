@@ -5,9 +5,12 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { EvaluationForm } from "@/components/evaluation-form";
-import { getPhaseDetails, getPhaseLabel } from "@/lib/event-config";
+import { getCategoryCriteria, getPhaseDetails, getPhaseLabel } from "@/lib/event-config";
+import { scheduleLabel } from "@/lib/judging-agenda";
 import { MatchList, NotEnoughData, SimilarityBadge, SubmissionBadges } from "@/components/project-bits";
+import { ProjectRegistration } from "@/components/project-registration";
 import { ProjectForm } from "@/components/project-form";
+import { ProjectLogo } from "@/components/project-logo";
 import { SubmissionEditor, SubmissionView } from "@/components/submission";
 import {
   Badge,
@@ -157,6 +160,10 @@ function ProjectBody({
     ...(isMember && hasFeedback ? [{ id: "feedback" as Tab, label: "Resultados" }] : []),
   ];
 
+  if (project.registrationPending && canParticipate && isLeader) {
+    return <ProjectRegistration key={project.id} event={event} project={project} />;
+  }
+
   return (
     <div className="space-y-6">
       <Link href={`/eventos/${event.id}`} className="inline-flex items-center gap-1.5 font-mono text-xs text-muted hover:text-ink">
@@ -165,12 +172,14 @@ function ProjectBody({
       {isMember && !canParticipate && <p className="rounded-2xl bg-amber-50 p-5 text-sm text-amber-900">Tu correo figura en este equipo y también tiene un rol de administración o juez. Puedes consultar el proyecto, pero ese rol impide editarlo o entregar archivos como integrante. La administración debe corregir la incompatibilidad.</p>}
 
       <section className="ui-panel rounded-3xl p-6 sm:p-8">
+        <ProjectLogo project={project} canEdit={canEditInfo && isLeader && !project.registrationPending} />
         <div className="flex flex-wrap items-center gap-1.5">
           {project.category && <Badge tone="dark">{project.category}</Badge>}
           <SubmissionBadges project={project} event={event} />
           {canReview && seeOriginality && !fingerprints.loading && <SimilarityBadge match={matches[0]} state={state} />}
         </div>
-        <h1 className="mt-4 break-words font-display text-3xl font-bold leading-tight sm:text-4xl">{project.title}</h1>
+        <h1 className="mt-4 break-words font-display text-3xl font-bold leading-tight sm:text-4xl">{project.title || "Registro pendiente del líder"}</h1>
+        {project.registrationPending && <p className="mt-2 text-sm text-muted">El alumno líder completará los datos del proyecto y registrará a sus integrantes al entrar.</p>}
         <p className="mt-2 max-w-3xl text-sm leading-relaxed text-ink/75">{project.summary}</p>
         <ul className="mt-5 flex flex-wrap gap-2">
           {project.members.map((m) => (
@@ -187,6 +196,12 @@ function ProjectBody({
         </ul>
       </section>
 
+      {canEditInfo && (!project.summary || !project.problem || !project.solution) && (
+        <div className="rounded-2xl bg-lime p-4 text-sm">
+          Tu equipo ya está registrado. Completa la información del proyecto para que los jueces puedan conocerlo.
+          <Button variant="outline" size="sm" className="mt-3" onClick={() => { setTab("info"); setEditingInfo(true); }}>Completar información</Button>
+        </div>
+      )}
       <Tabs tabs={tabs} value={tab} onChange={(t) => setTab(t)} />
 
       {tab === "info" && (
@@ -197,6 +212,7 @@ function ProjectBody({
               leader={leader}
               maxTeamSize={event.maxTeamSize}
               categories={eventCategories(event)}
+              categoryLocked={event.categoryLocked || event.judgingOpen || event.resultsPublished}
               submitLabel="Guardar"
               canManageMembers={isLeader && event.accessVersion === 1}
               onCancel={() => setEditingInfo(false)}
@@ -309,7 +325,7 @@ function ProjectBody({
 
       {tab === "evaluate" && isJudge && user && (
         <Card>
-          <SectionTitle title="Tu calificación" subtitle="Usa los criterios que el organizador definió para este evento." />
+          <SectionTitle title="Tu calificación" subtitle={`Rúbrica de ${project.category}: criterios definidos por el organizador para esta categoría.`} />
           {phases.length > 1 && (
             <div className="mb-5">
               <Tabs tabs={phases.map((p) => ({ id: p, label: getPhaseLabel(event, p) }))} value={evalPhase} onChange={setEvalPhase} />
@@ -324,15 +340,16 @@ function ProjectBody({
                   El equipo aún no ha enviado esta entrega: {getPhaseLabel(event, evalPhase)}. Puedes calificar si la presentaron en vivo.
                 </p>
               )}
+              <p className="mb-4 rounded-xl bg-paper p-3 text-sm font-medium">Tu horario: {scheduleLabel(event.judgeAssignments?.[normalizeEmail(user.email ?? "")]?.schedule?.[project.id])}</p>
               <EvaluationForm
-                key={evalPhase}
-                criteria={event.criteria}
+                key={`${evalPhase}:${project.category}:${JSON.stringify(getCategoryCriteria(event, project.category))}`}
+                criteria={getCategoryCriteria(event, project.category)}
                 locked={!assigned || !event.judgingOpen || event.resultsPublished || event.accessVersion !== 1}
                 lockReason={!assigned ? "Este proyecto no está asignado a tu evaluación. Puedes revisarlo." : event.resultsPublished ? "Los resultados están publicados. Tus calificaciones ya no se pueden cambiar." : event.accessVersion !== 1 ? "El superadmin debe actualizar los permisos de este evento antes de habilitar la evaluación." : undefined}
                 initial={evaluations.data.find((e) => e.id === evaluationId(user.uid, project.id, evalPhase)) ?? null}
-                onSave={async (scores, total, comment) => {
+                onSave={async (scores, comment) => {
                   try {
-                    await saveEvaluation(event, project.id, evalPhase, user, scores, total, comment);
+                    await saveEvaluation(event, project, evalPhase, user, scores, comment);
                     toast("Calificación guardada.");
                   } catch (err) {
                     toast(firestoreErrorMessage(err), "error");
@@ -387,7 +404,7 @@ function ProjectBody({
           {evaluations.data.length ? (
             <div className="space-y-3">
               {evaluations.data.map((e) => {
-                const currentTotal = effectiveEvaluationTotal(event.criteria, e);
+                const currentTotal = effectiveEvaluationTotal(getCategoryCriteria(event, project.category), e);
                 return (
                   <div key={e.id} className="rounded-2xl bg-paper p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -410,7 +427,7 @@ function ProjectBody({
                       </div>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-1.5">
-                      {event.criteria.map((c) => (
+                      {getCategoryCriteria(event, project.category).map((c) => (
                         <Badge key={c.id}>
                           {c.name}: {e.scores[c.id] ?? "—"}
                         </Badge>
@@ -510,7 +527,7 @@ function ProjectBody({
                     </span>
                   </div>
                   <div className="mt-5 space-y-2.5">
-                    {event.criteria.map((c) => (
+                    {getCategoryCriteria(event, project.category).map((c) => (
                       <div key={c.id}>
                         <div className="flex justify-between font-mono text-[11px]">
                           <span>{c.name}</span>

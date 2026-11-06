@@ -23,10 +23,10 @@ export function EvaluationForm({
   initial: EvaluationDoc | null;
   locked: boolean;
   lockReason?: string;
-  onSave: (scores: Record<string, number>, total: number, comment: string) => Promise<void>;
+  onSave: (scores: Record<string, number>, comment: string) => Promise<void>;
 }) {
   const [scores, setScores] = useState<Record<string, number>>(
-    () => initial?.scores ?? Object.fromEntries(criteria.map((c) => [c.id, 5])),
+    () => Object.fromEntries(criteria.map((c) => [c.id, initial?.scores[c.id] ?? 5])),
   );
   const [comment, setComment] = useState(initial?.comment ?? "");
   const [busy, setBusy] = useState(false);
@@ -39,7 +39,7 @@ export function EvaluationForm({
     e.preventDefault();
     setBusy(true);
     try {
-      await onSave(scores, total, comment);
+      await onSave(scores, comment);
     } finally {
       setBusy(false);
     }

@@ -37,6 +37,8 @@ export type ResultRow = {
 export type JudgeAssignment = {
   categories?: string[];
   projectIds?: string[];
+  /** Instantes UTC; la interfaz programa y muestra la hora de Culiacán. */
+  schedule?: Record<string, { startsAt: string; endsAt: string }>;
 };
 
 export type EventDoc = {
@@ -59,6 +61,10 @@ export type EventDoc = {
   judgingOpen: boolean;
   maxTeamSize: number;
   criteria: Criterion[];
+  /** Rúbricas por categoría; si no hay una personalizada se conserva criteria. */
+  categoryCriteria?: Record<string, Criterion[]>;
+  /** La categoría de un proyecto queda fija desde que empieza la evaluación. */
+  categoryLocked?: boolean;
   /** Opcional: categorías personalizadas del evento (si no existe usa DEFAULT_CATEGORIES). */
   categories?: string[];
   /** Opcional: qué categorías o proyectos evalúa cada juez (clave = correo normalizado). */
@@ -99,6 +105,9 @@ export type Submission = {
 
 export type Member = { name: string; email: string };
 
+/** Imagen opcional de la marca, privada en Supabase; nunca guarda una URL firmada. */
+export type ProjectLogo = { path: string; storage: "supabase" };
+
 export type PhaseFeedback = {
   score: number;
   judges: number;
@@ -111,6 +120,11 @@ export type PhaseFeedback = {
 export type ProjectDoc = {
   id: string;
   eventId: string;
+  /** Si existe, esta selección manda sobre las asignaciones generales del evento. */
+  judging?: { maxJudges: number; judgeEmails: string[] };
+  /** Alta por correo: el líder aún debe completar el formulario de su proyecto. */
+  registrationPending?: boolean;
+  logo?: ProjectLogo | null;
   title: string;
   summary: string;
   problem: string;

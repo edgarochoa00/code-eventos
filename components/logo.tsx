@@ -2,9 +2,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-export const APP_NAME = "Feria 2027";
+export const APP_NAME = "Feria 2026";
 export const APP_SUBTITLE = "TECNM CULIACÁN · SISTEMAS Y TICS";
-export const APP_TAGLINE = "Feria 2027 · TECNM CULIACÁN";
+export const APP_TAGLINE = "Feria 2026 · TECNM CULIACÁN";
 
 export function Logo({
   href = "/",

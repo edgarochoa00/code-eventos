@@ -3,8 +3,8 @@
  * La versión de cada documento es independiente de la versión de la app.
  */
 
-export const LEGAL_VERSION = "2026-11-04.1";
-export const LEGAL_UPDATED_LABEL = "4 de noviembre de 2026";
+export const LEGAL_VERSION = "2026-11-05.1";
+export const LEGAL_UPDATED_LABEL = "5 de noviembre de 2026";
 
 export const SERVICE_CONTACT = {
   name: "Edgar Ochoa",
@@ -22,6 +22,43 @@ export type Release = { version: string; date: string; title: string; changes: s
 
 /** La primera entrada es la versión actual (debe coincidir con package.json). */
 export const RELEASES: Release[] = [
+  { version: "0.4.6", date: "6 de noviembre de 2026", title: "Estabilidad de Administración y agenda unificada", changes: [
+    "El formulario de alta de alumnos conserva sus datos y muestra un aviso si desaparece el evento seleccionado.",
+    "Sesión estable de autenticación, avance de jueces calculado una sola vez y eliminación de controles vacíos.",
+    "Edición y visualización de turnos usan la misma zona horaria de Culiacán.",
+  ] },
+  { version: "0.4.5", date: "6 de noviembre de 2026", title: "Jueces elegidos por proyecto", changes: [
+    "El organizador define el máximo de jueces de cada proyecto y elige quiénes lo califican.",
+    "La selección por proyecto se refleja en la agenda y las estadísticas y se comprueba al guardar calificaciones.",
+  ] },
+  { version: "0.4.4", date: "6 de noviembre de 2026", title: "Estadísticas en su propia sección", changes: [
+    "Estadísticas de jueces en una pestaña independiente: proyectos asignados, calificados y pendientes.",
+    "La gestión de jueces, accesos y horarios queda separada del seguimiento de evaluaciones.",
+  ] },
+  { version: "0.4.3", date: "5 de noviembre de 2026", title: "Agenda y control de jueces", changes: [
+    "Horarios por juez y proyecto con fecha, inicio y fin en hora de Culiacán.",
+    "Control en tiempo real de evaluaciones completadas, pendientes, en turno y atrasadas.",
+    "Las presentaciones en vivo sin archivos también cuentan como tareas de evaluación.",
+  ] },
+  {
+    version: "0.4.2",
+    date: "5 de noviembre de 2026",
+    title: "Acceso por correo para jueces y organizadores",
+    changes: [
+      "Asignar un rol de juez, organizador o administrador envía un correo para establecer la contraseña y crea la cuenta si hace falta.",
+      "Las cuentas existentes conservan sus datos y su contraseña hasta que la persona decide cambiarla.",
+      "Botón para reenviar el acceso y mensajes que distinguen el permiso guardado de un fallo del correo.",
+    ],
+  },
+  {
+    version: "0.4.1",
+    date: "5 de noviembre de 2026",
+    title: "Feria 2026",
+    changes: [
+      "Nombre de la plataforma corregido a Feria 2026 y nueva dirección feria2026.web.app.",
+      "Corrección de la caché que dejaba la pantalla en Cargando al entrar desde otro navegador.",
+    ],
+  },
   {
     version: "0.4.0",
     date: "4 de noviembre de 2026",

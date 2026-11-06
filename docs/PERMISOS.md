@@ -6,7 +6,7 @@ En un evento, organizar y juzgar son incompatibles. Los integrantes activos de e
 
 Los jueces pueden consultar los proyectos del evento y sus propias calificaciones, pero solo pueden guardar evaluaciones para los proyectos o categorías asignados. Una asignación ausente o con ambas listas vacías significa «todos». La evaluación debe estar abierta, la etapa habilitada y los resultados sin publicar. Se conserva la posibilidad de evaluar una presentación en vivo sin archivo entregado.
 
-Publicar resultados congela las calificaciones y las modificaciones de los equipos, aunque haya quedado algún interruptor de registro o entregas abierto. Primero se ocultan los resultados para volver a editar. El organizador no reemplaza el contenido o los archivos del equipo.
+Publicar resultados congela las calificaciones y las modificaciones de los equipos, aunque haya quedado algún interruptor de registro o entregas abierto. Primero se ocultan los resultados para volver a editar. El organizador no reemplaza las descripciones ni los archivos del equipo. El administrador y el organizador dan de alta únicamente el correo del líder; el alumno completa su proyecto y registra a sus integrantes al entrar. El servicio mantiene la reserva en el registro privado. Véase [Alta de alumnos líderes](ALTAS_EQUIPOS.md).
 
 ## Registro privado y operaciones atómicas
 

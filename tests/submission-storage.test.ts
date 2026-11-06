@@ -58,6 +58,7 @@ let storageCalls: number;
 let projectForbidden: boolean;
 let memberEmails: string[];
 let resultsPublished: boolean;
+let registrationPending: boolean;
 
 const response = (body: unknown, status = 200) => Response.json(body, { status });
 const fakeFetch: typeof fetch = async (input, init) => {
@@ -68,7 +69,7 @@ const fakeFetch: typeof fetch = async (input, init) => {
   if (url.includes("/documents/events/e1/projects/p1")) {
     if (projectForbidden) return response({}, 403);
     return response({ fields: fields({
-      memberEmails, leaderId: "member",
+      memberEmails, leaderId: "member", registrationPending,
       prototype: { files: [{ storage: "supabase", path }] }, final: null,
     }) });
   }
@@ -118,6 +119,7 @@ describe("permisos y almacenamiento de entregas", { concurrency: false }, () => 
     projectForbidden = false;
     memberEmails = ["member@example.test"];
     resultsPublished = false;
+    registrationPending = false;
   });
   after(() => {
     mock.restoreAll();
@@ -163,6 +165,11 @@ describe("permisos y almacenamiento de entregas", { concurrency: false }, () => 
     const result = await call(upload);
     assert.match(result.path!, /^events\/e1\/projects\/p1\/prototype\/[a-f\d-]+_one\.pdf$/);
     assert.match(result.signedUrl!, /test-upload-token/);
+  });
+  test("un líder con registro pendiente no sube archivos aunque la entrega esté abierta", async () => {
+    registrationPending = true;
+    await rejects(upload, 403);
+    assert.equal(storageCalls, 0);
   });
   test("un integrante no sube ni elimina cuando la etapa está cerrada", async () => {
     open = false;

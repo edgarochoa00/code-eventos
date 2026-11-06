@@ -37,7 +37,7 @@ function decodeFields(fields: Record<string, FirestoreValue>) {
   return Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, decode(value)]));
 }
 
-async function readDocument<T>(path: string, token: string): Promise<T | null> {
+export async function readDocumentSnapshot<T>(path: string, token: string): Promise<{ data: T; updateTime: string } | null> {
   const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
   if (!projectId) throw new StorageRequestError(503, "Falta configurar Firebase en el servidor.");
   const origin = emulator() ? "http://127.0.0.1:8085" : "https://firestore.googleapis.com";
@@ -49,10 +49,14 @@ async function readDocument<T>(path: string, token: string): Promise<T | null> {
   if (response.status === 401 || response.status === 403) throw deny();
   if (!response.ok) throw new StorageRequestError(503, "No se pudieron comprobar los permisos. Intenta de nuevo.");
   const document = await response.json();
-  return decodeFields(document.fields ?? {}) as T;
+  return { data: decodeFields(document.fields ?? {}) as T, updateTime: document.updateTime };
 }
 
-async function session(request: Request) {
+export async function readDocument<T>(path: string, token: string): Promise<T | null> {
+  return (await readDocumentSnapshot<T>(path, token))?.data ?? null;
+}
+
+export async function session(request: Request) {
   const header = request.headers.get("authorization") ?? "";
   if (!/^Bearer \S+$/.test(header) || header.length > 16384) {
     throw new StorageRequestError(401, "Inicia sesión para acceder a los archivos.");
@@ -91,7 +95,7 @@ async function access(request: Request, eventId: unknown, projectId: unknown, ph
   if (!organizer && !member && !event.judgeEmails.includes(user.email)) throw deny();
   // Las entregas son del equipo: el organizador puede descargarlas, pero no reemplazarlas.
   const teamMember = member && !organizer && !event.judgeEmails.includes(user.email);
-  const canEdit = teamMember && !event.resultsPublished && event.phases[phase] && event.submissions[phase];
+  const canEdit = teamMember && !project.registrationPending && !event.resultsPublished && event.phases[phase] && event.submissions[phase];
   const canDeleteProject = !event.resultsPublished && (organizer || (teamMember && project.leaderId === user.uid && event.registrationOpen));
   return { project, canEdit, canDeleteProject, eventId, projectId, phase: phase as Phase };
 }
@@ -108,7 +112,7 @@ function storageClient() {
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
 }
 
-async function privateBucket() {
+export async function privateBucket() {
   const client = storageClient();
   const name = process.env.SUPABASE_STORAGE_BUCKET || "code-submissions";
   // Rechaza buckets públicos o sin límite: protege los archivos incluso con una configuración equivocada.

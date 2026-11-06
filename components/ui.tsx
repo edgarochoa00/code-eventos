@@ -77,15 +77,17 @@ export function ButtonLink({
   size = "md",
   className,
   children,
+  onClick,
 }: {
   href: string;
+  onClick?: React.MouseEventHandler<HTMLAnchorElement>;
   variant?: Variant;
   size?: Size;
   className?: string;
   children: ReactNode;
 }) {
   return (
-    <Link href={href} className={cn(base, VARIANTS[variant], SIZES[size], className)}>
+    <Link href={href} onClick={onClick} className={cn(base, VARIANTS[variant], SIZES[size], className)}>
       {children}
     </Link>
   );
@@ -373,6 +375,7 @@ export function Modal({
     <dialog
       ref={ref}
       onClose={onClose}
+      onCancel={(e) => { e.preventDefault(); onClose(); }}
       onClick={(e) => e.target === ref.current && onClose()}
       className="ui-panel m-auto w-[calc(100%-2rem)] max-w-lg rounded-3xl p-0 text-ink backdrop:bg-black/55 backdrop:backdrop-blur-sm max-sm:mb-0 max-sm:w-full max-sm:max-w-none max-sm:rounded-b-none"
     >

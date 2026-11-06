@@ -4,7 +4,15 @@ Web app pensada primero para celular para organizar eventos de proyectos. El org
 
 Stack: Next.js 16 (App Router) · React 19 · Tailwind 4 · Firebase (Auth + Firestore, proyecto `code-94fbe`) · Supabase Storage (archivos).
 
-Cada evento tiene nombre, descripción y criterios propios, definidos por el organizador al crearlo. Por ejemplo, **Carteles** y **Prototipos** se crean como dos eventos independientes, cada uno con su código, jueces y resultados. No se precargan criterios de evaluación; las categorías empiezan en General y se pueden personalizar. Los eventos anteriores conservan sus entregas y rúbricas.
+Cada evento tiene nombre, descripción, entregas y categorías definidos por el organizador. **Carteles y Prototipos pueden convivir en el mismo evento con criterios de evaluación distintos**: en **Rúbrica**, selecciona la categoría, escribe sus criterios y guarda su rúbrica. El juez recibe automáticamente los criterios de la categoría del proyecto. Los resultados, la retroalimentación y el CSV usan esos criterios y sus pesos, normalizados a 100.
+
+Al crear un evento debes completar la rúbrica de cada categoría. En eventos existentes, las categorías aún sin personalizar conservan la rúbrica general; puedes guardarlas por separado sin alterar las demás. Desde que se abre la evaluación, los equipos ya no pueden cambiar su categoría. Oculta los resultados antes de editar una rúbrica publicada. Las entregas, los archivos y las calificaciones históricas se conservan.
+
+El líder también puede agregar un **logo opcional de su marca** después de completar el registro: aparece como sticker en su proyecto y en la tarjeta del alumno. Acepta PNG, JPG o WebP de hasta 2 MB, permite previsualizar, reemplazar o quitar la imagen y conserva los fondos transparentes. Se guarda de forma privada en Supabase Storage; solo el líder lo modifica mientras el proyecto permite ediciones. Consulta [la configuración y el flujo de almacenamiento](docs/SUPABASE_STORAGE.md#logo-opcional-de-la-marca).
+
+## Alta de líderes y equipos
+
+El administrador y el organizador dan de alta únicamente el correo del alumno desde **Dar de alta alumno líder**. Se crea la cuenta si falta y se conserva el acceso si ya existe. Al entrar, el líder completa el formulario: su nombre, datos del proyecto, categoría e integrantes. Hasta completarlo, el registro queda pendiente y no recibe entregas ni calificaciones. El líder administra después a sus integrantes desde **Información → Editar**. [Guía de altas y permisos](docs/ALTAS_EQUIPOS.md).
 
 ## Arranque
 
@@ -26,17 +34,23 @@ Las entregas nuevas requieren archivos subidos directamente: hasta **30 MB por a
 
 ## Publicar en Firebase
 
-El backend de App Hosting es `feria2027`, en el proyecto `code-94fbe`. `firebase.json` también conecta `feria2027.web.app` con su servicio de Cloud Run.
+La dirección pública es **https://feria2026.web.app**. El backend existente de App Hosting conserva su identificador interno `feria2027`, en el proyecto `code-94fbe`; `firebase.json` conecta el sitio `feria2026` con ese servicio de Cloud Run. La dirección anterior `feria2027.web.app` redirige a la nueva conservando la ruta y los parámetros.
 
 ```bash
 npx -y firebase-tools@15 deploy --only apphosting --project code-94fbe
 npm run deploy:rules
-npx -y firebase-tools@15 deploy --only hosting --project code-94fbe
+npm run deploy:hosting
 ```
+
+**Publica Hosting siempre después de App Hosting.** Este paso limpia la caché de `feria2026.web.app` y comprueba las páginas, el nombre Feria 2026 y sus archivos JavaScript/CSS. Las rutas de la interfaz tienen `Cache-Control: private, no-cache, no-store` en `firebase.json`; los archivos con hash de `/_next/static/` conservan su caché `immutable`. Así una página anterior no sigue pidiendo archivos eliminados después de una publicación, lo que causaba la pantalla permanente de «Cargando…». Si agregas otra ruta principal, inclúyela en la regla de cabeceras y en la comprobación. [Comportamiento de caché de Firebase](https://firebase.google.com/docs/hosting/manage-cache).
+
+Puedes repetir la verificación sin publicar con `npm run check:deployment`, o comprobar un canal de prueba con `npm run check:deployment -- https://URL-DEL-CANAL.web.app`. Después abre la portada en un navegador sin sesión: la comprobación HTTP verifica archivos y cabeceras, pero no ejecuta la app.
 
 Usa una cuenta de Firebase con acceso al proyecto (`--account CORREO` si tienes varias sesiones). El secreto `SUPABASE_SERVICE_ROLE_KEY` debe existir y permitir acceso al backend. `.env.local` no se publica. Al actualizar los permisos, sigue también la [puesta en marcha de eventos existentes](docs/PERMISOS.md#puesta-en-marcha).
 
 ## Permisos
+
+Al agregar jueces u organizadores de un evento, o dar permiso global de organizador o administrador, se envía un acceso por correo y se crea la cuenta si falta. La persona elige su contraseña desde el enlace de Firebase. Las cuentas existentes se conservan. **Enviar acceso** permite reenviar a los correos ya registrados. [Flujo, comprobaciones y límites de envío](docs/ACCESO_POR_CORREO.md).
 
 ### En la plataforma (Administración → `/admin`)
 
@@ -137,3 +151,11 @@ tests/              Pruebas de firestore.rules
 | Integrante | demo.integrante@example.com |
 | Alumno sin proyecto | demo.nuevo@example.com |
 | Suspendido | demo.suspendido@example.com |
+
+## Seguimiento con Entire
+
+Entire está configurado para Codex mediante `.entire/settings.json` y `.codex/hooks.json`. En cada equipo se necesita tener Entire instalado y revisar y aprobar los hooks desde `/hooks` en Codex antes de registrar sesiones. `entire status` indica si falta esa aprobación.
+
+El repositorio es público: la subida automática de conversaciones está desactivada (`push_sessions: false`) y no se importa historial anterior. Los checkpoints se conservan localmente. Los cambios de código se suben normalmente a GitHub.
+
+El espejo del proyecto es `entire://aws-us-east-2.entire.io/gh/edgarochoa00/code-eventos`. Para enlazar otro clon, usa `entire repo remote add entire`; `origin` sigue apuntando a GitHub. Entire conserva el contexto del trabajo de los agentes; habilitar el seguimiento no inicia por sí solo una tarea de desarrollo.

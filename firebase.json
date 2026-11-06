@@ -35,22 +35,66 @@
       ]
     }
   ],
-  "hosting": {
-    "site": "feria2027",
-    "public": "hosting-empty",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
-    "rewrites": [
-      {
-        "source": "**",
-        "run": {
-          "serviceId": "feria2027",
-          "region": "us-central1"
+  "hosting": [
+    {
+      "site": "feria2026",
+      "public": "hosting-empty",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "headers": [
+        {
+          "regex": "^/(|login|panel|admin|eventos|terminos|privacidad|cookies|versiones)(/.*)?$",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "private, no-cache, no-store, max-age=0, must-revalidate"
+            }
+          ]
         }
-      }
-    ]
-  }
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "run": {
+            "serviceId": "feria2027",
+            "region": "us-central1"
+          }
+        }
+      ]
+    },
+    {
+      "site": "feria2027",
+      "public": "hosting-empty",
+      "ignore": [
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "redirects": [
+        {
+          "source": "/",
+          "destination": "https://feria2026.web.app/",
+          "type": 302
+        },
+        {
+          "source": "/:path*",
+          "destination": "https://feria2026.web.app/:path",
+          "type": 302
+        }
+      ],
+      "headers": [
+        {
+          "source": "**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, no-store, max-age=0, must-revalidate"
+            }
+          ]
+        }
+      ]
+    }
+  ]
 }
