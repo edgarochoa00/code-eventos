@@ -151,3 +151,11 @@ tests/              Pruebas de firestore.rules
 | Integrante | demo.integrante@example.com |
 | Alumno sin proyecto | demo.nuevo@example.com |
 | Suspendido | demo.suspendido@example.com |
+
+## Seguimiento con Entire
+
+Entire está configurado para Codex mediante `.entire/settings.json` y `.codex/hooks.json`. En cada equipo se necesita tener Entire instalado y revisar y aprobar los hooks desde `/hooks` en Codex antes de registrar sesiones. `entire status` indica si falta esa aprobación.
+
+El repositorio es público: la subida automática de conversaciones está desactivada (`push_sessions: false`) y no se importa historial anterior. Los checkpoints se conservan localmente. Los cambios de código se suben normalmente a GitHub.
+
+El espejo del proyecto es `entire://aws-us-east-2.entire.io/gh/edgarochoa00/code-eventos`. Para enlazar otro clon, usa `entire repo remote add entire`; `origin` sigue apuntando a GitHub. Entire conserva el contexto del trabajo de los agentes; habilitar el seguimiento no inicia por sí solo una tarea de desarrollo.
