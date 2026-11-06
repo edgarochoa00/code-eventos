@@ -23,3 +23,13 @@ env:
     secret: SUPABASE_SERVICE_ROLE_KEY
     availability:
       - RUNTIME
+  - variable: FERIA_MAIL_PROVIDER
+    value: "brevo"
+  - variable: FERIA_MAIL_FROM
+    value: "feria2026.culiacan@outlook.com"
+  - variable: FERIA_BREVO_API_KEY
+    secret: FERIA_BREVO_API_KEY
+    availability:
+      - RUNTIME
+  - variable: FERIA_BREVO_API_KEY
+    secret: FERIA_BREVO_API_KEY

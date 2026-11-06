@@ -7,6 +7,7 @@ import { validDocumentId } from "../submission-files";
 import { SUPERADMIN_EMAIL, type EventDoc, type ParticipantRoster, type StaffDoc } from "../types";
 import { isEmail, normalizeEmail } from "../utils";
 import { adminServices } from "./firebase-admin";
+import { AccessEmailError, accessEmailConfig, sendBrevoAccessEmail, type AccessEmailContext } from "./access-email";
 
 export class InvitationError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -36,7 +37,14 @@ function parseInput(body: unknown): AccountInvitation {
   throw new InvitationError(400, "El permiso de la invitación no es válido.");
 }
 
-async function sendSetupEmail(email: string) {
+async function sendSetupEmail(email: string, context: AccessEmailContext) {
+  const config = accessEmailConfig();
+  if (config) {
+    const { auth } = adminServices();
+    const link = new URL(await auth.generatePasswordResetLink(email, { url: "https://feria2026.web.app/login" }));
+    link.searchParams.set("lang", "es");
+    return sendBrevoAccessEmail(config, email, context, link.href);
+  }
   const emulator = process.env.NEXT_PUBLIC_USE_EMULATORS === "true";
   const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
   if (!apiKey) throw new InvitationError(503, "Falta configurar el envío de acceso.");
@@ -58,6 +66,7 @@ async function sendSetupEmail(email: string) {
     }
     throw new InvitationError(502, "No se pudo enviar el correo de acceso. El permiso se conserva; vuelve a intentarlo.");
   }
+  return { provider: "firebase" as const };
 }
 
 export async function handleAccountInvitation(request: Request) {
@@ -79,7 +88,7 @@ export async function handleAccountInvitation(request: Request) {
   const limitRef = db.doc(`accountInvitationLimits/${identity.uid}`);
   const lease = randomUUID();
 
-  async function authorize(tx: Transaction) {
+  async function authorize(tx: Transaction): Promise<AccessEmailContext> {
     const [actorSnap, targetSnap] = await tx.getAll(db.doc(`staff/${actor}`), db.doc(`staff/${input.email}`));
     const actorRole = (actorSnap.data() as StaffDoc | undefined)?.role;
     const targetRole = (targetSnap.data() as StaffDoc | undefined)?.role;
@@ -89,7 +98,7 @@ export async function handleAccountInvitation(request: Request) {
     if (input.kind === "staff") {
       if (!superadmin) throw new InvitationError(403, "Solo el superadmin puede enviar acceso por un permiso global.");
       if (targetRole !== input.role) throw new InvitationError(409, "Guarda primero ese permiso para este correo.");
-      return;
+      return { role: input.role, eventName: null };
     }
     const [eventSnap, rosterSnap] = await tx.getAll(db.doc(`events/${input.eventId}`), db.doc(`events/${input.eventId}/access/participants`));
     const event = eventSnap.data() as EventDoc | undefined;
@@ -104,6 +113,7 @@ export async function handleAccountInvitation(request: Request) {
     if ((rosterSnap.data() as ParticipantRoster | undefined)?.members[input.email]) {
       throw new InvitationError(409, "Ese correo pertenece a un equipo y no puede recibir ese rol.");
     }
+    return { role: input.role, eventName: event.name || "tu evento de Feria 2026" };
   }
 
   const recentlySent = await db.runTransaction(async (tx) => {
@@ -139,11 +149,12 @@ export async function handleAccountInvitation(request: Request) {
     }
     if (account.disabled) throw new InvitationError(409, "La cuenta está deshabilitada en Firebase Authentication.");
     // Revisa de nuevo los permisos si cambiaron durante la creación de la cuenta.
-    await db.runTransaction(authorize);
-    await sendSetupEmail(input.email);
+    const context = await db.runTransaction(authorize);
+    const delivery = await sendSetupEmail(input.email, context);
     await db.runTransaction(async (tx) => {
       const receipt = await tx.get(receiptRef);
-      if (receipt.data()?.lease === lease) tx.update(receiptRef, { status: "sent", lease: null });
+      if (receipt.data()?.lease === lease) tx.update(receiptRef, { status: "sent", lease: null, provider: delivery.provider,
+        ...("messageId" in delivery ? { messageId: delivery.messageId } : {}) });
     });
     return { status: "sent" as const };
   } catch (error) {
@@ -152,6 +163,7 @@ export async function handleAccountInvitation(request: Request) {
       if (receipt.data()?.lease === lease) tx.update(receiptRef, { status: "failed", lease: null });
     }).catch(() => undefined);
     if (error instanceof InvitationError) throw error;
+    if (error instanceof AccessEmailError) throw new InvitationError(error.status, error.message);
     throw new InvitationError(503, "No se pudo enviar el acceso. El permiso se conserva; vuelve a intentarlo.");
   }
 }
