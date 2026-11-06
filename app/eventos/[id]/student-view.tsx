@@ -7,6 +7,8 @@ import { useMemo, useState } from "react";
 import { Leaderboard } from "@/components/leaderboard";
 import { SubmissionBadges } from "@/components/project-bits";
 import { ProjectForm } from "@/components/project-form";
+import { ProjectRegistration } from "@/components/project-registration";
+import { ProjectLogo } from "@/components/project-logo";
 import { Badge, Card, EmptyState, ErrorNote, SectionTitle, Spinner, Tabs, firestoreErrorMessage, useToast } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { createProject, qMyEventProject } from "@/lib/data";
@@ -43,7 +45,9 @@ export function StudentView({ event }: { event: EventDoc }) {
     <div className="space-y-8">
       {mine.error && <ErrorNote code={mine.error} />}
 
-      {project ? (
+      {project?.registrationPending && project.leaderId === user?.uid ? (
+        <ProjectRegistration key={project.id} event={event} project={project} />
+      ) : project ? (
         <>
           {mine.data.length > 1 && (
             <Tabs
@@ -57,6 +61,7 @@ export function StudentView({ event }: { event: EventDoc }) {
             href={`/eventos/${event.id}/proyectos/${project.id}`}
             className="group flex items-center justify-between gap-4 rounded-3xl bg-night p-6 text-white sm:p-8"
           >
+            {project.logo && <ProjectLogo project={project} compact />}
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-mono text-[11px] text-white/75">Tu proyecto</p>

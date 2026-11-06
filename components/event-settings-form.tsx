@@ -3,10 +3,10 @@
 import { Plus, RotateCcw, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import type { EventSettingsInput } from "@/lib/data";
-import { criteriaError } from "@/lib/event-config";
+import { categoryCriteriaError, getPhaseDetails } from "@/lib/event-config";
 import type { Criterion } from "@/lib/types";
 import { DEFAULT_CATEGORIES } from "@/lib/utils";
-import { CriteriaEditor } from "./criteria-editor";
+import { CategoryCriteriaEditor } from "./category-criteria-editor";
 import { Button, Field, Input, Textarea } from "./ui";
 
 export function EventSettingsForm({
@@ -18,7 +18,7 @@ export function EventSettingsForm({
   initial?: Partial<EventSettingsInput>;
   submitLabel: string;
   onSubmit: (input: EventSettingsInput) => Promise<void>;
-  rubric?: { criteria: Criterion[]; onChange: (criteria: Criterion[]) => void };
+  rubric?: boolean;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [institution, setInstitution] = useState(initial?.institution ?? "");
@@ -30,6 +30,7 @@ export function EventSettingsForm({
     initial?.categories?.length ? initial.categories : initial ? DEFAULT_CATEGORIES : ["General"],
   );
   const [newCategory, setNewCategory] = useState("");
+  const [categoryCriteria, setCategoryCriteria] = useState<Record<string, Criterion[]>>({});
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -49,8 +50,11 @@ export function EventSettingsForm({
     e.preventDefault();
     setError("");
     if (name.trim().length < 3) return setError("Escribe el nombre del evento.");
+    const rubrics = Object.fromEntries(categories.map((category) => [category,
+      Object.hasOwn(categoryCriteria, category) ? categoryCriteria[category] : [{ id: "c_1", name: "", description: "", weight: 100 }],
+    ]));
     if (rubric) {
-      const rubricError = criteriaError(rubric.criteria);
+      const rubricError = categoryCriteriaError(rubrics);
       if (rubricError) return setError(rubricError);
     }
     if (!categories.length) return setError("El evento necesita al menos una categoría.");
@@ -64,9 +68,13 @@ export function EventSettingsForm({
         startDate,
         endDate,
         maxTeamSize: Math.min(15, Math.max(1, maxTeamSize)),
-        phases: { prototype: true, final: false },
-        phaseDetails: { prototype: { name: "Entrega", description: "" } },
+        phases: initial?.phases ?? { prototype: true, final: false },
+        phaseDetails: initial ? {
+          prototype: getPhaseDetails(initial, "prototype"),
+          final: getPhaseDetails(initial, "final"),
+        } : { prototype: { name: "Entrega", description: "" } },
         categories,
+        ...(rubric ? { categoryCriteria: rubrics } : {}),
       });
     } catch {
       setError("No se pudo guardar. Revisa tu conexión o tus permisos.");
@@ -110,19 +118,6 @@ export function EventSettingsForm({
           />
         </Field>
       </div>
-
-      {rubric && (
-        <div className="space-y-3">
-          <div>
-            <h2 className="font-display text-lg font-bold">Criterios de evaluación</h2>
-            <p className="mt-1 font-mono text-xs leading-relaxed text-muted">
-              Define los criterios y sus pesos para este evento. Cada criterio se califica de 0 a 10 y el total se calcula sobre 100.
-              Después podrás ajustarlos en Rúbrica.
-            </p>
-          </div>
-          <CriteriaEditor criteria={rubric.criteria} onChange={rubric.onChange} />
-        </div>
-      )}
 
       <div className="space-y-2.5">
         <div className="flex items-center justify-between gap-2">
@@ -177,6 +172,17 @@ export function EventSettingsForm({
           </Button>
         </div>
       </div>
+
+      {rubric && (
+        <div className="space-y-3">
+          <h2 className="font-display text-lg font-bold">Criterios por categoría</h2>
+          <p className="font-mono text-xs leading-relaxed text-muted">
+            Selecciona cada categoría y define sus criterios y pesos. Cada criterio se califica de 0 a 10 y el total se calcula sobre 100.
+          </p>
+          <CategoryCriteriaEditor categories={categories} rubrics={categoryCriteria}
+            onChange={(category, criteria) => setCategoryCriteria((prev) => ({ ...prev, [category]: criteria }))} />
+        </div>
+      )}
 
       {error && (
         <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 font-mono text-[11px] text-red-700">

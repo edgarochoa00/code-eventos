@@ -1,7 +1,7 @@
 // Casos de uso integrales por rol, lógica de negocio, evaluación y originalidad (sin conectar a la nube).
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { criteriaError, deliverySettingsError, getPhaseDetails, getPhaseLabel } from "../lib/event-config";
+import { categoryCriteriaError, criteriaError, deliverySettingsError, evaluationScoresError, getCategoryCriteria, getPhaseDetails, getPhaseLabel } from "../lib/event-config";
 import {
   analysisState,
   buildFingerprint,
@@ -13,6 +13,7 @@ import {
   sha256Text,
   tokenize,
 } from "../lib/similarity";
+import { computeStandings, resultRubricColumns } from "../lib/results";
 import { MAX_FILE_BYTES, MAX_SUBMISSION_FILES, validateSubmissionFiles } from "../lib/submission-files";
 import { DEFAULT_ORIGINALITY, SUPERADMIN_EMAIL, type Criterion, type EvaluationDoc, type EventDoc, type FileItem, type ProjectDoc } from "../lib/types";
 import {
@@ -451,4 +452,96 @@ describe("Casos de uso · Validación de entregas multi-archivo y utilidades", (
     assert.equal(safeUrl("github.com/org/repo"), "https://github.com/org/repo");
     assert.equal(safeUrl("javascript:alert(1)"), "");
   });
+});
+
+
+describe("Rúbricas distintas dentro del mismo evento", () => {
+  const visual: Criterion[] = [
+    { id: "contenido", name: "Contenido del cartel", description: "", weight: 30 },
+    { id: "diseno", name: "Diseño visual", description: "", weight: 70 },
+  ];
+  const funcional: Criterion[] = [
+    { id: "contenido", name: "Funcionamiento", description: "", weight: 80 },
+    { id: "prueba", name: "Pruebas", description: "", weight: 20 },
+  ];
+  const event: EventDoc = { ...baseEvent, categories: ["Carteles", "Prototipos"], categoryCriteria: { Carteles: visual, Prototipos: funcional } };
+  const projects = [makeProject({ id: "cartel", category: "Carteles" }), makeProject({ id: "proto", category: "Prototipos" })];
+  const evaluation = (id: string, projectId: string, scores: Record<string, number>, phase: "prototype" | "final" = "prototype"): EvaluationDoc => ({
+    id, projectId, eventId: event.id, phase, judgeId: id, judgeEmail: `${id}@tec.mx`, judgeName: id,
+    scores, total: 1, comment: `Comentario ${id}`, updatedAt: null,
+  });
+  const evaluations = [
+    evaluation("j1", "cartel", { contenido: 10, diseno: 5 }),
+    evaluation("j2", "cartel", { contenido: 8, diseno: 7 }),
+    evaluation("j3", "proto", { contenido: 10, prueba: 5 }),
+    evaluation("j4", "cartel", { contenido: 6, diseno: 6 }, "final"),
+  ];
+
+  test("la categoría selecciona exclusivamente su rúbrica, incluso con ids de criterio compartidos", () => {
+    assert.deepEqual(getCategoryCriteria(event, "Carteles"), visual);
+    assert.deepEqual(getCategoryCriteria(event, "Prototipos"), funcional);
+    assert.equal(weightedTotal(getCategoryCriteria(event, "Carteles"), { contenido: 10, diseno: 5 }), 65);
+    assert.equal(weightedTotal(getCategoryCriteria(event, "Prototipos"), { contenido: 10, prueba: 5 }), 90);
+  });
+
+  test("la rúbrica general conserva eventos antiguos y categorías aún sin personalizar", () => {
+    assert.deepEqual(getCategoryCriteria(baseEvent, "Software"), baseEvent.criteria);
+    assert.deepEqual(getCategoryCriteria(event, "Nueva"), baseEvent.criteria);
+    assert.deepEqual(getCategoryCriteria(event, "toString"), baseEvent.criteria);
+    assert.deepEqual(getCategoryCriteria({ ...event, categoryCriteria: { "Diseño 2.0 / IoT": visual } }, "Diseño 2.0 / IoT"), visual);
+  });
+
+  test("valida cada categoría y señala cuál tiene criterios incompletos", () => {
+    assert.equal(categoryCriteriaError(event.categoryCriteria!), null);
+    assert.match(categoryCriteriaError({ Carteles: visual, Prototipos: [] })!, /Prototipos/);
+    assert.ok(categoryCriteriaError({ Carteles: [{ ...visual[0], weight: -1 }] }));
+    assert.ok(categoryCriteriaError(Object.fromEntries(Array.from({ length: 21 }, (_, i) => [`Categoría ${i}`, visual]))));
+  });
+
+  test("rechaza puntuaciones de otra rúbrica, ausentes, sobrantes o fuera de escala", () => {
+    assert.equal(evaluationScoresError(visual, { contenido: 8, diseno: 10 }), null);
+    for (const scores of [{ contenido: 8, prueba: 10 }, { contenido: 8 }, { contenido: 8, diseno: 10, extra: 5 }, { contenido: NaN, diseno: 5 }, { contenido: 11, diseno: 5 }, { contenido: -1, diseno: 5 }] as Record<string, number>[]) {
+      assert.ok(evaluationScoresError(visual, scores));
+    }
+  });
+
+  test("resultados y retroalimentación promedian los criterios de cada categoría por etapa", () => {
+    const standings = computeStandings(event, projects, evaluations);
+    assert.equal(standings.prototype[0].projectId, "proto");
+    assert.equal(standings.prototype[0].score, 90);
+    const cartel = standings.prototype[1];
+    assert.equal(cartel.score, 69);
+    assert.equal(cartel.judges, 2);
+    assert.deepEqual(cartel.criteria, { contenido: 9, diseno: 6 });
+    assert.deepEqual(cartel.comments, ["Comentario j1", "Comentario j2"]);
+    assert.equal(standings.final[0].score, 60);
+  });
+
+  test("ajustar los pesos de Carteles no modifica los puntajes de Prototipos", () => {
+    const changed = { ...event, categoryCriteria: { ...event.categoryCriteria, Carteles: visual.map((c) => ({ ...c, weight: 50 })) } };
+    const standings = computeStandings(changed, projects, evaluations);
+    assert.equal(standings.prototype.find((s) => s.projectId === "cartel")!.score, 75);
+    assert.equal(standings.prototype.find((s) => s.projectId === "proto")!.score, 90);
+    assert.deepEqual(computeStandings({ ...event, phases: { prototype: true, final: false } }, projects, evaluations).final, []);
+  });
+
+  test("CSV diferencia las columnas por categoría aunque compartan ids", () => {
+    assert.deepEqual(resultRubricColumns(event, projects).map(({ category, criterion }) => `${category}: ${criterion.name}`), [
+      "Carteles: Contenido del cartel", "Carteles: Diseño visual", "Prototipos: Funcionamiento", "Prototipos: Pruebas",
+    ]);
+  });
+});
+
+test("un alta pendiente no se asigna a jueces ni entra en resultados aunque tenga evaluaciones anteriores", () => {
+  const pending = makeProject({ registrationPending: true });
+  const active = makeProject({ id: "completed", registrationPending: false });
+  const event = { ...baseEvent, judgingOpen: true };
+  assert.equal(isProjectAssignedToJudge(event, pending, "juez1@tec.mx"), false);
+  assert.equal(isProjectAssignedToJudge(event, active, "juez1@tec.mx"), true);
+  const evaluation: EvaluationDoc = { id: "old", eventId: event.id, projectId: pending.id, phase: "prototype", judgeId: "judge",
+    judgeEmail: "juez1@tec.mx", judgeName: "Juez", scores: Object.fromEntries(event.criteria.map((criterion) => [criterion.id, 8])),
+    total: 80, comment: "Conservar fuera del ranking", updatedAt: null };
+  const results = computeStandings(event, [pending, active], [evaluation, { ...evaluation, id: "active", projectId: active.id }]);
+  assert.deepEqual(results.prototype.map((row) => row.projectId), [active.id]);
+  assert.equal(resultRubricColumns(event, [makeProject({ registrationPending: true, category: "" })]).some((column) => column.category === ""), false);
 });

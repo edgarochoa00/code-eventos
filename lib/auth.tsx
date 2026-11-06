@@ -12,7 +12,7 @@ import {
   updateProfile,
   type User,
 } from "firebase/auth";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { auth } from "./firebase";
 import { upsertUserProfile } from "./data";
 
@@ -25,6 +25,7 @@ type AuthState = {
   resetPassword: (email: string) => Promise<void>;
   resendVerification: () => Promise<void>;
   refreshUser: () => Promise<boolean>;
+  updateName: (name: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -90,10 +91,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(() => fbSignOut(auth), []);
 
-  const value = useMemo(
-    () => ({ user, loading, signInEmail, signUpEmail, signInGoogle, resetPassword, resendVerification, refreshUser, signOut }),
-    [user, loading, signInEmail, signUpEmail, signInGoogle, resetPassword, resendVerification, refreshUser, signOut],
-  );
+  const updateName = useCallback(async (name: string) => {
+    if (!auth.currentUser) throw new Error("Inicia sesión para guardar tu nombre.");
+    await updateProfile(auth.currentUser, { displayName: name.trim() });
+    await upsertUserProfile(auth.currentUser);
+    setUser(auth.currentUser);
+    setVersion((v) => v + 1);
+  }, []);
+
+  const value: AuthState = { user, loading, signInEmail, signUpEmail, signInGoogle, resetPassword, resendVerification, refreshUser, updateName, signOut };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

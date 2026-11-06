@@ -84,9 +84,10 @@ const project = {
 let superDb, org, admin, judge, stu, mate, outsider, blocked, fakeJudge;
 
 before(async () => {
+  const [host, port] = (process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:8085").split(":");
   env = await initializeTestEnvironment({
     projectId: "demo-code",
-    firestore: { rules: readFileSync("firestore.rules", "utf8"), host: "127.0.0.1", port: 8085 },
+    firestore: { rules: readFileSync("firestore.rules", "utf8"), host, port: Number(port) },
   });
   superDb = ctx("super", SUPER);
   org = ctx("org", "org@tec.mx");
@@ -359,7 +360,7 @@ describe("proyectos", () => {
     await assertSucceeds(syncTeam(org, "other", null, other.memberEmails, "e2"));
     await assertSucceeds(updateDoc(doc(superDb, "events/e2"), { judgeEmails: ["org@tec.mx"] }));
     await assertSucceeds(syncTeam(stu, "cross-event", { ...project, eventId: "e2" }, [], "e2"));
-    await assertSucceeds(updateDoc(doc(superDb, "events/e2"), { judgingOpen: true }));
+    await assertSucceeds(updateDoc(doc(superDb, "events/e2"), { judgingOpen: true, categoryLocked: true }));
     await assertSucceeds(setDoc(doc(org, "events/e2/evaluations/org_cross-event_prototype"), {
       eventId: "e2", projectId: "cross-event", phase: "prototype", judgeId: "org", judgeEmail: "org@tec.mx", judgeName: "", scores: { a: 8 }, total: 80, comment: "",
     }));
@@ -376,14 +377,14 @@ describe("proyectos", () => {
     const other = { ...project, leaderId: "out", leaderEmail: "out@tec.mx", memberEmails: ["out@tec.mx"] };
     await assertSucceeds(syncTeam(outsider, "legacy-conflict", other));
     await env.withSecurityRulesDisabled(async (c) => {
-      await updateDoc(doc(c.firestore(), "events/e1"), { judgeEmails: ["judge@tec.mx", "mate@tec.mx"], judgingOpen: true });
+      await updateDoc(doc(c.firestore(), "events/e1"), { judgeEmails: ["judge@tec.mx", "mate@tec.mx"], judgingOpen: true, categoryLocked: true });
     });
     await assertFails(getDoc(doc(mate, "events/e1/projects/legacy-conflict")));
     await assertFails(updateDoc(doc(mate, "events/e1/projects/p1"), { title: "Juez competidor" }));
     await assertFails(setDoc(doc(mate, "events/e1/evaluations/mate_legacy-conflict_prototype"), {
       eventId: "e1", projectId: "legacy-conflict", phase: "prototype", judgeId: "mate", judgeEmail: "mate@tec.mx", judgeName: "", scores: { a: 8 }, total: 80, comment: "",
     }));
-    await assertSucceeds(updateDoc(doc(org, "events/e1"), { judgeEmails: ["judge@tec.mx"], judgingOpen: false }));
+    await assertSucceeds(updateDoc(doc(org, "events/e1"), { judgeEmails: ["judge@tec.mx"], judgingOpen: false, categoryLocked: true }));
     await assertSucceeds(syncTeam(outsider, "legacy-conflict", null, other.memberEmails));
   });
 
@@ -392,6 +393,88 @@ describe("proyectos", () => {
     await assertFails(
       updateDoc(doc(org, "events/e1/projects/p1"), { feedback: { prototype: {} }, title: "Cambiado por organizador" }),
     );
+  });
+});
+
+describe("logo opcional del proyecto", () => {
+  const eventId = "logo-event";
+  const path = `events/${eventId}/projects/p1`;
+  const logo = { path: `${path}/logo/11111111-1111-4111-8111-111111111111.webp`, storage: "supabase" };
+
+  before(async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, `events/${eventId}`), { ...eventFor("org", "org@tec.mx"), judgeEmails: ["judge@tec.mx"] });
+      await setDoc(doc(db, `events/${eventId}/access/participants`), { members: { "stu@tec.mx": true, "mate@tec.mx": true }, projectId: "p1" });
+      await setDoc(doc(db, path), { ...project, eventId });
+    });
+  });
+  const changeEvent = patch => env.withSecurityRulesDisabled(context => updateDoc(doc(context.firestore(), `events/${eventId}`), patch));
+  const changeProject = patch => env.withSecurityRulesDisabled(context => updateDoc(doc(context.firestore(), path), patch));
+
+  test("el líder puede guardar y quitar su logo; integrantes y revisores no", async () => {
+    await assertSucceeds(updateDoc(doc(stu, path), { logo }));
+    for (const db of [mate, judge, org, admin, superDb, outsider]) {
+      await assertFails(updateDoc(doc(db, path), { logo: null }));
+    }
+    await assertSucceeds(getDoc(doc(mate, path)));
+    await assertSucceeds(getDoc(doc(judge, path)));
+    await assertSucceeds(getDoc(doc(org, path)));
+    await assertSucceeds(updateDoc(doc(stu, path), { logo: null }));
+  });
+  test("rechaza rutas de otro proyecto, URLs públicas y metadatos adicionales", async () => {
+    for (const value of [
+      { ...logo, path: logo.path.replace("projects/p1", "projects/p2") },
+      { ...logo, path: "https://example.test/logo.png" },
+      { ...logo, path: logo.path.replace(".webp", ".svg") },
+      { ...logo, url: "https://example.test" },
+      { ...logo, storage: "firebase" },
+    ]) await assertFails(updateDoc(doc(stu, path), { logo: value }));
+  });
+  test("el guardado REST del servidor respeta permisos y rechaza una versión desactualizada", async () => {
+    // Token sin firma exclusivo del emulador, equivalente al contexto stu de estas pruebas.
+    const base64 = value => Buffer.from(JSON.stringify(value)).toString("base64url");
+    const token = `${base64({ alg: "none", typ: "JWT" })}.${base64({
+      aud: "demo-code", iss: "https://securetoken.google.com/demo-code", sub: "stu", user_id: "stu",
+      email: "stu@tec.mx", email_verified: true, iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 3600, firebase: { sign_in_provider: "custom", identities: {} },
+    })}.`;
+    const database = "projects/demo-code/databases/(default)/documents";
+    const origin = `http://${process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:8085"}/v1`;
+    const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+    const snapshot = await fetch(`${origin}/${database}/${path}`, { headers }).then(response => response.json());
+    const write = {
+      update: { name: `${database}/${path}`, fields: { logo: { mapValue: { fields: {
+        path: { stringValue: logo.path }, storage: { stringValue: "supabase" },
+      } } } } }, updateMask: { fieldPaths: ["logo"] }, currentDocument: { updateTime: snapshot.updateTime },
+      updateTransforms: [{ fieldPath: "updatedAt", setToServerValue: "REQUEST_TIME" }],
+    };
+    const commit = () => fetch(`${origin}/${database}:commit`, { method: "POST", headers, body: JSON.stringify({ writes: [write] }) });
+    assert.equal((await commit()).status, 200);
+    const stale = await commit();
+    assert.ok([400, 409, 412].includes(stale.status), `No se rechazó la versión anterior: ${stale.status}`);
+    await assertSucceeds(updateDoc(doc(stu, path), { logo: null }));
+  });
+  test("con entregas abiertas el líder puede cambiar el logo aunque el registro esté cerrado", async () => {
+    await changeEvent({ registrationOpen: false, submissions: { prototype: true, final: false } });
+    await assertSucceeds(updateDoc(doc(stu, path), { logo }));
+  });
+  test("con todo cerrado o con resultados publicados el logo no cambia", async () => {
+    await changeEvent({ registrationOpen: false, submissions: { prototype: false, final: false } });
+    await assertFails(updateDoc(doc(stu, path), { logo: null }));
+    await changeEvent({ registrationOpen: true, resultsPublished: true });
+    await assertFails(updateDoc(doc(stu, path), { logo: null }));
+    await changeEvent({ resultsPublished: false });
+  });
+  test("un registro pendiente no permite agregar logo aunque complete el formulario en la misma escritura", async () => {
+    await changeProject({ registrationPending: true });
+    await assertFails(updateDoc(doc(stu, path), { logo: null }));
+    await assertFails(updateDoc(doc(stu, path), {
+      logo: null, registrationPending: false, title: "Mi marca escolar", summary: "Resumen con suficientes caracteres",
+      problem: "Problema con suficientes caracteres", solution: "Solución con suficientes caracteres",
+      members: [{ email: "stu@tec.mx", name: "Alumno líder" }, { email: "mate@tec.mx", name: "Alumno integrante" }],
+    }));
+    await changeProject({ registrationPending: false });
   });
 });
 
@@ -410,7 +493,7 @@ describe("evaluaciones", () => {
 
   test("el juez solo califica con la evaluación abierta", async () => {
     await assertFails(setDoc(doc(judge, "events/e1/evaluations/judge_p1_prototype"), evalDoc));
-    await updateDoc(doc(org, "events/e1"), { judgingOpen: true });
+    await updateDoc(doc(org, "events/e1"), { judgingOpen: true, categoryLocked: true });
     await assertSucceeds(setDoc(doc(judge, "events/e1/evaluations/judge_p1_prototype"), evalDoc));
   });
 
@@ -438,6 +521,36 @@ describe("evaluaciones", () => {
     await assertSucceeds(updateDoc(doc(org, "events/e1"), { phases: { prototype: true, final: false } }));
     await assertFails(setDoc(doc(judge, "events/e1/evaluations/judge_p1_final"), { ...evalDoc, phase: "final" }));
     await assertSucceeds(updateDoc(doc(org, "events/e1"), { phases: { prototype: true, final: true } }));
+  });
+
+  test("máximo por proyecto, selección exclusiva y permisos de configuración", async () => {
+    const projectRef = doc(org, "events/e1/projects/p1");
+    const changeEvent = patch => env.withSecurityRulesDisabled(c => updateDoc(doc(c.firestore(), "events/e1"), patch));
+    const judging = { maxJudges: 1, judgeEmails: ["judge@tec.mx"] };
+    try {
+      await assertSucceeds(updateDoc(doc(org, "events/e1"), { judgeEmails: ["judge@tec.mx", "out@tec.mx"] }));
+      await assertSucceeds(updateDoc(projectRef, { judging }));
+      for (const invalid of [
+        { maxJudges: 0, judgeEmails: [] }, { maxJudges: 1.5, judgeEmails: [] },
+        { maxJudges: 1, judgeEmails: ["judge@tec.mx", "out@tec.mx"] },
+        { maxJudges: 2, judgeEmails: ["judge@tec.mx", "judge@tec.mx"] },
+        { maxJudges: 1, judgeEmails: ["unknown@tec.mx"] },
+        { maxJudges: 1, judgeEmails: ["stu@tec.mx"] },
+      ]) await assertFails(updateDoc(projectRef, { judging: invalid }));
+      await assertFails(updateDoc(doc(stu, "events/e1/projects/p1"), { judging: { maxJudges: 2, judgeEmails: [] } }));
+      await assertFails(updateDoc(doc(judge, "events/e1/projects/p1"), { judging: { maxJudges: 2, judgeEmails: [] } }));
+      await assertFails(updateDoc(projectRef, { judging, title: "Cambio de contenido no permitido" }));
+      await assertSucceeds(setDoc(doc(judge, "events/e1/evaluations/judge_p1_prototype"), evalDoc));
+      await assertFails(setDoc(doc(outsider, "events/e1/evaluations/out_p1_prototype"), { ...evalDoc, judgeId: "out", judgeEmail: "out@tec.mx" }));
+      // Ni siquiera la asignación general del juez vuelve a darle permiso.
+      await assertSucceeds(updateDoc(projectRef, { judging: { maxJudges: 1, judgeEmails: [] } }));
+      await assertFails(setDoc(doc(judge, "events/e1/evaluations/judge_p1_prototype"), evalDoc));
+      await changeEvent({ resultsPublished: true });
+      await assertFails(updateDoc(projectRef, { judging }));
+    } finally {
+      await changeEvent({ resultsPublished: false, judgeEmails: ["judge@tec.mx"] });
+      await env.withSecurityRulesDisabled(async c => updateDoc(doc(c.firestore(), "events/e1/projects/p1"), { judging: deleteField() }));
+    }
   });
 
   test("un admin o superadmin en una lista antigua de jueces no califica", async () => {
@@ -558,5 +671,155 @@ describe("huellas anti-plagio", () => {
   test("se leen con cuenta verificada y nunca se borran", async () => {
     await assertSucceeds(getDocs(collection(outsider, "fingerprints")));
     await assertFails(deleteDoc(doc(superDb, "fingerprints/p1")));
+  });
+});
+
+describe("rúbricas por categoría", () => {
+  const cartelCriteria = [{ id: "diseno", name: "Diseño visual", description: "", weight: 100 }];
+  const prototypeCriteria = [{ id: "funcionamiento", name: "Funcionamiento", description: "", weight: 100 }];
+  const eid = "rubricas-categorias";
+  const scoreDoc = (projectId, scores) => ({
+    eventId: eid, projectId, phase: "prototype", judgeId: "judge", judgeEmail: "judge@tec.mx", judgeName: "Juez",
+    scores, total: 80, comment: "",
+  });
+
+  test("un evento guarda dos categorías con sus criterios independientes", async () => {
+    const data = { ...eventFor("org", "org@tec.mx"), categories: ["Carteles", "Prototipos"], categoryCriteria: { Carteles: cartelCriteria, Prototipos: prototypeCriteria } };
+    await assertSucceeds(createEvent(org, eid, data));
+    await env.withSecurityRulesDisabled(async (c) => {
+      const db = c.firestore();
+      await setDoc(doc(db, `events/${eid}/projects/cartel`), { ...project, eventId: eid, category: "Carteles" });
+      await setDoc(doc(db, `events/${eid}/projects/proto`), { ...project, eventId: eid, category: "Prototipos" });
+    });
+    await assertSucceeds(updateDoc(doc(org, `events/${eid}`), { judgeEmails: ["judge@tec.mx"], judgingOpen: true, categoryLocked: true }));
+    const saved = (await getDoc(doc(judge, `events/${eid}`))).data();
+    assert.deepEqual(saved.categoryCriteria.Carteles, cartelCriteria);
+    assert.deepEqual(saved.categoryCriteria.Prototipos, prototypeCriteria);
+  });
+
+  test("cada proyecto acepta únicamente los criterios de su categoría", async () => {
+    const ref = doc(judge, `events/${eid}/evaluations/judge_cartel_prototype`);
+    await assertSucceeds(setDoc(ref, scoreDoc("cartel", { diseno: 8 })));
+    await assertFails(setDoc(ref, scoreDoc("cartel", { funcionamiento: 8 })));
+    await assertSucceeds(setDoc(doc(judge, `events/${eid}/evaluations/judge_proto_prototype`), scoreDoc("proto", { funcionamiento: 8 })));
+  });
+
+  test("rechaza criterios vacíos, sobrantes, ausentes o fuera de escala", async () => {
+    const ref = doc(judge, `events/${eid}/evaluations/judge_cartel_prototype`);
+    for (const scores of [{}, { diseno: 8, funcionamiento: 5 }, { diseno: -1 }, { diseno: 11 }, { diseno: "8" }]) {
+      await assertFails(setDoc(ref, scoreDoc("cartel", scores)));
+    }
+  });
+
+  test("solo organizadores editan rúbricas y los nombres con puntos no crean rutas", async () => {
+    const ref = doc(org, `events/${eid}`);
+    await assertFails(updateDoc(doc(judge, `events/${eid}`), { categoryCriteria: { Carteles: prototypeCriteria } }));
+    await assertSucceeds(updateDoc(ref, new FieldPath("categoryCriteria", "Diseño 2.0 / IoT"), cartelCriteria));
+    const saved = (await getDoc(ref)).data();
+    assert.deepEqual(saved.categoryCriteria["Diseño 2.0 / IoT"], cartelCriteria);
+    assert.deepEqual(saved.categoryCriteria.Prototipos, prototypeCriteria);
+    await assertFails(updateDoc(ref, new FieldPath("categoryCriteria", "Carteles"), []));
+    await assertFails(updateDoc(ref, { categoryCriteria: [] }));
+  });
+
+  test("sin rúbrica personalizada una categoría conserva la general", async () => {
+    await env.withSecurityRulesDisabled(async (c) => {
+      await setDoc(doc(c.firestore(), `events/${eid}/projects/legacy`), { ...project, eventId: eid, category: "Sin personalizar" });
+    });
+    await assertSucceeds(setDoc(doc(judge, `events/${eid}/evaluations/judge_legacy_prototype`), scoreDoc("legacy", { a: 8 })));
+  });
+
+  test("la categoría no se cambia después de iniciar la evaluación, incluso al cerrarla", async () => {
+    const ref = doc(stu, `events/${eid}/projects/cartel`);
+    await assertFails(updateDoc(ref, { category: "Prototipos" }));
+    await assertSucceeds(updateDoc(doc(org, `events/${eid}`), { judgingOpen: false }));
+    await assertFails(updateDoc(ref, { category: "Prototipos" }));
+    await assertFails(updateDoc(doc(org, `events/${eid}`), { categoryLocked: false }));
+    await assertSucceeds(updateDoc(ref, { title: "Cartel corregido" }));
+  });
+
+  test("admite el máximo de 20 categorías y 20 criterios por rúbrica", async () => {
+    const categories = Array.from({ length: 20 }, (_, i) => `Categoría ${i}`);
+    const fullCriteria = Array.from({ length: 20 }, (_, i) => ({ id: `c${i}`, name: `Criterio ${i}`, description: "", weight: 5 }));
+    await assertSucceeds(createEvent(org, "rubricas-maximo", {
+      ...eventFor("org", "org@tec.mx"), categories,
+      categoryCriteria: Object.fromEntries(categories.map((category) => [category, fullCriteria])),
+    }));
+    await assertSucceeds(updateDoc(doc(org, "events/rubricas-maximo"), new FieldPath("categoryCriteria", categories[0]), fullCriteria.map((c) => ({ ...c, name: `Actualizado ${c.id}` }))));
+    await env.withSecurityRulesDisabled(async (c) => {
+      await setDoc(doc(c.firestore(), "events/rubricas-maximo/projects/pmax"), { ...project, eventId: "rubricas-maximo", category: categories[19] });
+    });
+    await assertSucceeds(updateDoc(doc(org, "events/rubricas-maximo"), { judgeEmails: ["judge@tec.mx"], judgingOpen: true, categoryLocked: true }));
+    await assertSucceeds(setDoc(doc(judge, "events/rubricas-maximo/evaluations/judge_pmax_prototype"), {
+      ...scoreDoc("pmax", Object.fromEntries(fullCriteria.map((c) => [c.id, 8]))), eventId: "rubricas-maximo",
+    }));
+  });
+});
+
+describe("alta por correo y formulario inicial del líder", () => {
+  const pendingProject = { ...project, title: "", summary: "", problem: "", solution: "", category: "",
+    registrationPending: true, members: [{ name: "", email: "stu@tec.mx" }], memberEmails: ["stu@tec.mx"] };
+  const completed = { registrationPending: false, title: "Proyecto del alumno", category: "Software",
+    summary: "Resumen completo del proyecto escolar", problem: "Problema que atiende el proyecto escolar",
+    solution: "Solución que propone el alumno líder", members: [{ name: "Alumno Líder", email: "stu@tec.mx" }], memberEmails: ["stu@tec.mx"] };
+  async function seedPending(id, patch = {}) {
+    await env.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, `events/${id}`), { ...eventFor("org", "org@tec.mx"), judgeEmails: ["judge@tec.mx"],
+        registrationOpen: false, submissions: { prototype: false, final: false }, categories: ["Software", "Hardware"], ...patch });
+      await setDoc(doc(db, `events/${id}/projects/pending`), { ...pendingProject, eventId: id });
+      await setDoc(doc(db, `events/${id}/access/participants`), { members: { "stu@tec.mx": true }, projectId: "pending" });
+    });
+  }
+  test("el líder ve su alta en Mis proyectos y completa el formulario con registro público cerrado", async () => {
+    const id = "pending-completion";
+    await seedPending(id);
+    const mine = await assertSucceeds(getDocs(query(collectionGroup(stu, "projects"), where("memberEmails", "array-contains", "stu@tec.mx"))));
+    assert.ok(mine.docs.some((snapshot) => snapshot.ref.path === `events/${id}/projects/pending`));
+    const data = { ...completed, members: [...completed.members, { name: "Alumna Integrante", email: "mate@tec.mx" }], memberEmails: ["stu@tec.mx", "mate@tec.mx"] };
+    await assertSucceeds(syncTeam(stu, "pending", data, ["stu@tec.mx"], id));
+    await assertSucceeds(getDoc(doc(mate, `events/${id}/projects/pending`)));
+    const roster = await getDoc(doc(org, `events/${id}/access/participants`));
+    assert.deepEqual(roster.data().members, { "stu@tec.mx": true, "mate@tec.mx": true });
+  });
+  test("ni organizador ni otro alumno completan el formulario del líder", async () => {
+    const id = "pending-owner";
+    await seedPending(id);
+    for (const actor of [org, admin, mate, outsider]) {
+      await assertFails(updateDoc(doc(actor, `events/${id}/projects/pending`), completed));
+    }
+  });
+  test("no se omite el formulario, nombre del líder, categoría ni descripciones", async () => {
+    const id = "pending-required";
+    await seedPending(id);
+    const ref = doc(stu, `events/${id}/projects/pending`);
+    for (const patch of [{ registrationPending: false }, { ...completed, summary: "" }, { ...completed, problem: "" },
+      { ...completed, solution: "" }, { ...completed, category: "Ajena" },
+      { ...completed, members: [{ name: "", email: "stu@tec.mx" }] }, { ...completed, registrationPending: true }]) {
+      await assertFails(updateDoc(ref, patch));
+    }
+  });
+  test("el líder no puede autoasignarse el alta pendiente para saltarse el cierre de registro", async () => {
+    const id = "pending-forged";
+    await seedPending(id);
+    await assertFails(syncTeam(outsider, "forged", { ...pendingProject, eventId: id,
+      leaderId: "out", leaderEmail: "out@tec.mx", memberEmails: ["out@tec.mx"] }, [], id));
+    await assertSucceeds(updateDoc(doc(stu, `events/${id}/projects/pending`), completed));
+    await assertFails(updateDoc(doc(stu, `events/${id}/projects/pending`), { registrationPending: true }));
+  });
+  test("no admite entregas ni evaluaciones de un registro pendiente", async () => {
+    const id = "pending-evaluation";
+    await seedPending(id, { judgingOpen: true, submissions: { prototype: true, final: true } });
+    await assertFails(updateDoc(doc(stu, `events/${id}/projects/pending`), { prototype: { description: "Entrega prematura", files: [], links: [] } }));
+    await assertFails(updateDoc(doc(stu, `events/${id}/projects/pending`), { ...completed, prototype: { description: "No junto con el registro" } }));
+    await assertFails(setDoc(doc(judge, `events/${id}/evaluations/judge_pending_prototype`), {
+      eventId: id, projectId: "pending", phase: "prototype", judgeId: "judge", judgeEmail: "judge@tec.mx", scores: { a: 8 }, total: 80, comment: "" }));
+  });
+  test("el formulario inicial respeta categoría bloqueada y resultados publicados", async () => {
+    for (const [suffix, patch] of Object.entries({ locked: { categoryLocked: true }, published: { resultsPublished: true } })) {
+      const id = `pending-${suffix}`;
+      await seedPending(id, patch);
+      await assertFails(updateDoc(doc(stu, `events/${id}/projects/pending`), completed));
+    }
   });
 });

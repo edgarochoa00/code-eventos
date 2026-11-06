@@ -163,8 +163,8 @@ function VerifyEmail() {
         </div>
         <h1 className="font-display text-2xl font-bold">Verifica tu correo</h1>
         <p className="mt-2 font-mono text-xs leading-relaxed text-muted">
-          Enviamos un enlace a tu correo. Lo pedimos para que nadie pueda
-          hacerse pasar por un juez o por un integrante de tu equipo. Revisa también spam.
+          Confirma que este correo es tuyo para entrar con tu rol. Si aún no tienes
+          un enlace de verificación, puedes enviarlo con el botón de abajo. Revisa también spam.
         </p>
         <div className="mt-6 grid gap-2">
           <Button
@@ -185,14 +185,14 @@ function VerifyEmail() {
               setBusy("send");
               try {
                 await resendVerification();
-                toast("Correo reenviado.");
+                toast("Correo de verificación enviado.");
               } catch {
                 toast("Espera un momento antes de reenviar.", "error");
               }
               setBusy(null);
             }}
           >
-            Reenviar correo
+            Enviar o reenviar verificación
           </Button>
         </div>
       </Card>

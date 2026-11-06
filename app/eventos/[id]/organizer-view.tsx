@@ -20,9 +20,13 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { CriteriaEditor } from "@/components/criteria-editor";
+import { JudgingControl } from "@/components/judging-agenda";
+import { ProjectJudgeAssignments } from "@/components/project-judge-assignment";
+import { scheduleLabel, scheduleError } from "@/lib/judging-agenda";
+import { CategoryCriteriaEditor } from "@/components/category-criteria-editor";
 import { EmailListEditor } from "@/components/email-list-editor";
 import { EventSettingsForm } from "@/components/event-settings-form";
+import { TeamEnrollmentButton } from "@/components/team-enrollment";
 import { Leaderboard } from "@/components/leaderboard";
 import { SimilarityBadge, SubmissionBadges } from "@/components/project-bits";
 import {
@@ -51,13 +55,15 @@ import {
   generateUniqueEventCode,
   projectsCol,
   publishResults,
-  saveCriteria,
+  saveCategoryCriteria,
   saveEventEmails,
+  saveJudgeAssignment,
   unpublishResults,
   updateEvent,
 } from "@/lib/data";
 import { useCollection, useFingerprints } from "@/lib/hooks";
-import { criteriaError, getPhaseLabel } from "@/lib/event-config";
+import { resultRubricColumns } from "@/lib/results";
+import { criteriaError, getCategoryCriteria, getPhaseLabel } from "@/lib/event-config";
 import { analysisState, findMatches, type AnalysisState } from "@/lib/similarity";
 import {
   PHASES,
@@ -85,7 +91,7 @@ import {
   todayISO,
 } from "@/lib/utils";
 
-type Tab = "summary" | "projects" | "judges" | "rubric" | "results" | "settings";
+type Tab = "summary" | "projects" | "judges" | "statistics" | "rubric" | "results" | "settings";
 
 export function OrganizerView({ event }: { event: EventDoc }) {
   const [tab, setTab] = useState<Tab>("summary");
@@ -115,6 +121,7 @@ export function OrganizerView({ event }: { event: EventDoc }) {
           { id: "summary", label: "Resumen" },
           { id: "projects", label: "Proyectos", count: projects.data.length },
           { id: "judges", label: "Jueces", count: event.judgeEmails.length },
+          { id: "statistics", label: "Estadísticas" },
           { id: "rubric", label: "Rúbrica" },
           { id: "results", label: "Resultados" },
           { id: "settings", label: "Ajustes" },
@@ -125,7 +132,7 @@ export function OrganizerView({ event }: { event: EventDoc }) {
       {(projects.error || evaluations.error) && <ErrorNote code={projects.error ?? evaluations.error ?? ""} />}
 
       {tab === "summary" && (
-        <Summary event={event} projects={projects.data} evaluations={evaluations.data} analysis={analysis} onGo={setTab} />
+        <Summary event={event} projects={projects.data} analysis={analysis} onGo={setTab} />
       )}
       {tab === "projects" && (
         <ProjectsTab
@@ -136,8 +143,9 @@ export function OrganizerView({ event }: { event: EventDoc }) {
           onReload={fingerprints.reload}
         />
       )}
-      {tab === "judges" && <JudgesTab event={event} evaluations={evaluations.data} projects={projects.data} />}
-      {tab === "rubric" && <RubricTab event={event} hasEvaluations={evaluations.data.length > 0} />}
+      {tab === "judges" && <JudgesTab event={event} projects={projects.data.filter((p) => !p.registrationPending)} />}
+      {tab === "statistics" && <JudgingControl event={event} projects={projects.data} evaluations={evaluations.data} />}
+      {tab === "rubric" && <RubricTab event={event} projects={projects.data} hasEvaluations={evaluations.data.length > 0} />}
       {tab === "results" && <ResultsTab event={event} projects={projects.data} evaluations={evaluations.data} />}
       {tab === "settings" && <SettingsTab event={event} />}
     </div>
@@ -149,27 +157,16 @@ export function OrganizerView({ event }: { event: EventDoc }) {
 function Summary({
   event,
   projects,
-  evaluations,
   analysis,
   onGo,
 }: {
   event: EventDoc;
   projects: ProjectDoc[];
-  evaluations: EvaluationDoc[];
   analysis: Analysis;
   onGo: (t: Tab) => void;
 }) {
   const toast = useToast();
   const phases = PHASES.filter((p) => event.phases[p]);
-  const expected = event.judgeEmails.reduce(
-    (sum, email) =>
-      sum +
-      phases.reduce(
-        (s, ph) => s + projects.filter((p) => p[ph] && isProjectAssignedToJudge(event, p, email)).length,
-        0,
-      ),
-    0,
-  );
 
   async function toggle(patch: Partial<EventDoc>) {
     try {
@@ -188,7 +185,6 @@ function Summary({
         value: projects.filter((p) => p[ph]).length,
       };
     }),
-    { label: "Evaluaciones", value: `${evaluations.length}${expected ? `/${expected}` : ""}` },
   ];
 
   return (
@@ -460,7 +456,7 @@ function ProjectsTab({
     const rows = sorted.map((p) => {
       const evs = evaluations.filter((e) => e.projectId === p.id);
       const avg = evs.length
-        ? (evs.reduce((s, e) => s + effectiveEvaluationTotal(event.criteria, e), 0) / evs.length).toFixed(1)
+        ? (evs.reduce((s, e) => s + effectiveEvaluationTotal(getCategoryCriteria(event, p.category), e), 0) / evs.length).toFixed(1)
         : "";
       const match = topMatch.get(p.id);
       const leaderName = p.members.find((m) => m.email === p.leaderEmail)?.name ?? "";
@@ -483,15 +479,6 @@ function ProjectsTab({
     downloadCsv(`proyectos_${event.code}.csv`, headers, rows);
   }
 
-  if (!projects.length) {
-    return (
-      <EmptyState
-        icon={<Users className="size-5" />}
-        title="Aún no hay proyectos"
-        text={`Comparte el código ${event.code} con los alumnos para que registren su proyecto.`}
-      />
-    );
-  }
 
   return (
     <div className="space-y-4">
@@ -505,6 +492,7 @@ function ProjectsTab({
           onChange={setSort}
         />
         <div className="flex flex-wrap gap-2">
+          <TeamEnrollmentButton event={event} />
           <Button variant="outline" size="sm" onClick={exportProjectsCsv}>
             <Download className="size-3.5" /> Exportar CSV
           </Button>
@@ -561,7 +549,7 @@ function ProjectsTab({
         <ul className="space-y-3">
           {sorted.map((p) => {
             const evs = evaluations.filter((e) => e.projectId === p.id);
-            const avg = evs.length ? evs.reduce((s, e) => s + effectiveEvaluationTotal(event.criteria, e), 0) / evs.length : null;
+            const avg = evs.length ? evs.reduce((s, e) => s + effectiveEvaluationTotal(getCategoryCriteria(event, p.category), e), 0) / evs.length : null;
             const match = topMatch.get(p.id);
             return (
               <li key={p.id}>
@@ -571,7 +559,8 @@ function ProjectsTab({
                 >
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-display text-lg font-bold">{p.title}</h3>
+                      <h3 className="font-display text-lg font-bold">{p.title || displayEmail(p.leaderEmail)}</h3>
+                      {p.registrationPending && <Badge>Registro pendiente del líder</Badge>}
                       {p.category && <Badge>{p.category}</Badge>}
                     </div>
                     <p className="mt-0.5 font-mono text-[11px] text-muted">
@@ -597,7 +586,9 @@ function ProjectsTab({
           })}
         </ul>
       ) : (
-        <EmptyState title="Sin coincidencias" text="Prueba con otra búsqueda o cambia los filtros." />
+        <EmptyState icon={!projects.length ? <Users className="size-5" /> : undefined}
+          title={projects.length ? "Sin coincidencias" : "Aún no hay proyectos"}
+          text={projects.length ? "Prueba con otra búsqueda o cambia los filtros." : "Da de alta el correo del alumno líder. Él completará su proyecto y agregará a sus integrantes al entrar."} />
       )}
     </div>
   );
@@ -605,9 +596,8 @@ function ProjectsTab({
 
 /* ---------- Jueces y organizadores ---------- */
 
-function JudgesTab({ event, evaluations, projects }: { event: EventDoc; evaluations: EvaluationDoc[]; projects: ProjectDoc[] }) {
+function JudgesTab({ event, projects }: { event: EventDoc; projects: ProjectDoc[] }) {
   const toast = useToast();
-  const phases = PHASES.filter((p) => event.phases[p]);
   const ownerEmail = event.ownerEmail;
   const [editingJudge, setEditingJudge] = useState<string | null>(null);
 
@@ -617,10 +607,6 @@ function JudgesTab({ event, evaluations, projects }: { event: EventDoc; evaluati
     return Array.from(set);
   }, [event, projects]);
 
-  function judgeTasksCount(email: string) {
-    const assigned = projects.filter((p) => isProjectAssignedToJudge(event, p, email));
-    return phases.reduce((s, ph) => s + assigned.filter((p) => p[ph]).length, 0);
-  }
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[repeat(2,minmax(0,1fr))]">
@@ -628,26 +614,26 @@ function JudgesTab({ event, evaluations, projects }: { event: EventDoc; evaluati
         title="Jueces"
         subtitle="Califican sus proyectos asignados. No pueden organizar ni formar parte de un equipo de este evento."
         emails={event.judgeEmails}
+        invitation={{ kind: "event", eventId: event.id, role: "judge" }}
         onSave={(judgeEmails) => saveEventEmails(event, "judgeEmails", judgeEmails)}
-        progress={(email) => {
-          const n = evaluations.filter((e) => e.judgeEmail === email).length;
-          const conflict = event.organizerEmails.includes(email) ? " · debe quitarse de jueces: ya organiza" : "";
-          return `${n}/${judgeTasksCount(email)} evaluaciones${conflict}`;
-        }}
+
       />
       <EmailListEditor
         title="Organizadores"
         subtitle="Administran el evento. No pueden calificar ni concursar en él."
         emails={event.organizerEmails}
+        invitation={{ kind: "event", eventId: event.id, role: "organizer" }}
         locked={[ownerEmail]}
         onSave={(organizerEmails) => saveEventEmails(event, "organizerEmails", organizerEmails)}
       />
 
+      <ProjectJudgeAssignments event={event} projects={projects} />
+
       {event.judgeEmails.length > 0 && (
         <Card className="lg:col-span-2">
           <SectionTitle
-            title="Asignación de jueces"
-            subtitle="Por defecto cada juez evalúa todos los proyectos. Puedes limitar a un juez por categorías o proyectos específicos."
+            title="Agenda por juez"
+            subtitle="Programa horarios y revisa la carga de cada juez. En proyectos con máximo definido se respeta la selección de «Asignación por proyecto»; los demás conservan la asignación general."
           />
           <ul className="divide-y divide-line">
             {event.judgeEmails.map((email) => {
@@ -661,7 +647,7 @@ function JudgesTab({ event, evaluations, projects }: { event: EventDoc; evaluati
                     <p className="truncate font-mono text-xs font-medium">{displayEmail(key)}</p>
                     <div className="mt-1 flex flex-wrap gap-1.5">
                       {!hasCustom ? (
-                        <Badge>Todos los proyectos ({projects.length})</Badge>
+                        <Badge>{assignedCount} proyecto(s) asignado(s)</Badge>
                       ) : (
                         <>
                           <Badge tone="lime">{assignedCount} proyecto(s) asignado(s)</Badge>
@@ -676,7 +662,7 @@ function JudgesTab({ event, evaluations, projects }: { event: EventDoc; evaluati
                     </div>
                   </div>
                   <Button variant="outline" size="sm" onClick={() => setEditingJudge(key)}>
-                    <SlidersHorizontal className="size-3.5" /> Asignar
+                    <SlidersHorizontal className="size-3.5" /> Asignación y horario
                   </Button>
                 </li>
               );
@@ -696,6 +682,7 @@ function JudgesTab({ event, evaluations, projects }: { event: EventDoc; evaluati
       <Modal open={!!editingJudge} onClose={() => setEditingJudge(null)} title="Asignar proyectos a juez">
         {editingJudge && (
           <JudgeAssignmentModal
+            event={event}
             judgeEmail={editingJudge}
             categories={categories}
             projects={projects}
@@ -703,13 +690,7 @@ function JudgesTab({ event, evaluations, projects }: { event: EventDoc; evaluati
             onClose={() => setEditingJudge(null)}
             onSave={async (assignment) => {
               try {
-                const next = { ...(event.judgeAssignments ?? {}) };
-                if (!assignment.categories?.length && !assignment.projectIds?.length) {
-                  delete next[editingJudge];
-                } else {
-                  next[editingJudge] = assignment;
-                }
-                await updateEvent(event.id, { judgeAssignments: next });
+                await saveJudgeAssignment(event.id, editingJudge, assignment);
                 toast("Asignación guardada.");
                 setEditingJudge(null);
               } catch (err) {
@@ -724,6 +705,7 @@ function JudgesTab({ event, evaluations, projects }: { event: EventDoc; evaluati
 }
 
 function JudgeAssignmentModal({
+  event,
   judgeEmail,
   categories,
   projects,
@@ -731,6 +713,7 @@ function JudgeAssignmentModal({
   onSave,
   onClose,
 }: {
+  event: EventDoc;
   judgeEmail: string;
   categories: string[];
   projects: ProjectDoc[];
@@ -740,6 +723,15 @@ function JudgeAssignmentModal({
 }) {
   const [selectedCats, setSelectedCats] = useState<string[]>(initial?.categories ?? []);
   const [selectedProjs, setSelectedProjs] = useState<string[]>(initial?.projectIds ?? []);
+  const [schedule, setSchedule] = useState<NonNullable<JudgeAssignment["schedule"]>>(initial?.schedule ?? {});
+  const [scheduleMessage, setScheduleMessage] = useState("");
+  const draftEvent = { ...event, judgeAssignments: { ...event.judgeAssignments, [judgeEmail]: { categories: selectedCats, projectIds: selectedProjs } } };
+  const scheduledProjects = projects.filter(p => isProjectAssignedToJudge(draftEvent, p, judgeEmail));
+  const localValue = (iso?: string) => iso && Number.isFinite(Date.parse(iso)) ? new Date(Date.parse(iso) - 7 * 3600000).toISOString().slice(0,16) : "";
+  function changeTime(projectId: string, field: "startsAt" | "endsAt", raw: string) {
+    setSchedule(prev => ({ ...prev, [projectId]: { startsAt: prev[projectId]?.startsAt ?? "", endsAt: prev[projectId]?.endsAt ?? "",
+      [field]: raw ? new Date(`${raw.length === 16 ? raw + ":00" : raw}-07:00`).toISOString() : "" } }));
+  }
   const [busy, setBusy] = useState(false);
 
   const isAll = selectedCats.length === 0 && selectedProjs.length === 0;
@@ -757,9 +749,7 @@ function JudgeAssignmentModal({
       <div>
         <p className="font-mono text-xs font-medium">{displayEmail(judgeEmail)}</p>
         <p className="mt-1 font-mono text-[11px] text-muted">
-          {isAll
-            ? "Actualmente evalúa todos los proyectos del evento."
-            : "Solo verá como pendientes los proyectos de las categorías o proyectos que marques abajo."}
+          Evalúa {scheduledProjects.length} proyecto(s). Los proyectos configurados en «Asignación por proyecto» respetan sus jueces seleccionados. Los filtros de abajo se aplican a los demás.
         </p>
       </div>
 
@@ -805,14 +795,14 @@ function JudgeAssignmentModal({
           <div className="max-h-52 divide-y divide-line overflow-y-auto rounded-2xl bg-paper px-3">
             {projects.map((p) => {
               const byCat = Boolean(p.category && selectedCats.includes(p.category));
-              const checked = byCat || selectedProjs.includes(p.id);
+                  const checked = p.judging ? p.judging.judgeEmails.includes(judgeEmail) : byCat || selectedProjs.includes(p.id);
               return (
                 <Toggle
                   key={p.id}
                   label={p.title}
-                  description={byCat ? `${p.category} (incluido por categoría)` : p.category}
+                  description={p.judging ? "Jueces elegidos en Asignación por proyecto" : byCat ? `${p.category} (incluido por categoría)` : p.category}
                   checked={checked}
-                  disabled={byCat}
+                  disabled={!!p.judging || byCat}
                   onChange={() => toggleProj(p.id)}
                 />
               );
@@ -820,6 +810,20 @@ function JudgeAssignmentModal({
           </div>
         </div>
       )}
+
+      <section className="space-y-3">
+        <p className="text-sm font-medium">Fecha y hora para calificar · Culiacán (UTC−7)</p>
+        <p className="text-xs text-muted">Programa cada proyecto asignado. El horario organiza el turno; el interruptor de evaluación del evento controla cuándo se pueden guardar notas.</p>
+        {scheduledProjects.map(p => <div key={p.id} className="space-y-2 rounded-xl bg-paper p-3">
+          <p className="text-sm font-medium">{p.title}</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Field label="Inicio" htmlFor={`start-${p.id}`}><Input id={`start-${p.id}`} type="datetime-local" value={localValue(schedule[p.id]?.startsAt)} onChange={e=>changeTime(p.id,"startsAt",e.target.value)} /></Field>
+            <Field label="Fin" htmlFor={`end-${p.id}`}><Input id={`end-${p.id}`} type="datetime-local" value={localValue(schedule[p.id]?.endsAt)} onChange={e=>changeTime(p.id,"endsAt",e.target.value)} /></Field>
+          </div>
+          <p className="text-xs text-muted">{scheduleLabel(schedule[p.id])}</p>
+        </div>)}
+        {scheduleMessage && <p role="alert" className="text-sm text-red-700">{scheduleMessage}</p>}
+      </section>
 
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={onClose}>
@@ -830,7 +834,10 @@ function JudgeAssignmentModal({
           onClick={async () => {
             setBusy(true);
             try {
-              await onSave({ categories: selectedCats, projectIds: selectedProjs });
+              const activeSchedule = Object.fromEntries(Object.entries(schedule).filter(([id,slot]) => scheduledProjects.some(p=>p.id===id) && (slot.startsAt || slot.endsAt)));
+              const error = scheduleError(activeSchedule);
+              if (error) { setScheduleMessage(error); return; }
+              await onSave({ categories: selectedCats, projectIds: selectedProjs, schedule: activeSchedule });
             } finally {
               setBusy(false);
             }
@@ -845,44 +852,35 @@ function JudgeAssignmentModal({
 
 /* ---------- Rúbrica ---------- */
 
-function RubricTab({ event, hasEvaluations }: { event: EventDoc; hasEvaluations: boolean }) {
+function RubricTab({ event, projects, hasEvaluations }: { event: EventDoc; projects: ProjectDoc[]; hasEvaluations: boolean }) {
   const toast = useToast();
-  const [criteria, setCriteria] = useState<Criterion[]>(event.criteria);
-  const [busy, setBusy] = useState(false);
+  const [drafts, setDrafts] = useState<Record<string, Criterion[]>>({});
+  const categories = [...new Set([...eventCategories(event), ...projects.map((p) => p.category).filter(Boolean)])];
 
   return (
     <Card>
-      <SectionTitle
-        title="Rúbrica"
-        subtitle="Tú defines los criterios de este evento. Cada criterio se califica de 0 a 10; su peso define cuánto cuenta en el total de 100."
-      />
+      <SectionTitle title="Rúbricas por categoría"
+        subtitle="Selecciona la categoría y guarda sus propios criterios. El juez recibirá automáticamente la rúbrica de la categoría del proyecto; cada total se normaliza a 100." />
       {hasEvaluations && (
         <p className="mb-4 rounded-xl bg-amber-50 px-3 py-2.5 font-mono text-[11px] text-amber-800">
-          Ya hay evaluaciones. Si cambias los pesos o quitas un criterio, los promedios se recalculan automáticamente. Si
-          agregas un criterio nuevo, avisa a los jueces para que lo califiquen.
+          Ya hay evaluaciones. Cambiar pesos o quitar criterios recalcula los promedios de esa categoría. Si agregas criterios,
+          avisa a sus jueces para que completen la evaluación.
         </p>
       )}
-      <CriteriaEditor criteria={criteria} onChange={setCriteria} />
-      <div className="mt-4 flex justify-end">
-        <Button
-          loading={busy}
-          onClick={async () => {
-            const error = criteriaError(criteria);
-            if (error) return toast(error, "error");
-            setBusy(true);
-            try {
-              await saveCriteria(event.id, criteria.map((c) => ({ ...c, name: c.name.trim(), description: c.description.trim() })));
-              toast("Rúbrica guardada.");
-            } catch (err) {
-              toast(firestoreErrorMessage(err), "error");
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          Guardar rúbrica
-        </Button>
-      </div>
+      {event.resultsPublished && <p className="mb-4 font-mono text-xs text-muted">Oculta los resultados antes de cambiar una rúbrica.</p>}
+      <CategoryCriteriaEditor categories={categories} rubrics={{ ...event.categoryCriteria, ...drafts }} fallbackCriteria={event.criteria}
+        disabled={event.resultsPublished}
+        onChange={(category, criteria) => setDrafts((prev) => ({ ...prev, [category]: criteria }))}
+        onSave={async (category, criteria) => {
+          const error = criteriaError(criteria);
+          if (error) return toast(error, "error");
+          try {
+            await saveCategoryCriteria(event.id, category, criteria);
+            toast(`Rúbrica de ${category} guardada.`);
+          } catch (err) {
+            toast(firestoreErrorMessage(err), "error");
+          }
+        }} />
     </Card>
   );
 }
@@ -906,7 +904,8 @@ function ResultsTab({ event, projects, evaluations }: { event: EventDoc; project
   }, [phases, standings]);
 
   function exportResultsCsv() {
-    const criterionHeaders = event.criteria.map((c) => `${c.name} (0-10)`);
+    const rubricColumns = resultRubricColumns(event, projects);
+    const criterionHeaders = rubricColumns.map(({ category, criterion }) => `${category}: ${criterion.name} (0-10)`);
     const headers = [
       "Etapa",
       "Lugar general",
@@ -937,7 +936,7 @@ function ResultsTab({ event, projects, evaluations }: { event: EventDoc; project
           proj ? proj.members.map((m) => m.name || displayEmail(m.email)).join("; ") : "",
           proj ? proj.members.map((m) => displayEmail(m.email)).join("; ") : "",
           s.judges,
-          ...event.criteria.map((c) => s.criteria[c.id] ?? ""),
+          ...rubricColumns.map(({ category, criterion }) => category === cat ? s.criteria[criterion.id] ?? "" : ""),
           s.score,
           s.comments.join(" | "),
         ]);

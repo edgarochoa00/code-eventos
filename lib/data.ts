@@ -19,9 +19,15 @@ import {
 } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import { auth, db } from "./firebase";
-import { criteriaError, deliverySettingsError } from "./event-config";
+import { inviteSavedAccounts } from "./account-invitation-client";
+import { scheduleError } from "./judging-agenda";
+import { projectJudgesError } from "./project-judges";
+import type { JudgeAssignment } from "./types";
+import { categoryCriteriaError, cleanCriteria, criteriaError, deliverySettingsError, evaluationScoresError, getCategoryCriteria } from "./event-config";
+import { computeStandings } from "./results";
 import { validateSubmissionFiles } from "./submission-files";
 import { removeSubmissionFile, verifySubmissionFiles } from "./submission-storage";
+import { projectLogoRequest } from "./project-logo-storage";
 import { buildFingerprint } from "./similarity";
 import type {
   Criterion,
@@ -39,11 +45,14 @@ import type {
 } from "./types";
 import { DEFAULT_ORIGINALITY, SUPERADMIN_EMAIL } from "./types";
 import {
-  effectiveEvaluationTotal,
+  weightedTotal,
   isProjectAssignedToJudge,
   normalizeEmail,
   randomCode,
 } from "./utils";
+
+export { computeStandings } from "./results";
+export type { PhaseStanding } from "./results";
 
 /* ---------- Referencias ---------- */
 
@@ -75,16 +84,17 @@ export const qAllProjects = () => query(collectionGroup(db, "projects"));
 
 /* ---------- Permisos globales (solo superadmin) ---------- */
 
-export function setStaffRole(email: string, role: StaffRole | "user", by: User) {
+export async function setStaffRole(email: string, role: StaffRole | "user", by: User) {
   const id = normalizeEmail(email);
   if (id === SUPERADMIN_EMAIL) throw new Error("El superadmin no se puede modificar");
   if (role === "user") return deleteDoc(doc(db, "staff", id));
-  return setDoc(doc(db, "staff", id), {
+  await setDoc(doc(db, "staff", id), {
     email: id,
     role,
     updatedBy: normalizeEmail(by.email ?? ""),
     updatedAt: serverTimestamp(),
   });
+  if (role === "organizer" || role === "admin") await inviteSavedAccounts({ kind: "staff", role }, [id]);
 }
 
 /** Agrega o quita un correo de la lista de jueces/organizadores de un evento. */
@@ -108,7 +118,7 @@ export async function saveEventEmails(event: EventDoc, list: "judgeEmails" | "or
   const requested = Array.from(new Set(emails.map(normalizeEmail).filter(Boolean)));
   const removed = event[list].filter((email) => !requested.includes(email));
   const added = requested.filter((email) => !event[list].includes(email));
-  await runTransaction(db, async (tx) => {
+  const newlyAdded = await runTransaction(db, async (tx) => {
     const [eventSnap, rosterSnap] = await Promise.all([tx.get(eventRef(event.id)), tx.get(participantRosterRef(event.id))]);
     if (!eventSnap.exists()) throw new Error("El evento ya no existe.");
     if (!rosterSnap.exists()) throw new Error("El superadmin debe actualizar los permisos de este evento antes de cambiar sus roles.");
@@ -123,6 +133,31 @@ export async function saveEventEmails(event: EventDoc, list: "judgeEmails" | "or
     if (contestant) throw new Error(`${contestant} participa en un equipo y no puede administrar ni calificar este evento.`);
     if (list === "organizerEmails" && !next.includes(current.ownerEmail)) throw new Error("No se puede quitar al creador del evento.");
     tx.update(eventRef(event.id), { [list]: next });
+    return added.filter((email) => !current[list].includes(email));
+  });
+  await inviteSavedAccounts({ kind: "event", eventId: event.id, role: list === "judgeEmails" ? "judge" : "organizer" }, newlyAdded);
+}
+
+export async function saveJudgeAssignment(eventId: string, email: string, assignment: JudgeAssignment) {
+  const error = scheduleError(assignment.schedule);
+  if (error) throw new Error(error);
+  const key = normalizeEmail(email);
+  await runTransaction(db, async tx => {
+    const snap = await tx.get(eventRef(eventId));
+    if (!snap.exists() || !(snap.data() as EventDoc).judgeEmails.includes(key)) throw new Error("El juez ya no pertenece al evento.");
+    const next = { ...((snap.data() as EventDoc).judgeAssignments ?? {}), [key]: assignment };
+    tx.update(eventRef(eventId), { judgeAssignments: next });
+  });
+}
+
+export async function saveProjectJudges(eventId: string, projectId: string, judging: NonNullable<ProjectDoc["judging"]>) {
+  const next = { maxJudges: judging.maxJudges, judgeEmails: judging.judgeEmails.map(normalizeEmail) };
+  await runTransaction(db, async tx => {
+    const [eventSnap, projectSnap] = await Promise.all([tx.get(eventRef(eventId)), tx.get(projectRef(eventId, projectId))]);
+    if (!eventSnap.exists() || !projectSnap.exists()) throw new Error("El evento o proyecto ya no existe.");
+    const error = projectJudgesError(eventSnap.data() as EventDoc, projectSnap.data() as ProjectDoc, next);
+    if (error) throw new Error(error);
+    tx.update(projectRef(eventId, projectId), { judging: next });
   });
 }
 
@@ -192,6 +227,7 @@ export type EventSettingsInput = {
   phases: Record<Phase, boolean>;
   phaseDetails: Partial<Record<Phase, PhaseDetails>>;
   categories?: string[];
+  categoryCriteria?: Record<string, Criterion[]>;
 };
 
 export type NewEventInput = EventSettingsInput & { criteria: Criterion[] };
@@ -206,7 +242,7 @@ export async function generateUniqueEventCode() {
 }
 
 export async function createEvent(input: NewEventInput, user: User) {
-  const error = deliverySettingsError(input) ?? criteriaError(input.criteria);
+  const error = deliverySettingsError(input) ?? criteriaError(input.criteria) ?? categoryCriteriaError(input.categoryCriteria ?? {});
   if (error) throw new Error(error);
   const email = normalizeEmail(user.email ?? "");
   const code = await generateUniqueEventCode();
@@ -222,7 +258,8 @@ export async function createEvent(input: NewEventInput, user: User) {
     submissions: { ...input.phases },
     registrationOpen: true,
     judgingOpen: false,
-    criteria: input.criteria.map((c) => ({ ...c, name: c.name.trim(), description: c.description.trim() })),
+    criteria: cleanCriteria(input.criteria),
+    ...(input.categoryCriteria ? { categoryCriteria: Object.fromEntries(Object.entries(input.categoryCriteria).map(([category, criteria]) => [category, cleanCriteria(criteria)])) } : {}),
     resultsPublished: false,
     results: null,
     originality: DEFAULT_ORIGINALITY,
@@ -236,10 +273,20 @@ export async function createEvent(input: NewEventInput, user: User) {
   return created.id;
 }
 
-export function updateEvent(
+export async function updateEvent(
   eventId: string,
   patch: Partial<Omit<EventDoc, "id" | "ownerId" | "ownerEmail" | "createdAt" | "accessVersion" | "judgeEmails" | "organizerEmails">>,
 ) {
+  if (typeof patch.judgingOpen === "boolean") {
+    return runTransaction(db, async (transaction) => {
+      const snapshot = await transaction.get(eventRef(eventId));
+      if (!snapshot.exists()) throw new Error("El evento ya no existe.");
+      transaction.update(eventRef(eventId), {
+        ...patch,
+        categoryLocked: Boolean(patch.judgingOpen || snapshot.data().judgingOpen || snapshot.data().categoryLocked),
+      });
+    });
+  }
   return updateDoc(eventRef(eventId), patch);
 }
 
@@ -271,10 +318,16 @@ export async function findEventByCode(code: string) {
   return snap.empty ? null : snap.docs[0].id;
 }
 
-export function saveCriteria(eventId: string, criteria: Criterion[]) {
-  const error = criteriaError(criteria);
+export async function saveCategoryCriteria(eventId: string, category: string, criteria: Criterion[]) {
+  const error = categoryCriteriaError({ [category]: criteria });
   if (error) throw new Error(error);
-  return updateDoc(eventRef(eventId), { criteria });
+  return runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(eventRef(eventId));
+    if (!snapshot.exists()) throw new Error("El evento ya no existe.");
+    if (snapshot.data().resultsPublished) throw new Error("Oculta los resultados antes de cambiar una rúbrica.");
+    // FieldPath conserva nombres como «Hardware / IoT» o «Diseño 2.0» sin crear rutas anidadas.
+    transaction.update(eventRef(eventId), new FieldPath("categoryCriteria", category), cleanCriteria(criteria));
+  });
 }
 
 /* ---------- Proyectos ---------- */
@@ -291,7 +344,7 @@ async function writeFingerprint(project: ProjectDoc, event: EventDoc) {
 
 export async function createProject(event: EventDoc, input: ProjectInfoInput, user: User) {
   const leaderEmail = normalizeEmail(user.email ?? "");
-  const members = dedupeMembers([{ name: user.displayName ?? "", email: leaderEmail }, ...input.members]);
+  const members = dedupeMembers([{ name: input.members.find((member) => member.email === leaderEmail)?.name || user.displayName || "", email: leaderEmail }, ...input.members]);
   const memberEmails = members.map((m) => m.email);
   assertNotEventStaff(event, memberEmails);
   const ref = doc(projectsCol(event.id));
@@ -328,6 +381,7 @@ export async function updateProjectInfo(event: EventDoc, project: ProjectDoc, in
     if (!projectSnap.exists() || !eventSnap.exists()) throw new Error("El proyecto ya no existe.");
     const current = { ...projectSnap.data(), id: project.id } as ProjectDoc;
     const isLeader = user.uid === current.leaderId;
+    if (current.registrationPending && !isLeader) throw new Error("Solo el líder puede completar el registro del proyecto.");
     // Solo el líder administra a los integrantes; los demás conservan la lista actual.
     const members = isLeader ? dedupeMembers(input.members) : [...current.members];
     if (!members.some((m) => m.email === current.leaderEmail)) {
@@ -337,7 +391,8 @@ export async function updateProjectInfo(event: EventDoc, project: ProjectDoc, in
     assertNotEventStaff(eventSnap.data() as EventDoc, memberEmails);
     const changedMembers = memberEmails.length !== current.memberEmails.length || memberEmails.some((email, index) => current.memberEmails[index] !== email);
     if (changedMembers && eventSnap.data().accessVersion !== 1) throw new Error("El superadmin debe actualizar los permisos de este evento antes de cambiar integrantes.");
-    const patch = isLeader ? { ...input, members, memberEmails } : { ...input, members: current.members };
+    const completion = current.registrationPending ? { registrationPending: false } : {};
+    const patch = isLeader ? { ...input, ...completion, members, memberEmails } : { ...input, members: current.members };
     tx.update(projectRef(event.id, project.id), { ...patch, updatedAt: serverTimestamp() });
     if (changedMembers) syncParticipants(tx, event.id, project.id, current.memberEmails, memberEmails);
     return { ...current, ...patch };
@@ -352,6 +407,7 @@ export async function deleteProject(eventId: string, project: ProjectDoc, asOrga
   if (event.data().accessVersion !== 1) throw new Error("El superadmin debe actualizar los permisos antes de eliminar proyectos.");
   const evaluations = asOrganizer ? (await getDocs(query(evaluationsCol(eventId), where("projectId", "==", project.id)))).docs : [];
   const files = [...(project.prototype?.files ?? []), ...(project.final?.files ?? [])];
+  if (project.logo) await projectLogoRequest(eventId, project.id, "DELETE", undefined, true);
   await Promise.all(files.map(file => removeSubmissionFile(file)));
   await runTransaction(db, async (tx) => {
     const current = await tx.get(projectRef(eventId, project.id));
@@ -394,33 +450,42 @@ export async function loadAllFingerprints() {
 
 export async function saveEvaluation(
   event: EventDoc,
-  projectId: string,
+  project: Pick<ProjectDoc, "id" | "category">,
   phase: Phase,
   user: User,
   scores: Record<string, number>,
-  total: number,
   comment: string,
 ) {
-  const [eventSnap, projectSnap] = await Promise.all([getDoc(eventRef(event.id)), getDoc(projectRef(event.id, projectId))]);
-  if (!eventSnap.exists() || !projectSnap.exists()) throw new Error("El proyecto ya no existe.");
-  const current = { ...eventSnap.data(), id: event.id } as EventDoc;
-  if (current.accessVersion !== 1 || !current.judgingOpen || current.resultsPublished) throw new Error("La evaluación está cerrada.");
-  if (!current.phases[phase] || !isProjectAssignedToJudge(current, { ...projectSnap.data(), id: projectId } as ProjectDoc, user.email ?? "")) {
-    throw new Error("Este proyecto o etapa no está asignado a tu evaluación.");
-  }
-  const id = evaluationId(user.uid, projectId, phase);
-  const data: Omit<EvaluationDoc, "id" | "updatedAt"> = {
-    eventId: event.id,
-    projectId,
-    phase,
-    judgeId: user.uid,
-    judgeEmail: normalizeEmail(user.email ?? ""),
-    judgeName: user.displayName ?? "",
-    scores,
-    total,
-    comment: comment.trim(),
-  };
-  await setDoc(doc(evaluationsCol(event.id), id), { ...data, updatedAt: serverTimestamp() });
+  const projectId = project.id;
+  return runTransaction(db, async (transaction) => {
+    const [eventSnap, projectSnap] = await Promise.all([transaction.get(eventRef(event.id)), transaction.get(projectRef(event.id, projectId))]);
+    if (!eventSnap.exists() || !projectSnap.exists()) throw new Error("El proyecto ya no existe.");
+    const current = { ...eventSnap.data(), id: event.id } as EventDoc;
+    const currentProject = { ...projectSnap.data(), id: projectId } as ProjectDoc;
+    if (current.accessVersion !== 1 || !current.judgingOpen || current.resultsPublished) throw new Error("La evaluación está cerrada.");
+    if (!current.phases[phase] || !isProjectAssignedToJudge(current, currentProject, user.email ?? "")) {
+      throw new Error("Este proyecto o etapa no está asignado a tu evaluación.");
+    }
+    const criteria = getCategoryCriteria(current, currentProject.category);
+    if (currentProject.category !== project.category || JSON.stringify(criteria) !== JSON.stringify(getCategoryCriteria(event, project.category))) {
+      throw new Error("La categoría o su rúbrica cambió. Recarga el proyecto antes de guardar.");
+    }
+    const error = evaluationScoresError(criteria, scores);
+    if (error) throw new Error(error);
+    const id = evaluationId(user.uid, projectId, phase);
+    const data: Omit<EvaluationDoc, "id" | "updatedAt"> = {
+      eventId: event.id,
+      projectId,
+      phase,
+      judgeId: user.uid,
+      judgeEmail: normalizeEmail(user.email ?? ""),
+      judgeName: user.displayName ?? "",
+      scores,
+      total: weightedTotal(criteria, scores),
+      comment: comment.trim(),
+    };
+    transaction.set(doc(evaluationsCol(event.id), id), { ...data, updatedAt: serverTimestamp() });
+  });
 }
 
 export function deleteEvaluation(eventId: string, evalId: string) {
@@ -428,39 +493,6 @@ export function deleteEvaluation(eventId: string, evalId: string) {
 }
 
 /* ---------- Resultados ---------- */
-
-export type PhaseStanding = ResultRow & { criteria: Record<string, number>; comments: string[] };
-
-export function computeStandings(
-  event: EventDoc,
-  projects: ProjectDoc[],
-  evaluations: EvaluationDoc[],
-): Record<Phase, PhaseStanding[]> {
-  const out: Record<Phase, PhaseStanding[]> = { prototype: [], final: [] };
-  for (const phase of ["prototype", "final"] as Phase[]) {
-    if (!event.phases[phase]) continue;
-    for (const p of projects) {
-      const evs = evaluations.filter((e) => e.projectId === p.id && e.phase === phase);
-      if (!evs.length) continue;
-      const criteria: Record<string, number> = {};
-      for (const c of event.criteria) {
-        const values = evs.map((e) => e.scores[c.id]).filter((v): v is number => typeof v === "number");
-        if (values.length) criteria[c.id] = round1(values.reduce((a, b) => a + b, 0) / values.length);
-      }
-      out[phase].push({
-        projectId: p.id,
-        title: p.title,
-        category: p.category,
-        score: round1(evs.reduce((a, e) => a + effectiveEvaluationTotal(event.criteria, e), 0) / evs.length),
-        judges: evs.length,
-        criteria,
-        comments: evs.map((e) => e.comment).filter(Boolean),
-      });
-    }
-    out[phase].sort((a, b) => b.score - a.score);
-  }
-  return out;
-}
 
 export async function publishResults(event: EventDoc, projects: ProjectDoc[], evaluations: EvaluationDoc[]) {
   const standings = computeStandings(event, projects, evaluations);
@@ -481,7 +513,7 @@ export async function publishResults(event: EventDoc, projects: ProjectDoc[], ev
       judges,
     })),
   };
-  batch.update(eventRef(event.id), { results, resultsPublished: true, judgingOpen: false });
+  batch.update(eventRef(event.id), { results, resultsPublished: true, judgingOpen: false, categoryLocked: true });
 
   for (const p of projects) {
     const feedback: Partial<Record<Phase, PhaseFeedback>> = {};
@@ -505,8 +537,4 @@ export async function publishResults(event: EventDoc, projects: ProjectDoc[], ev
 
 export function unpublishResults(eventId: string) {
   return updateDoc(eventRef(eventId), { resultsPublished: false });
-}
-
-function round1(n: number) {
-  return Math.round(n * 10) / 10;
 }

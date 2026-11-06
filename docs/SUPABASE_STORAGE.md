@@ -35,3 +35,13 @@ Con un evento de prueba, entrega un archivo pequeño como alumno, descárgalo co
 `npm run dev:emulators` no permite conectar cuentas simuladas a Supabase remoto. Para pruebas aisladas usa Supabase local con una URL de localhost; los emuladores de Firebase no simulan Supabase Storage.
 
 La configuración local no añade automáticamente las variables a Vercel ni publica los cambios.
+
+## Logo opcional de la marca
+
+Después de completar su formulario inicial, el líder puede usar **Agregar logo** en la cabecera de su proyecto. Puede previsualizarlo, guardarlo, reemplazarlo o quitarlo. El logo se presenta como sticker en la cabecera y en la tarjeta del alumno. Los demás integrantes, jueces y organizadores pueden verlo con los mismos permisos del proyecto.
+
+Se aceptan PNG, JPG y WebP de hasta **2 MB**, sin animación y con hasta 16 megapíxeles. El servidor decodifica la imagen, aplica su orientación, elimina sus metadatos y guarda una versión WebP de hasta 512 × 512 píxeles, conservando la transparencia. No elimina fondos: para un sticker con forma propia, el alumno debe subir un logo con fondo transparente.
+
+Usa el mismo bucket privado y las mismas variables de las entregas; permite también `image/webp` si configuraste una lista de tipos MIME en el bucket. La ruta es `events/{evento}/projects/{proyecto}/logo/{uuid}.webp`. Firestore solo guarda `logo: { path, storage: "supabase" }`, sin URL pública. La imagen se consulta mediante `/api/project-logo` con sesión Firebase y respuesta sin caché.
+
+Solo el líder puede modificar el logo mientras las inscripciones o alguna entrega estén abiertas, con el registro completo y sin resultados publicados. Las reglas y el servidor comprueban estos permisos. Una sustitución guarda primero la imagen nueva y su referencia; después limpia la anterior. Quitar el logo también limpia el archivo, y eliminar el proyecto incluye la limpieza de su logo. Un error de limpieza posterior al guardado se registra en el servidor sin deshacer el cambio ya confirmado.
