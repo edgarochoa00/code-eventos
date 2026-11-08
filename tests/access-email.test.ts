@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { mock, test } from "node:test";
 import { AccessEmailError, accessEmailConfig, renderAccessEmail, sendBrevoAccessEmail } from "../lib/server/access-email";
+import { feriaAccessLink } from "../lib/server/access-link";
 
 const config = { apiKey: "key-for-unit-tests-only", from: "feria@example.com" };
 const context = { role: "judge" as const, eventName: "Feria de Ingeniería 2026" };
@@ -37,6 +38,8 @@ test("el mensaje usa el logo y la acción segura, escapa contenido y ofrece text
 });
 
 test("envía a un único destinatario sin listas de marketing y devuelve solo confirmación del proveedor", async () => {
+  const action = feriaAccessLink(link);
+  assert.equal(action, "https://feria2026.web.app/acceso#oobCode=fake");
   let calls = 0;
   const mocked = mock.method(globalThis, "fetch", async (url: string | URL | Request, init?: RequestInit) => {
     calls++;
@@ -45,14 +48,15 @@ test("envía a un único destinatario sin listas de marketing y devuelve solo co
     const body = JSON.parse(init!.body as string);
     assert.deepEqual(body.sender, { name: "Feria 2026", email: config.from });
     assert.deepEqual(body.to, [{ email: "juez@example.com", contactPixelTrackingConsent: false }]);
-    assert.ok(body.textContent.includes(link));
+    assert.ok(body.textContent.includes(action));
+    assert.ok(body.htmlContent.includes(`href="${action}"`));
     assert.equal(body.subject, "Tu acceso a Feria 2026");
     assert.equal(body.bcc, undefined); assert.equal(body.cc, undefined); assert.equal(body.listIds, undefined);
     assert.ok(!JSON.stringify(body).includes(config.apiKey));
     return Response.json({ messageId: "provider-message-id" }, { status: 201 });
   });
   try {
-    assert.deepEqual(await sendBrevoAccessEmail(config, "juez@example.com", context, link),
+    assert.deepEqual(await sendBrevoAccessEmail(config, "juez@example.com", context, action),
       { provider: "brevo", messageId: "provider-message-id" });
     assert.equal(calls, 1);
   } finally { mocked.mock.restore(); }

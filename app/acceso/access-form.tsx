@@ -17,6 +17,10 @@ function isInvalidLink(error: unknown) {
     .includes((error as { code?: string })?.code ?? "");
 }
 
+function accessCode() {
+  return new URLSearchParams(window.location.hash.slice(1)).get("oobCode");
+}
+
 export function AccessForm() {
   const [state, setState] = useState<AccessState>({ status: "checking" });
   const [attempt, setAttempt] = useState(0);
@@ -27,9 +31,23 @@ export function AccessForm() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    function onNewLink() {
+      setState({ status: "checking" });
+      setAttempt((value) => value + 1);
+      setPassword("");
+      setConfirmation("");
+      setVisible(false);
+      setError("");
+      setBusy(false);
+    }
+    window.addEventListener("hashchange", onNewLink);
+    return () => window.removeEventListener("hashchange", onNewLink);
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     async function checkLink() {
-      const code = new URLSearchParams(window.location.hash.slice(1)).get("oobCode");
+      const code = accessCode();
       if (!code) return { status: "invalid" } as const;
       try {
         const email = await verifyPasswordResetCode(auth, code);
@@ -45,24 +63,25 @@ export function AccessForm() {
 
   async function savePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (state.status !== "ready" || busy) return;
+    if (state.status !== "ready" || busy || accessCode() !== state.code) return;
     if (password !== confirmation) return setError("Las contraseñas no coinciden.");
     setError("");
     setBusy(true);
     try {
       await confirmPasswordReset(auth, state.code, password);
-      window.history.replaceState(null, "", window.location.pathname);
+      if (accessCode() !== state.code) return;
       setState({ status: "saved" });
       setPassword("");
       setConfirmation("");
+      setBusy(false);
+      window.history.replaceState(null, "", window.location.pathname);
     } catch (err) {
+      if (accessCode() !== state.code) return;
       if (isInvalidLink(err)) {
         setState({ status: "invalid" });
         setPassword("");
         setConfirmation("");
-      }
-      else setError(authErrorMessage(err));
-    } finally {
+      } else setError(authErrorMessage(err));
       setBusy(false);
     }
   }
