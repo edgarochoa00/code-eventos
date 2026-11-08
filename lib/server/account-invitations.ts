@@ -8,6 +8,7 @@ import { SUPERADMIN_EMAIL, type EventDoc, type ParticipantRoster, type StaffDoc 
 import { isEmail, normalizeEmail } from "../utils";
 import { adminServices } from "./firebase-admin";
 import { AccessEmailError, accessEmailConfig, sendBrevoAccessEmail, type AccessEmailContext } from "./access-email";
+import { feriaAccessLink } from "./access-link";
 
 export class InvitationError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -41,9 +42,8 @@ async function sendSetupEmail(email: string, context: AccessEmailContext) {
   const config = accessEmailConfig();
   if (config) {
     const { auth } = adminServices();
-    const link = new URL(await auth.generatePasswordResetLink(email, { url: "https://feria2026.web.app/login" }));
-    link.searchParams.set("lang", "es");
-    return sendBrevoAccessEmail(config, email, context, link.href);
+    const link = await auth.generatePasswordResetLink(email);
+    return sendBrevoAccessEmail(config, email, context, feriaAccessLink(link));
   }
   const emulator = process.env.NEXT_PUBLIC_USE_EMULATORS === "true";
   const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;

@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { after, before, mock, test } from "node:test";
+import { deleteApp, initializeApp } from "firebase/app";
+import { confirmPasswordReset, connectAuthEmulator, getAuth, verifyPasswordResetCode } from "firebase/auth";
 import { POST } from "../app/api/account-invitations/route";
+import { feriaAccessLink } from "../lib/server/access-link";
 import { adminServices } from "../lib/server/firebase-admin";
 import { invitationDeliveryId } from "../lib/server/account-invitations";
 import { SUPERADMIN_EMAIL } from "../lib/types";
@@ -121,22 +124,27 @@ test("un juez nuevo recibe un enlace: elige contraseña, verifica el correo y co
   assert.equal(codes.length, 1);
   assert.equal(codes[0].requestType, "PASSWORD_RESET");
   assert.equal(new URL(codes[0].oobLink).searchParams.get("continueUrl"), "https://feria2026.web.app/login");
+  const link = new URL(feriaAccessLink(await auth.generatePasswordResetLink(input.email)));
+  assert.equal(link.origin + link.pathname, "https://feria2026.web.app/acceso");
+  assert.equal(link.search, "");
+  const code = new URLSearchParams(link.hash.slice(1)).get("oobCode")!;
   const chosen = "Elegida!PorElJuez2026";
-  const response = await fetch(`${emulatorOrigin}/identitytoolkit.googleapis.com/v1/accounts:resetPassword?key=fake-key`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ oobCode: codes[0].oobCode, newPassword: chosen }),
-  });
-  assert.equal(response.status, 200);
+  const client = initializeApp({ apiKey: "fake-key", projectId: "demo-code" }, "invitation-access-test");
+  try {
+    const clientAuth = getAuth(client);
+    connectAuthEmulator(clientAuth, emulatorOrigin, { disableWarnings: true });
+    assert.equal(await verifyPasswordResetCode(clientAuth, code), input.email);
+    await confirmPasswordReset(clientAuth, code, chosen);
+    await assert.rejects(verifyPasswordResetCode(clientAuth, code), { code: "auth/invalid-action-code" });
+  } finally {
+    await deleteApp(client);
+  }
   const token = await login(input.email, chosen);
   const identity = await auth.verifyIdToken(token);
   assert.equal(identity.uid, user.uid);
   assert.equal(identity.email_verified, true);
   assert.ok((await db.doc(`events/${eventId}`).get()).data()?.judgeEmails.includes(input.email));
   assert.equal((await db.doc(`staff/${input.email}`).get()).exists, false);
-  // El código solo se puede usar una vez.
-  const reused = await fetch(`${emulatorOrigin}/identitytoolkit.googleapis.com/v1/accounts:resetPassword?key=fake-key`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ oobCode: codes[0].oobCode, newPassword: chosen }),
-  });
-  assert.equal(reused.status, 400);
 });
 
 test("admin y coorganizador envían acceso a organizadores de su evento", async () => {

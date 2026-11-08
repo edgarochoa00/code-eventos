@@ -22,6 +22,10 @@ export type Release = { version: string; date: string; title: string; changes: s
 
 /** La primera entrada es la versión actual (debe coincidir con package.json). */
 export const RELEASES: Release[] = [
+  { version: "0.4.7", date: "8 de noviembre de 2026", title: "Configuración de acceso en Feria 2026", changes: [
+    "Las nuevas invitaciones abren una pantalla de Feria 2026 para elegir y confirmar la contraseña.",
+    "La pantalla confirma cuándo se guardó la contraseña y explica cómo proceder si el enlace ya no es válido.",
+  ] },
   { version: "0.4.6", date: "6 de noviembre de 2026", title: "Estabilidad de Administración y agenda unificada", changes: [
     "El formulario de alta de alumnos conserva sus datos y muestra un aviso si desaparece el evento seleccionado.",
     "Sesión estable de autenticación, avance de jueces calculado una sola vez y eliminación de controles vacíos.",

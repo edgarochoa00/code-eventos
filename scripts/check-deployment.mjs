@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 
 // Usa las URLs normales: una query aleatoria ocultaría una página vieja en la CDN.
 const origin = new URL(process.argv[2] ?? "https://feria2026.web.app");
-const routes = ["/", "/login", "/panel", "/panel/privacidad", "/admin", "/eventos/nuevo", "/terminos", "/privacidad", "/cookies", "/versiones"];
+const routes = ["/", "/login", "/acceso", "/panel", "/panel/privacidad", "/admin", "/eventos/nuevo", "/terminos", "/privacidad", "/cookies", "/versiones"];
 const assets = new Set();
 
 async function request(path) {

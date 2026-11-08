@@ -1,12 +1,9 @@
 "use client";
 
 import { ArrowUpRight } from "lucide-react";
-import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
-import { LegalLinks } from "@/components/legal-links";
-import { APP_SUBTITLE, Logo } from "@/components/logo";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { AuthCard } from "@/components/auth-card";
 import { Button, Field, Input, Tabs, useToast } from "@/components/ui";
 import { authErrorMessage, useAuth } from "@/lib/auth";
 
@@ -58,100 +55,74 @@ export function LoginForm() {
   }
 
   return (
-    <div className="flex flex-1 flex-col px-4 py-4 sm:px-10 sm:py-6">
-      <div className="flex items-center justify-between">
-        <Logo />
-        <ThemeToggle />
+    <AuthCard>
+      <h1 className="font-display text-2xl font-extrabold uppercase tracking-[0.04em] sm:text-3xl">
+        {mode === "login" ? "Iniciar sesión" : "Crear cuenta"}
+      </h1>
+
+      <div className="mt-5">
+        <Tabs
+          tabs={[
+            { id: "login", label: "Entrar" },
+            { id: "signup", label: "Crear cuenta" },
+          ]}
+          value={mode}
+          onChange={(m) => {
+            setMode(m);
+            setError("");
+          }}
+        />
       </div>
 
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-6 sm:py-10">
-        <div className="rounded-3xl border-2 border-line bg-surface p-6 shadow-xs sm:p-8">
-          <div className="mb-6 flex flex-col items-center text-center">
-            <span className="grid size-24 place-items-center overflow-hidden rounded-full bg-white p-1 shadow-md ring-2 ring-ink/15">
-              <Image
-                src="/logo.png"
-                alt="Logo TECNM Culiacán · Sistemas Computacionales y TICs"
-                width={92}
-                height={92}
-                className="size-full object-contain"
-                priority
-              />
-            </span>
-            <p className="mt-3 font-display text-[11px] font-bold uppercase tracking-[0.14em] text-ink/75">
-              {APP_SUBTITLE}
-            </p>
-          </div>
+      <form onSubmit={onSubmit} className="mt-5 space-y-4">
+        {mode === "signup" && (
+          <Field label="Nombre completo" htmlFor="name">
+            <Input id="name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} required />
+          </Field>
+        )}
+        <Field label="Correo" htmlFor="email" hint={mode === "signup" ? "De preferencia tu correo institucional." : undefined}>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            inputMode="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </Field>
+        <Field label="Contraseña" htmlFor="password">
+          <Input
+            id="password"
+            type="password"
+            autoComplete={mode === "login" ? "current-password" : "new-password"}
+            minLength={6}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </Field>
 
-          <h2 className="font-display text-2xl font-extrabold uppercase tracking-[0.04em] sm:text-3xl">
-            {mode === "login" ? "Iniciar sesión" : "Crear cuenta"}
-          </h2>
+        {error && (
+          <p role="alert" className="rounded-2xl bg-red-50 px-3.5 py-2.5 font-sans text-xs font-medium text-red-700">
+            {error}
+          </p>
+        )}
 
-          <div className="mt-5">
-            <Tabs
-              tabs={[
-                { id: "login", label: "Entrar" },
-                { id: "signup", label: "Crear cuenta" },
-              ]}
-              value={mode}
-              onChange={(m) => {
-                setMode(m);
-                setError("");
-              }}
-            />
-          </div>
+        <Button type="submit" className="w-full" size="lg" loading={busy}>
+          {mode === "login" ? "Entrar" : "Crear cuenta"} <ArrowUpRight className="size-4" />
+        </Button>
+      </form>
 
-          <form onSubmit={onSubmit} className="mt-5 space-y-4">
-            {mode === "signup" && (
-              <Field label="Nombre completo" htmlFor="name">
-                <Input id="name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} required />
-              </Field>
-            )}
-            <Field label="Correo" htmlFor="email" hint={mode === "signup" ? "De preferencia tu correo institucional." : undefined}>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="email"
-                inputMode="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Contraseña" htmlFor="password">
-              <Input
-                id="password"
-                type="password"
-                autoComplete={mode === "login" ? "current-password" : "new-password"}
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </Field>
-
-            {error && (
-              <p role="alert" className="rounded-2xl bg-red-50 px-3.5 py-2.5 font-sans text-xs font-medium text-red-700">
-                {error}
-              </p>
-            )}
-
-            <Button type="submit" className="w-full" size="lg" loading={busy}>
-              {mode === "login" ? "Entrar" : "Crear cuenta"} <ArrowUpRight className="size-4" />
-            </Button>
-          </form>
-
-          {mode === "login" && (
-            <button
-              type="button"
-              onClick={onReset}
-              className="mt-5 font-display text-[11px] font-bold uppercase tracking-[0.08em] text-muted underline underline-offset-4 hover:text-ink"
-            >
-              Olvidé mi contraseña
-            </button>
-          )}
-        </div>
-      </div>
-      <LegalLinks className="mx-auto w-full max-w-md pb-[env(safe-area-inset-bottom)]" />
-    </div>
+      {mode === "login" && (
+        <button
+          type="button"
+          onClick={onReset}
+          className="mt-5 font-display text-[11px] font-bold uppercase tracking-[0.08em] text-muted underline underline-offset-4 hover:text-ink"
+        >
+          Olvidé mi contraseña
+        </button>
+      )}
+    </AuthCard>
   );
 }
