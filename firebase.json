@@ -46,7 +46,7 @@
       ],
       "headers": [
         {
-          "regex": "^/(|login|panel|admin|eventos|terminos|privacidad|cookies|versiones)(/.*)?$",
+          "regex": "^/(|login|acceso|panel|admin|eventos|terminos|privacidad|cookies|versiones)(/.*)?$",
           "headers": [
             {
               "key": "Cache-Control",
