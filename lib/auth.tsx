@@ -19,7 +19,7 @@ import { upsertUserProfile } from "./data";
 type AuthState = {
   user: User | null;
   loading: boolean;
-  signInEmail: (email: string, password: string) => Promise<void>;
+  signInEmail: (email: string, password: string) => Promise<User>;
   signUpEmail: (name: string, email: string, password: string) => Promise<void>;
   signInGoogle: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -45,7 +45,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signInEmail = useCallback(async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email.trim(), password);
+    const { user } = await signInWithEmailAndPassword(auth, email.trim(), password);
+    return user;
   }, []);
 
   const signUpEmail = useCallback(async (name: string, email: string, password: string) => {
@@ -90,10 +91,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(() => fbSignOut(auth), []);
 
   const updateName = useCallback(async (name: string) => {
-    if (!auth.currentUser) throw new Error("Inicia sesión para guardar tu nombre.");
-    await updateProfile(auth.currentUser, { displayName: name.trim() });
-    await upsertUserProfile(auth.currentUser);
-    setSession({ user: auth.currentUser });
+    const user = auth.currentUser;
+    if (!user) throw new Error("Inicia sesión para guardar tu nombre.");
+    await updateProfile(user, { displayName: name.trim() });
+    if (auth.currentUser === user) setSession({ user });
+    await upsertUserProfile(user);
   }, []);
 
   const value = useMemo<AuthState>(() => ({ user: session.user, loading, signInEmail, signUpEmail, signInGoogle,

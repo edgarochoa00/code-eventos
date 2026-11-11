@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useAccess } from "@/lib/access";
 import { useAuth } from "@/lib/auth";
-import { cn, displayEmail } from "@/lib/utils";
+import { cn, displayEmail, initials } from "@/lib/utils";
 import { LegalLinks } from "./legal-links";
 import { Logo } from "./logo";
 import { ThemeToggle } from "./theme-toggle";
@@ -16,7 +16,7 @@ import { Button, Card, Spinner, useToast } from "./ui";
  * Envoltura para páginas privadas: exige sesión y correo verificado
  * (los permisos de juez/organizador/integrante dependen del correo).
  * Con requireVerified={false} solo exige sesión: así cualquier cuenta,
- * aunque no esté verificada o esté suspendida, llega a «Privacidad de mi cuenta».
+ * aunque no esté verificada o esté suspendida, puede consultar su cuenta.
  */
 export function AppShell({ children, requireVerified = true }: { children: React.ReactNode; requireVerified?: boolean }) {
   const { user, loading } = useAuth();
@@ -68,11 +68,6 @@ function Header() {
   const access = useAccess();
   const router = useRouter();
   const pathname = usePathname();
-  const initials = (user?.displayName || displayEmail(user?.email ?? "") || "?")
-    .split(/[\s@.]+/)
-    .slice(0, 2)
-    .map((s) => s[0]?.toUpperCase())
-    .join("");
   const showAdmin = access.isAdmin && user?.emailVerified;
 
   return (
@@ -98,17 +93,21 @@ function Header() {
           <ThemeToggle />
           {user && (
             <>
-              <div className="hidden min-w-0 text-right md:block">
-                <p className="truncate text-sm font-medium leading-tight">{user.displayName || "Sin nombre"}</p>
-                <p className="truncate font-mono text-[10px] text-muted">{displayEmail(user.email ?? "")}</p>
-              </div>
-              <span
-                className="hidden size-9 shrink-0 place-items-center rounded-full bg-lime font-mono text-xs font-bold text-coal sm:grid"
-                title={displayEmail(user.email ?? "")}
-                aria-hidden
+              <Link
+                href="/panel/perfil"
+                className="flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full px-1 hover:bg-field focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink md:max-w-60 md:pl-3"
+                aria-label="Mi perfil"
+                aria-current={pathname === "/panel/perfil" ? "page" : undefined}
+                title="Mi perfil"
               >
-                {initials}
-              </span>
+                <span className="hidden min-w-0 text-right md:block">
+                  <span className="block truncate text-sm font-medium leading-tight">{user.displayName || "Mi perfil"}</span>
+                  <span className="block truncate font-mono text-[10px] text-muted">{displayEmail(user.email ?? "")}</span>
+                </span>
+                <span className="grid size-9 shrink-0 place-items-center rounded-full bg-lime font-mono text-xs font-bold text-coal" aria-hidden>
+                  {initials(user.displayName || displayEmail(user.email ?? ""))}
+                </span>
+              </Link>
               <Button
                 variant="ghost"
                 size="sm"
