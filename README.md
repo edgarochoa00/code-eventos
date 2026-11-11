@@ -93,11 +93,10 @@ Cada proyecto guarda una huella permanente en `fingerprints/{projectId}` y se co
 
 Niveles: alto ≥ 75 %, medio ≥ 45 %, bajo ≥ 25 %. Si un proyecto tiene menos de 25 palabras útiles y no tiene enlaces ni archivos, aparece como «Sin datos aún» en lugar de «Original».
 
-Quién ve el análisis (se configura en Evento → Ajustes → Originalidad):
+Quién ve el análisis:
 
-- **Organizadores**: siempre.
-- **Jueces**: no ven el análisis de originalidad.
-- **Equipos**: nunca (predeterminado), al publicar resultados o desde una fecha. Solo ven su propio porcentaje y el motivo, nunca el nombre de los otros proyectos.
+- **Organizadores y administradores**: siempre.
+- **Jueces y equipos**: no ven el análisis de originalidad.
 
 ### Detector nuevo (en desarrollo, no activo)
 

@@ -72,7 +72,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocument> = {
         title: "Evaluación, resultados y originalidad",
         paragraphs: [
           "Los jueces califican de 0 a 10 por criterio y el total ponderado se calcula automáticamente. El organizador decide cuándo publicar resultados; al hacerlo, cada equipo ve su lugar, su puntaje por criterio y los comentarios de los jueces, sin el nombre de quien los escribió.",
-          "Para apoyar a organizadores y jueces, el servicio compara cada proyecto con los registrados antes y muestra coincidencias de texto, enlaces o archivos. Es una señal para revisar, no una conclusión: una coincidencia no implica por sí misma una copia, y las decisiones las toman las personas responsables del evento.",
+          "Para apoyar a organizadores y administradores, el servicio compara cada proyecto con los registrados antes y muestra coincidencias de texto, enlaces o archivos. Es una señal para revisar, no una conclusión: una coincidencia no implica por sí misma una copia, y las decisiones las toman las personas responsables del evento.",
         ],
       },
       {

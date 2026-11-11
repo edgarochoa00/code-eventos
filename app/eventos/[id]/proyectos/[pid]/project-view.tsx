@@ -57,7 +57,6 @@ import {
   isProjectAssignedToJudge,
   normalizeEmail,
   rolesInEvent,
-  teamsSeeOriginality,
 } from "@/lib/utils";
 
 type Tab = "info" | Phase | "evaluate" | "originality" | "scores" | "feedback";
@@ -116,10 +115,8 @@ function ProjectBody({
   const assigned = isJudge && isProjectAssignedToJudge(event, project, user?.email ?? "");
   const canParticipate = isMember && roles.includes("student");
   const isLeader = Boolean(user?.uid) && user?.uid === project.leaderId;
-  const canReview = isOrganizer || isJudge;
-  // Quién ve el análisis de originalidad (solo organizadores, y el equipo si el organizador lo habilita en Ajustes)
-  const teamView = !canReview && isMember;
-  const seeOriginality = isOrganizer || (teamView && teamsSeeOriginality(event));
+  // Quién ve el análisis de originalidad: únicamente organizadores y administradores
+  const seeOriginality = isOrganizer;
   const firstPhase = phases.find((p) => project[p]) ?? phases[0];
   const [tab, setTab] = useState<Tab>(isJudge ? "evaluate" : isMember && !isOrganizer ? (firstPhase ?? "info") : "info");
   const [editingInfo, setEditingInfo] = useState(false);
@@ -373,11 +370,7 @@ function ProjectBody({
         <Card>
           <SectionTitle
             title="Análisis de originalidad"
-            subtitle={
-              teamView
-                ? "Así se compara tu proyecto con los demás registrados en la plataforma."
-                : "Comparado contra todos los proyectos registrados en la plataforma, de cualquier evento y año."
-            }
+            subtitle="Comparado contra todos los proyectos registrados en la plataforma, de cualquier evento y año. Visible solo para organizadores y administradores."
             action={
               <Button variant="outline" size="sm" onClick={fingerprints.reload} loading={fingerprints.loading}>
                 <ScanSearch className="size-3.5" /> Volver a analizar
@@ -389,12 +382,11 @@ function ProjectBody({
           ) : state !== "ready" ? (
             <NotEnoughData state={state} />
           ) : (
-            <MatchList matches={matches.slice(0, 8)} currentEventId={event.id} anonymous={teamView} />
+            <MatchList matches={matches.slice(0, 8)} currentEventId={event.id} anonymous={false} />
           )}
           <p className="mt-5 font-mono text-[10px] leading-relaxed text-muted">
             El porcentaje es una señal, no un veredicto. Combina frases y vocabulario en común, enlaces compartidos
-            (repositorio, video, Drive) y archivos idénticos.
-            {teamView ? " Si crees que hay un error, habla con el organizador." : " Revisa el caso antes de tomar una decisión."}
+            (repositorio, video, Drive) y archivos idénticos. Revisa el caso antes de tomar una decisión.
           </p>
         </Card>
       )}

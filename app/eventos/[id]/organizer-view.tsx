@@ -39,7 +39,6 @@ import {
   Input,
   Modal,
   SectionTitle,
-  Segmented,
   Spinner,
   Tabs,
   Toggle,
@@ -71,10 +70,8 @@ import {
   type EvaluationDoc,
   type EventDoc,
   type JudgeAssignment,
-  type OriginalitySettings,
   type Phase,
   type ProjectDoc,
-  type TeamOriginality,
 } from "@/lib/types";
 import {
   cn,
@@ -82,12 +79,9 @@ import {
   downloadCsv,
   effectiveEvaluationTotal,
   eventCategories,
-  formatDate,
   hasJudgeAssignment,
   isProjectAssignedToJudge,
   normalizeEmail,
-  originalitySettings,
-  todayISO,
 } from "@/lib/utils";
 
 type Tab = "summary" | "projects" | "judges" | "statistics" | "rubric" | "results" | "settings";
@@ -251,15 +245,7 @@ type Analysis = {
   historyCount: number;
 };
 
-function teamVisibilityText(event: EventDoc) {
-  const o = originalitySettings(event);
-  if (o.teams === "results") return "Los equipos lo verán al publicar resultados";
-  if (o.teams === "date") return o.teamsFrom ? `Los equipos lo verán desde el ${formatDate(o.teamsFrom)}` : "Falta elegir la fecha";
-  return "Los equipos no lo ven";
-}
-
 function OriginalityCard({
-  event,
   projects,
   analysis,
   onGo,
@@ -316,63 +302,23 @@ function OriginalityCard({
       </button>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-3">
         <span className="flex items-center gap-1.5 font-mono text-[10px] text-white/75">
-          <EyeOff className="size-3.5" /> {teamVisibilityText(event)}
+          <EyeOff className="size-3.5" /> Visible solo para organizadores y administradores
         </span>
-        <button onClick={() => onGo("settings")} className="font-mono text-[10px] text-lime underline underline-offset-2">
-          Cambiar
-        </button>
       </div>
     </div>
   );
 }
 
-function OriginalitySettingsCard({ event }: { event: EventDoc }) {
-  const toast = useToast();
-  const o = originalitySettings(event);
-
-  async function save(patch: Partial<OriginalitySettings>) {
-    try {
-      await updateEvent(event.id, { originality: { ...o, ...patch } });
-    } catch (err) {
-      toast(firestoreErrorMessage(err), "error");
-    }
-  }
-
+function OriginalitySettingsCard() {
   return (
     <Card className="h-fit">
       <SectionTitle
         title="Originalidad"
-        subtitle="Solo los organizadores ven el análisis completo. Decide cuándo ve cada equipo el de su propio proyecto."
+        subtitle="Solo los organizadores y administradores ven el análisis de originalidad."
       />
-      <div className="space-y-5">
-        <div className="space-y-2">
-          <p className="text-sm font-medium">Cada equipo (solo su proyecto)</p>
-          <Segmented<TeamOriginality>
-            label="Cuándo ve cada equipo su originalidad"
-            value={o.teams}
-            onChange={(teams) => save({ teams, teamsFrom: teams === "date" ? o.teamsFrom || todayISO() : o.teamsFrom })}
-            options={[
-              { id: "hidden", label: "Nunca" },
-              { id: "results", label: "Al publicar resultados" },
-              { id: "date", label: "Desde una fecha" },
-            ]}
-          />
-          {o.teams === "date" && (
-            <Field label="Fecha" htmlFor="orig-date">
-              <Input
-                id="orig-date"
-                type="date"
-                value={o.teamsFrom}
-                onChange={(e) => e.target.value && save({ teamsFrom: e.target.value })}
-              />
-            </Field>
-          )}
-          <p className="font-mono text-[11px] leading-relaxed text-muted">
-            Los equipos solo ven el porcentaje de su proyecto y el motivo. Nunca ven el nombre de los otros proyectos con
-            los que coincide.
-          </p>
-        </div>
-      </div>
+      <p className="font-mono text-[11px] leading-relaxed text-muted">
+        El análisis de similitud contra el historial de proyectos es de uso interno para organización y administración; no se muestra a jueces ni a participantes.
+      </p>
     </Card>
   );
 }
@@ -1085,7 +1031,7 @@ function SettingsTab({ event }: { event: EventDoc }) {
         />
       </Card>
       <div className="space-y-4">
-        <OriginalitySettingsCard event={event} />
+        <OriginalitySettingsCard />
         <Card className="h-fit">
           <SectionTitle title="Código" subtitle="Genera uno nuevo si el actual se compartió donde no debía." />
           <Field label="Código actual" htmlFor="event-code">
