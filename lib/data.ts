@@ -23,7 +23,7 @@ import { inviteSavedAccounts, sendInvitations } from "./account-invitation-clien
 import { scheduleError } from "./judging-agenda";
 import { projectJudgesError } from "./project-judges";
 import type { JudgeAssignment } from "./types";
-import { categoryCriteriaError, cleanCriteria, criteriaError, deliverySettingsError, evaluationScoresError, getCategoryCriteria } from "./event-config";
+import { categoryCriteriaError, cleanCriteria, criteriaError, deliverySettingsError, evaluationScoresError, getCategoryCriteria, sameCriteria } from "./event-config";
 import { computeStandings } from "./results";
 import { validateSubmissionFiles } from "./submission-files";
 import { removeSubmissionFile, verifySubmissionFiles } from "./submission-storage";
@@ -471,7 +471,7 @@ export async function saveEvaluation(
       throw new Error("Este proyecto o etapa no está asignado a tu evaluación.");
     }
     const criteria = getCategoryCriteria(current, currentProject.category);
-    if (currentProject.category !== project.category || JSON.stringify(criteria) !== JSON.stringify(getCategoryCriteria(event, project.category))) {
+    if (currentProject.category !== project.category || !sameCriteria(criteria, getCategoryCriteria(event, project.category))) {
       throw new Error("La categoría o su rúbrica cambió. Recarga el proyecto antes de guardar.");
     }
     const error = evaluationScoresError(criteria, scores);

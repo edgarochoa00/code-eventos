@@ -71,7 +71,6 @@ import {
   type EvaluationDoc,
   type EventDoc,
   type JudgeAssignment,
-  type JudgeOriginality,
   type OriginalitySettings,
   type Phase,
   type ProjectDoc,
@@ -343,21 +342,9 @@ function OriginalitySettingsCard({ event }: { event: EventDoc }) {
     <Card className="h-fit">
       <SectionTitle
         title="Originalidad"
-        subtitle="Tú y los demás organizadores siempre ven el análisis. Decide cuándo lo ven los demás."
+        subtitle="Solo los organizadores ven el análisis completo. Decide cuándo ve cada equipo el de su propio proyecto."
       />
       <div className="space-y-5">
-        <div className="space-y-2">
-          <p className="text-sm font-medium">Jueces</p>
-          <Segmented<JudgeOriginality>
-            label="Cuándo ven los jueces la originalidad"
-            value={o.judges}
-            onChange={(judges) => save({ judges })}
-            options={[
-              { id: "always", label: "Siempre" },
-              { id: "judging", label: "Al abrir la evaluación" },
-            ]}
-          />
-        </div>
         <div className="space-y-2">
           <p className="text-sm font-medium">Cada equipo (solo su proyecto)</p>
           <Segmented<TeamOriginality>
@@ -633,6 +620,28 @@ function JudgesTab({ event, projects }: { event: EventDoc; projects: ProjectDoc[
             title="Agenda por juez"
             subtitle="Programa horarios y revisa la carga de cada juez. En proyectos con máximo definido se respeta la selección de «Asignación por proyecto»; los demás conservan la asignación general."
           />
+          {!event.judgingOpen && !event.resultsPublished && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-amber-50 p-4 text-amber-900">
+              <p className="font-mono text-xs leading-relaxed">
+                La evaluación de jueces está cerrada. Aunque asignes un horario, los jueces verán sus proyectos bloqueados hasta que abras la evaluación.
+              </p>
+              <Button
+                variant="dark"
+                size="sm"
+                disabled={event.accessVersion !== 1}
+                onClick={async () => {
+                  try {
+                    await updateEvent(event.id, { judgingOpen: true });
+                    toast("Evaluación de jueces abierta.");
+                  } catch (err) {
+                    toast(firestoreErrorMessage(err), "error");
+                  }
+                }}
+              >
+                Abrir evaluación ahora
+              </Button>
+            </div>
+          )}
           <ul className="divide-y divide-line">
             {event.judgeEmails.map((email) => {
               const key = normalizeEmail(email);

@@ -47,9 +47,19 @@ export function criteriaError(criteria: Criterion[]): string | null {
 
 /** La categoría del proyecto determina su rúbrica; los eventos históricos mantienen la general. */
 export function getCategoryCriteria(event: Pick<EventDoc, "criteria" | "categoryCriteria">, category: string): Criterion[] {
-  return event.categoryCriteria && Object.hasOwn(event.categoryCriteria, category)
+  const criteria = event.categoryCriteria && Object.hasOwn(event.categoryCriteria, category)
     ? event.categoryCriteria[category]
     : event.criteria;
+  return criteria.map(({ id, name, description, weight }) => ({ id, name, description, weight }));
+}
+
+export function sameCriteria(a: Criterion[], b: Criterion[]): boolean {
+  return a.length === b.length && a.every((c, i) => (
+    c.id === b[i]?.id &&
+    c.name === b[i]?.name &&
+    c.description === b[i]?.description &&
+    c.weight === b[i]?.weight
+  ));
 }
 
 export function categoryCriteriaError(rubrics: Record<string, Criterion[]>): string | null {

@@ -96,7 +96,7 @@ Niveles: alto ≥ 75 %, medio ≥ 45 %, bajo ≥ 25 %. Si un proyecto tiene meno
 Quién ve el análisis (se configura en Evento → Ajustes → Originalidad):
 
 - **Organizadores**: siempre.
-- **Jueces**: siempre, o solo cuando se abre la evaluación.
+- **Jueces**: no ven el análisis de originalidad.
 - **Equipos**: nunca (predeterminado), al publicar resultados o desde una fecha. Solo ven su propio porcentaje y el motivo, nunca el nombre de los otros proyectos.
 
 ### Detector nuevo (en desarrollo, no activo)

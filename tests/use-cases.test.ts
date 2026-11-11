@@ -1,7 +1,7 @@
 // Casos de uso integrales por rol, lógica de negocio, evaluación y originalidad (sin conectar a la nube).
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { categoryCriteriaError, criteriaError, deliverySettingsError, evaluationScoresError, getCategoryCriteria, getPhaseDetails, getPhaseLabel } from "../lib/event-config";
+import { categoryCriteriaError, criteriaError, deliverySettingsError, evaluationScoresError, getCategoryCriteria, getPhaseDetails, getPhaseLabel, sameCriteria } from "../lib/event-config";
 import {
   analysisState,
   buildFingerprint,
@@ -275,8 +275,8 @@ describe("Casos de uso · Rúbrica, calificación ponderada y recálculo de resu
 });
 
 describe("Casos de uso · Visibilidad del análisis de originalidad para jueces y equipos", () => {
-  test("CU-09: Visibilidad para jueces según configuración ('always' vs 'judging')", () => {
-    assert.equal(judgesSeeOriginality(baseEvent), true); // default is 'always'
+  test("CU-09: El rol de juez no puede ver el análisis de originalidad", () => {
+    assert.equal(judgesSeeOriginality(baseEvent), false);
 
     const onlyDuringJudging: EventDoc = {
       ...baseEvent,
@@ -285,8 +285,8 @@ describe("Casos de uso · Visibilidad del análisis de originalidad para jueces 
       originality: { judges: "judging", teams: "hidden", teamsFrom: "" },
     };
     assert.equal(judgesSeeOriginality(onlyDuringJudging), false);
-    assert.equal(judgesSeeOriginality({ ...onlyDuringJudging, judgingOpen: true }), true);
-    assert.equal(judgesSeeOriginality({ ...onlyDuringJudging, resultsPublished: true }), true);
+    assert.equal(judgesSeeOriginality({ ...onlyDuringJudging, judgingOpen: true }), false);
+    assert.equal(judgesSeeOriginality({ ...onlyDuringJudging, resultsPublished: true }), false);
   });
 
   test("CU-10: Visibilidad para equipos ('hidden', 'results', 'date')", () => {
@@ -482,6 +482,11 @@ describe("Rúbricas distintas dentro del mismo evento", () => {
     assert.deepEqual(getCategoryCriteria(event, "Prototipos"), funcional);
     assert.equal(weightedTotal(getCategoryCriteria(event, "Carteles"), { contenido: 10, diseno: 5 }), 65);
     assert.equal(weightedTotal(getCategoryCriteria(event, "Prototipos"), { contenido: 10, prueba: 5 }), 90);
+    const reordered = [{ description: "", weight: 30, name: "Contenido del cartel", id: "contenido" } as Criterion, visual[1]];
+    const snapshotEvent = { ...event, categoryCriteria: { ...event.categoryCriteria, Carteles: reordered } };
+    assert.equal(sameCriteria(getCategoryCriteria(event, "Carteles"), getCategoryCriteria(snapshotEvent, "Carteles")), true);
+    assert.equal(JSON.stringify(getCategoryCriteria(event, "Carteles")), JSON.stringify(getCategoryCriteria(snapshotEvent, "Carteles")));
+    assert.equal(sameCriteria(visual, funcional), false);
   });
 
   test("la rúbrica general conserva eventos antiguos y categorías aún sin personalizar", () => {

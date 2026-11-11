@@ -96,10 +96,10 @@ export function todayISO() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-/** ¿Pueden los jueces ver el análisis de originalidad ahora? */
-export function judgesSeeOriginality(event: EventDoc) {
-  const o = originalitySettings(event);
-  return o.judges === "always" || event.judgingOpen || event.resultsPublished;
+/** Los jueces no ven el análisis de originalidad; solo organizadores (y cada equipo si se habilita). */
+export function judgesSeeOriginality(_event: EventDoc) {
+  void _event;
+  return false;
 }
 
 /** ¿Puede un equipo ver el análisis de su propio proyecto ahora? */

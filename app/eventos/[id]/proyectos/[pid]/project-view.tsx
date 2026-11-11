@@ -54,7 +54,6 @@ import {
   displayEmail,
   effectiveEvaluationTotal,
   eventCategories,
-  judgesSeeOriginality,
   isProjectAssignedToJudge,
   normalizeEmail,
   rolesInEvent,
@@ -118,9 +117,9 @@ function ProjectBody({
   const canParticipate = isMember && roles.includes("student");
   const isLeader = Boolean(user?.uid) && user?.uid === project.leaderId;
   const canReview = isOrganizer || isJudge;
-  // Quién ve el análisis de originalidad (lo controla el organizador en Ajustes)
+  // Quién ve el análisis de originalidad (solo organizadores, y el equipo si el organizador lo habilita en Ajustes)
   const teamView = !canReview && isMember;
-  const seeOriginality = isOrganizer || (isJudge && judgesSeeOriginality(event)) || (teamView && teamsSeeOriginality(event));
+  const seeOriginality = isOrganizer || (teamView && teamsSeeOriginality(event));
   const firstPhase = phases.find((p) => project[p]) ?? phases[0];
   const [tab, setTab] = useState<Tab>(isJudge ? "evaluate" : isMember && !isOrganizer ? (firstPhase ?? "info") : "info");
   const [editingInfo, setEditingInfo] = useState(false);
@@ -178,7 +177,7 @@ function ProjectBody({
         <div className="flex flex-wrap items-center gap-1.5">
           {project.category && <Badge tone="dark">{project.category}</Badge>}
           <SubmissionBadges project={project} event={event} />
-          {canReview && seeOriginality && !fingerprints.loading && <SimilarityBadge match={matches[0]} state={state} />}
+          {isOrganizer && seeOriginality && !fingerprints.loading && <SimilarityBadge match={matches[0]} state={state} />}
         </div>
         <h1 className="mt-4 break-words font-display text-3xl font-bold leading-tight sm:text-4xl">{project.title || "Registro pendiente del líder"}</h1>
         {project.registrationPending && <p className="mt-2 text-sm text-muted">El alumno líder completará los datos del proyecto y registrará a sus integrantes al entrar.</p>}
