@@ -69,7 +69,7 @@ export function AccessForm() {
     event.preventDefault();
     if (state.status !== "ready" || busy || accessCode() !== state.code) return;
     const displayName = name.trim();
-    if (displayName && displayName.length < 2) return setError("Escribe un nombre de al menos 2 caracteres.");
+    if (displayName.length < 2) return setError("Escribe tu nombre completo.");
     if (password !== confirmation) return setError("Las contraseñas no coinciden.");
     setError("");
     setBusy(true);
@@ -92,18 +92,16 @@ export function AccessForm() {
 
     // El código solo autoriza cambiar la contraseña. Guardar el nombre requiere la sesión de esa cuenta.
     let signedInUser: User | undefined;
-    let namePending = Boolean(displayName);
-    if (displayName) {
-      try {
-        signedInUser = await signInEmail(state.email, password);
-        if (accessCode() !== state.code) return;
-        if (auth.currentUser === signedInUser) {
-          await updateName(displayName);
-          namePending = false;
-        }
-      } catch {
-        // La contraseña ya está guardada. El usuario puede completar el nombre desde su perfil.
+    let namePending = true;
+    try {
+      signedInUser = await signInEmail(state.email, password);
+      if (accessCode() !== state.code) return;
+      if (auth.currentUser === signedInUser) {
+        await updateName(displayName);
+        namePending = false;
       }
+    } catch {
+      // La contraseña ya está guardada. El usuario puede reintentar guardar el nombre desde su perfil.
     }
     if (accessCode() !== state.code) return;
     setState({ status: "saved", signedIn: Boolean(signedInUser && auth.currentUser === signedInUser), namePending });
@@ -130,12 +128,11 @@ export function AccessForm() {
       {state.status === "saved" && (
         <div className="mt-3 space-y-5">
           <p role="status" className="text-sm leading-relaxed text-muted">
-            {state.namePending ? "Puedes completar tu nombre desde Mi perfil."
-              : state.signedIn ? "Tu nombre quedó guardado. Ya puedes consultar tu perfil y entrar al panel."
-                : "Ya puedes entrar a Feria 2026 con tu correo y la contraseña que acabas de guardar."}
+            {state.namePending ? "No pudimos terminar de guardar tu nombre. Vuelve a intentarlo desde Mi perfil."
+              : "Tu nombre quedó guardado. Ya puedes consultar tu perfil y entrar al panel."}
           </p>
           <ButtonLink className="w-full" size="lg"
-            href={state.signedIn ? "/panel/perfil" : state.namePending ? "/login?next=/panel/perfil" : "/login"}>
+            href={state.signedIn ? "/panel/perfil" : "/login?next=/panel/perfil"}>
             {state.signedIn ? "Ir a mi perfil" : "Ir a iniciar sesión"} <ArrowUpRight className="size-4" aria-hidden />
           </ButtonLink>
         </div>
@@ -150,16 +147,16 @@ export function AccessForm() {
       )}
       {state.status === "ready" && (
         <>
-          <p className="mt-3 text-sm leading-relaxed text-muted">Elige la contraseña que usarás para entrar a Feria 2026.</p>
+          <p className="mt-3 text-sm leading-relaxed text-muted">Escribe tu nombre y elige la contraseña que usarás para entrar a Feria 2026.</p>
           <div className="mt-4 rounded-2xl border border-line bg-field px-4 py-3">
             <p className="text-[11px] font-bold uppercase tracking-wider text-muted">Correo de la cuenta</p>
             <p className="mt-1 text-sm font-semibold [overflow-wrap:anywhere]">{state.email}</p>
           </div>
           <form onSubmit={savePassword} className="mt-5 space-y-4">
             <input type="hidden" name="username" autoComplete="username" value={state.email} />
-            <Field label="Nombre completo (opcional)" htmlFor="access-name" hint="Si lo escribes, iniciaremos sesión con este correo para guardar tu nombre en el perfil.">
+            <Field label="Nombre completo" htmlFor="access-name">
               <Input id="access-name" name="name" autoComplete="name" minLength={2} maxLength={80} value={name}
-                onChange={(event) => setName(event.target.value)} disabled={busy} />
+                onChange={(event) => setName(event.target.value)} disabled={busy} required />
             </Field>
             <Field label="Nueva contraseña" htmlFor="new-password">
               <div className="relative">
