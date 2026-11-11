@@ -19,7 +19,7 @@ import {
 } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import { auth, db } from "./firebase";
-import { inviteSavedAccounts } from "./account-invitation-client";
+import { inviteSavedAccounts, sendInvitations } from "./account-invitation-client";
 import { scheduleError } from "./judging-agenda";
 import { projectJudgesError } from "./project-judges";
 import type { JudgeAssignment } from "./types";
@@ -372,11 +372,13 @@ export async function createProject(event: EventDoc, input: ProjectInfoInput, us
     syncParticipants(tx, event.id, ref.id, [], memberEmails);
   });
   await writeFingerprint(project, event);
-  return ref.id;
+  const failedInvitations = await sendInvitations({ kind: "team", role: "member", eventId: event.id, projectId: ref.id },
+    memberEmails.filter((email) => email !== leaderEmail));
+  return { id: ref.id, failedInvitations };
 }
 
 export async function updateProjectInfo(event: EventDoc, project: ProjectDoc, input: ProjectInfoInput, user: User) {
-  const updated = await runTransaction(db, async (tx) => {
+  const { updated, added } = await runTransaction(db, async (tx) => {
     const [projectSnap, eventSnap] = await Promise.all([tx.get(projectRef(event.id, project.id)), tx.get(eventRef(event.id))]);
     if (!projectSnap.exists() || !eventSnap.exists()) throw new Error("El proyecto ya no existe.");
     const current = { ...projectSnap.data(), id: project.id } as ProjectDoc;
@@ -395,9 +397,11 @@ export async function updateProjectInfo(event: EventDoc, project: ProjectDoc, in
     const patch = isLeader ? { ...input, ...completion, members, memberEmails } : { ...input, members: current.members };
     tx.update(projectRef(event.id, project.id), { ...patch, updatedAt: serverTimestamp() });
     if (changedMembers) syncParticipants(tx, event.id, project.id, current.memberEmails, memberEmails);
-    return { ...current, ...patch };
+    const added = memberEmails.filter((email) => email !== current.leaderEmail && !current.memberEmails.includes(email));
+    return { updated: { ...current, ...patch }, added };
   });
   await writeFingerprint(updated, event);
+  return sendInvitations({ kind: "team", role: "member", eventId: event.id, projectId: project.id }, added);
 }
 
 export async function deleteProject(eventId: string, project: ProjectDoc, asOrganizer = false) {

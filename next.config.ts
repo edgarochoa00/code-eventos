@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   outputFileTracingIncludes: {
     "/api/account-invitations": ["./emails/acceso.html"],
+    "/api/team-enrollment": ["./emails/acceso.html"],
   },
   turbopack: {
     rules: {

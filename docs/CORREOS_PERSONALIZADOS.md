@@ -16,6 +16,6 @@ Se utiliza la cuenta de Brevo con el remitente dedicado y verificado **Feria 202
 
 El transporte usa el nombre visible **Feria 2026**, HTML y texto plano; no agrega contactos a listas ni envía campañas. Los emuladores ignoran las credenciales reales y conservan el transporte local de Firebase. Un rechazo o una respuesta perdida de Brevo no causa un segundo envío automático por Firebase. La clave de la cuenta se usa únicamente en el servidor, sin incluirla en respuestas ni cuerpos de los mensajes. La contraseña de Outlook nunca se guarda en la aplicación.
 
-Las verificaciones de correo y la recuperación solicitadas desde el inicio de sesión conservan su envío nativo de Firebase; este cambio corresponde a accesos asignados a jueces, organizadores y administradores.
+Las invitaciones de jueces, organizadores, administradores, alumnos líderes e integrantes usan la plantilla de Feria. Las invitaciones de equipo llevan al proyecto después de guardar el nombre y la contraseña. Las verificaciones de correo y la recuperación solicitadas desde el inicio de sesión conservan su envío nativo de Firebase.
 
 Documentación: [Firebase: generación de enlaces y envío con plantillas propias](https://firebase.google.com/docs/auth/admin/email-action-links).

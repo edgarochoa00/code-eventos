@@ -90,6 +90,31 @@ test("sin sesión, con token inválido o sin correo verificado no crea cuentas n
   assert.equal((await oobCodes(input.email)).length, 0);
 });
 
+test("solo el líder puede invitar a un integrante que ya pertenece a su proyecto", async () => {
+  const leader = await account("team-leader");
+  const member = email("team-member");
+  const projectId = "team-invitation";
+  const projectRef = db.doc(`events/${eventId}/projects/${projectId}`);
+  await projectRef.set({ leaderId: leader.user.uid, leaderEmail: leader.user.email, memberEmails: [leader.user.email, member] });
+  const roster = db.doc(`events/${eventId}/access/participants`);
+  await roster.set({ members: { [leader.user.email!]: true, [member]: true }, projectId });
+  const input = { kind: "team", role: "member", eventId, projectId, email: member };
+  assert.equal((await send(input, orgToken)).status, 403);
+  assert.equal((await send({ ...input, email: email("not-in-team") }, leader.token)).status, 409);
+  assert.equal((await send({ ...input, role: "leader" }, orgToken)).status, 409);
+  assert.equal((await send({ ...input, next: "https://example.com" }, leader.token)).status, 400);
+  assert.equal((await oobCodes(member)).length, 0);
+  assert.deepEqual((await send(input, leader.token)).data, { status: "sent" });
+  assert.deepEqual((await send(input, leader.token)).data, { status: "recently-sent" });
+  const codes = await oobCodes(member);
+  assert.equal(codes.length, 1);
+  const next = new URL(new URL(codes[0].oobLink).searchParams.get("continueUrl")!);
+  assert.equal(next.searchParams.get("next"), `/eventos/${eventId}/proyectos/${projectId}`);
+  await projectRef.update({ memberEmails: [leader.user.email] });
+  assert.equal((await send(input, leader.token)).status, 409);
+  await roster.set({ members: {}, projectId: "" });
+});
+
 test("alumno, juez, suspendido y organizador de otro evento no pueden enviar accesos", async () => {
   for (const name of ["student", "judge", "blocked", "other-org"]) {
     const user = await account(name);

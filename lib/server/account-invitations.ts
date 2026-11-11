@@ -1,10 +1,11 @@
 import "server-only";
 
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import type { Auth, DecodedIdToken } from "firebase-admin/auth";
 import type { Transaction } from "firebase-admin/firestore";
 import type { AccountInvitation } from "../account-invitations";
 import { validDocumentId } from "../submission-files";
-import { SUPERADMIN_EMAIL, type EventDoc, type ParticipantRoster, type StaffDoc } from "../types";
+import { SUPERADMIN_EMAIL, type EventDoc, type ParticipantRoster, type ProjectDoc, type StaffDoc } from "../types";
 import { isEmail, normalizeEmail } from "../utils";
 import { adminServices } from "./firebase-admin";
 import { AccessEmailError, accessEmailConfig, sendBrevoAccessEmail, type AccessEmailContext } from "./access-email";
@@ -25,12 +26,16 @@ function parseInput(body: unknown): AccountInvitation {
   if (typeof value.email !== "string" || value.email.length > 254 || !isEmail(value.email) || /[\/\s]/.test(value.email.trim())) {
     throw new InvitationError(400, "Escribe un correo válido.");
   }
-  if (Object.keys(value).some((key) => !["kind", "email", "eventId", "role"].includes(key))) {
+  const allowed = ["kind", "email", "eventId", "role", ...(value.kind === "team" ? ["projectId"] : [])];
+  if (Object.keys(value).some((key) => !allowed.includes(key))) {
     throw new InvitationError(400, "La solicitud contiene datos no permitidos.");
   }
   const email = normalizeEmail(value.email);
   if (value.kind === "event" && validDocumentId(value.eventId) && (value.role === "judge" || value.role === "organizer")) {
     return { kind: "event", eventId: value.eventId, role: value.role, email };
+  }
+  if (value.kind === "team" && validDocumentId(value.eventId) && validDocumentId(value.projectId) && (value.role === "leader" || value.role === "member")) {
+    return { kind: "team", eventId: value.eventId, projectId: value.projectId, role: value.role, email };
   }
   if (value.kind === "staff" && value.eventId === undefined && (value.role === "organizer" || value.role === "admin")) {
     return { kind: "staff", role: value.role, email };
@@ -43,7 +48,7 @@ async function sendSetupEmail(email: string, context: AccessEmailContext) {
   if (config) {
     const { auth } = adminServices();
     const link = await auth.generatePasswordResetLink(email);
-    return sendBrevoAccessEmail(config, email, context, feriaAccessLink(link));
+    return sendBrevoAccessEmail(config, email, context, feriaAccessLink(link, context.projectPath));
   }
   const emulator = process.env.NEXT_PUBLIC_USE_EMULATORS === "true";
   const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
@@ -55,7 +60,8 @@ async function sendSetupEmail(email: string, context: AccessEmailContext) {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Firebase-Locale": "es" },
     body: JSON.stringify({ requestType: "PASSWORD_RESET", email,
-      continueUrl: "https://feria2026.web.app/login", canHandleCodeInApp: false }),
+      continueUrl: new URL(context.projectPath ? `/login?next=${encodeURIComponent(context.projectPath)}` : "/login", "https://feria2026.web.app").href,
+      canHandleCodeInApp: false }),
     signal: AbortSignal.timeout(15_000), cache: "no-store",
   });
   if (!response.ok) {
@@ -69,6 +75,19 @@ async function sendSetupEmail(email: string, context: AccessEmailContext) {
   return { provider: "firebase" as const };
 }
 
+export async function ensureInvitationAccount(auth: Auth, email: string) {
+  try { return await auth.getUserByEmail(email); }
+  catch (error) {
+    if ((error as { code?: string }).code !== "auth/user-not-found") throw error;
+    try {
+      return await auth.createUser({ email, emailVerified: false, password: `Feria!${randomBytes(24).toString("base64url")}9a` });
+    } catch (createError) {
+      if ((createError as { code?: string }).code !== "auth/email-already-exists") throw createError;
+      return auth.getUserByEmail(email);
+    }
+  }
+}
+
 export async function handleAccountInvitation(request: Request) {
   const header = request.headers.get("authorization") ?? "";
   if (!/^Bearer \S+$/.test(header) || header.length > 16_384) throw new InvitationError(401, "Inicia sesión para enviar el acceso.");
@@ -78,13 +97,21 @@ export async function handleAccountInvitation(request: Request) {
   let body: unknown;
   try { body = JSON.parse(text); } catch { throw new InvitationError(400, "La solicitud no es válida."); }
   const input = parseInput(body);
-  const { auth, db } = adminServices();
+  const { auth } = adminServices();
   let identity;
   try { identity = await auth.verifyIdToken(header.slice(7), true); }
   catch { throw new InvitationError(401, "Tu sesión caducó. Vuelve a iniciar sesión."); }
+  return sendAccountInvitation(input, identity);
+}
+
+export async function sendAccountInvitation(input: AccountInvitation, identity: DecodedIdToken) {
+  const { auth, db } = adminServices();
   if (!identity.email || !identity.email_verified) throw new InvitationError(403, "Verifica tu correo antes de enviar accesos.");
   const actor = normalizeEmail(identity.email);
-  const receiptRef = db.doc(`accountInvitationDeliveries/${invitationDeliveryId(input.email)}`);
+  const deliveryId = input.kind === "team"
+    ? createHash("sha256").update(JSON.stringify([input.eventId, input.projectId, input.role, input.email])).digest("hex")
+    : invitationDeliveryId(input.email);
+  const receiptRef = db.doc(`accountInvitationDeliveries/${deliveryId}`);
   const limitRef = db.doc(`accountInvitationLimits/${identity.uid}`);
   const lease = randomUUID();
 
@@ -102,7 +129,27 @@ export async function handleAccountInvitation(request: Request) {
     }
     const [eventSnap, rosterSnap] = await tx.getAll(db.doc(`events/${input.eventId}`), db.doc(`events/${input.eventId}/access/participants`));
     const event = eventSnap.data() as EventDoc | undefined;
-    if (!event || (!superadmin && actorRole !== "admin" && !event.organizerEmails.includes(actor))) {
+    const manages = superadmin || actorRole === "admin" || event?.organizerEmails.includes(actor);
+    const roster = rosterSnap.data() as ParticipantRoster | undefined;
+    if (input.kind === "team") {
+      if (!event || event.accessVersion !== 1) throw new InvitationError(404, "El equipo no está disponible.");
+      const projectPath = `/eventos/${input.eventId}/proyectos/${input.projectId}`;
+      const projectSnap = await tx.get(eventSnap.ref.collection("projects").doc(input.projectId));
+      const project = projectSnap.data() as ProjectDoc | undefined;
+      const isLeader = project?.leaderId === identity.uid && project.leaderEmail === actor;
+      if (input.role === "leader" ? !manages : !isLeader) {
+        throw new InvitationError(403, "Solo quien administra el alta puede enviar este acceso.");
+      }
+      if (!project || !project.memberEmails.includes(input.email) || roster?.members[input.email] !== true ||
+        (project.leaderEmail === input.email) !== (input.role === "leader")) {
+        throw new InvitationError(409, "Ese correo ya no tiene este lugar en el equipo.");
+      }
+      if (input.email === SUPERADMIN_EMAIL || targetRole === "admin" || event.organizerEmails.includes(input.email) || event.judgeEmails.includes(input.email)) {
+        throw new InvitationError(409, "Ese correo tiene un rol incompatible con participar en este equipo.");
+      }
+      return { role: input.role, eventName: event.name, projectPath };
+    }
+    if (!event || !manages) {
       throw new InvitationError(403, "Solo la administración de este evento puede enviar sus accesos.");
     }
     const assigned = input.role === "judge" ? event.judgeEmails : event.organizerEmails;
@@ -110,7 +157,7 @@ export async function handleAccountInvitation(request: Request) {
     if (input.role === "judge" && (event.organizerEmails.includes(input.email) || input.email === SUPERADMIN_EMAIL || targetRole === "admin")) {
       throw new InvitationError(409, "Ese correo administra el evento y no puede entrar como juez.");
     }
-    if ((rosterSnap.data() as ParticipantRoster | undefined)?.members[input.email]) {
+    if (roster?.members[input.email]) {
       throw new InvitationError(409, "Ese correo pertenece a un equipo y no puede recibir ese rol.");
     }
     return { role: input.role, eventName: event.name || "tu evento de Feria 2026" };
@@ -135,18 +182,7 @@ export async function handleAccountInvitation(request: Request) {
   if (recentlySent) return { status: "recently-sent" as const };
 
   try {
-    let account;
-    try { account = await auth.getUserByEmail(input.email); }
-    catch (error) {
-      if ((error as { code?: string }).code !== "auth/user-not-found") throw error;
-      try {
-        account = await auth.createUser({ email: input.email, emailVerified: false,
-          password: `Feria!${randomBytes(24).toString("base64url")}9a` });
-      } catch (createError) {
-        if ((createError as { code?: string }).code !== "auth/email-already-exists") throw createError;
-        account = await auth.getUserByEmail(input.email);
-      }
-    }
+    const account = await ensureInvitationAccount(auth, input.email);
     if (account.disabled) throw new InvitationError(409, "La cuenta está deshabilitada en Firebase Authentication.");
     // Revisa de nuevo los permisos si cambiaron durante la creación de la cuenta.
     const context = await db.runTransaction(authorize);

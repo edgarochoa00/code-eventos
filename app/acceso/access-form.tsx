@@ -4,14 +4,15 @@ import { ArrowUpRight, Eye, EyeOff } from "lucide-react";
 import { confirmPasswordReset, verifyPasswordResetCode, type User } from "firebase/auth";
 import { useEffect, useState, type FormEvent } from "react";
 import { Button, ButtonLink, Field, Input, Spinner } from "@/components/ui";
+import { invitationProjectPath } from "@/lib/account-invitations";
 import { authErrorMessage, useAuth } from "@/lib/auth";
 import { auth } from "@/lib/firebase";
 
 type AccessState =
   | { status: "checking" | "invalid" }
-  | { status: "saved"; signedIn: boolean; namePending: boolean }
+  | { status: "saved"; signedIn: boolean; namePending: boolean; projectPath: string | null }
   | { status: "retry"; message: string }
-  | { status: "ready"; email: string; code: string };
+  | { status: "ready"; email: string; code: string; projectPath: string | null };
 
 function isInvalidLink(error: unknown) {
   return ["auth/expired-action-code", "auth/invalid-action-code", "auth/user-disabled", "auth/user-not-found"]
@@ -51,11 +52,12 @@ export function AccessForm() {
   useEffect(() => {
     let cancelled = false;
     async function checkLink() {
-      const code = accessCode();
+      const params = new URLSearchParams(window.location.hash.slice(1));
+      const code = params.get("oobCode");
       if (!code) return { status: "invalid" } as const;
       try {
         const email = await verifyPasswordResetCode(auth, code);
-        return { status: "ready", email, code } as const;
+        return { status: "ready", email, code, projectPath: invitationProjectPath(params.get("next")) } as const;
       } catch (err) {
         if (isInvalidLink(err)) return { status: "invalid" } as const;
         return { status: "retry", message: authErrorMessage(err) } as const;
@@ -104,13 +106,14 @@ export function AccessForm() {
       // La contraseña ya está guardada. El usuario puede reintentar guardar el nombre desde su perfil.
     }
     if (accessCode() !== state.code) return;
-    setState({ status: "saved", signedIn: Boolean(signedInUser && auth.currentUser === signedInUser), namePending });
+    setState({ status: "saved", signedIn: Boolean(signedInUser && auth.currentUser === signedInUser), namePending, projectPath: state.projectPath });
     setBusy(false);
     window.history.replaceState(null, "", window.location.pathname);
   }
 
   const title = state.status === "saved" ? "Contraseña guardada"
     : state.status === "invalid" ? "Enlace no disponible" : "Configura tu acceso";
+  const projectPath = state.status === "saved" && !state.namePending ? state.projectPath : null;
 
   return (
     <>
@@ -129,11 +132,12 @@ export function AccessForm() {
         <div className="mt-3 space-y-5">
           <p role="status" className="text-sm leading-relaxed text-muted">
             {state.namePending ? "No pudimos terminar de guardar tu nombre. Vuelve a intentarlo desde Mi perfil."
-              : "Tu nombre quedó guardado. Ya puedes consultar tu perfil y entrar al panel."}
+              : projectPath ? "Tu nombre quedó guardado. Ya puedes entrar a tu proyecto."
+                : "Tu nombre quedó guardado. Ya puedes consultar tu perfil y entrar al panel."}
           </p>
           <ButtonLink className="w-full" size="lg"
-            href={state.signedIn ? "/panel/perfil" : "/login?next=/panel/perfil"}>
-            {state.signedIn ? "Ir a mi perfil" : "Ir a iniciar sesión"} <ArrowUpRight className="size-4" aria-hidden />
+            href={state.signedIn ? projectPath ?? "/panel/perfil" : `/login?next=${encodeURIComponent(projectPath ?? "/panel/perfil")}`}>
+            {state.signedIn ? projectPath ? "Ir a mi proyecto" : "Ir a mi perfil" : "Ir a iniciar sesión"} <ArrowUpRight className="size-4" aria-hidden />
           </ButtonLink>
         </div>
       )}

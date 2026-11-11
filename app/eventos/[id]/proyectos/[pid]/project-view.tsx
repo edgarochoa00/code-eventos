@@ -1,5 +1,7 @@
 "use client";
 
+import { AccountInvitationButton } from "@/components/account-invitation-button";
+
 import { ArrowLeft, Lock, MessageSquareQuote, Pencil, ScanSearch, Trash2, Trophy, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -191,6 +193,12 @@ function ProjectBody({
                 {m.name || displayEmail(m.email)}
                 {m.email === project.leaderEmail && <span className="font-mono text-[10px] text-muted"> · líder</span>}
               </span>
+              {isOrganizer && project.registrationPending && m.email === project.leaderEmail && (
+                <AccountInvitationButton scope={{ kind: "team", role: "leader", eventId: event.id, projectId: project.id }} email={m.email} />
+              )}
+              {canParticipate && isLeader && m.email !== project.leaderEmail && (
+                <AccountInvitationButton scope={{ kind: "team", role: "member", eventId: event.id, projectId: project.id }} email={m.email} />
+              )}
             </li>
           ))}
         </ul>
@@ -219,8 +227,9 @@ function ProjectBody({
               onSubmit={async (input) => {
                 if (!user) return;
                 try {
-                  await updateProjectInfo(event, project, input, user);
-                  toast("Proyecto actualizado.");
+                  const failedInvitations = await updateProjectInfo(event, project, input, user);
+                  if (failedInvitations.length) toast(`Proyecto actualizado. Reintenta enviar acceso a ${failedInvitations.join(", ")} desde el proyecto.`, "error");
+                  else toast("Proyecto actualizado.");
                   setEditingInfo(false);
                 } catch (err) {
                   toast(firestoreErrorMessage(err), "error");

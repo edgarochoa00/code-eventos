@@ -89,8 +89,9 @@ export function StudentView({ event }: { event: EventDoc }) {
             onSubmit={async (input) => {
               if (!user) return;
               try {
-                const id = await createProject(event, input, user);
-                toast("Proyecto registrado.");
+                const { id, failedInvitations } = await createProject(event, input, user);
+                if (failedInvitations.length) toast(`Proyecto registrado. Reintenta enviar acceso a ${failedInvitations.join(", ")} desde el proyecto.`, "error");
+                else toast("Proyecto registrado.");
                 router.push(`/eventos/${event.id}/proyectos/${id}`);
               } catch (err) {
                 toast(firestoreErrorMessage(err), "error");

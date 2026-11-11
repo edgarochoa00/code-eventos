@@ -16,7 +16,7 @@ export async function sendAccountInvitation(scope: InvitationScope, email: strin
   return result;
 }
 
-export async function inviteSavedAccounts(scope: InvitationScope, emails: string[]) {
+export async function sendInvitations(scope: InvitationScope, emails: string[]) {
   const failed: string[] = [];
   // Limita las solicitudes simultáneas al agregar una lista de jueces.
   for (let i = 0; i < emails.length; i += 4) {
@@ -26,6 +26,11 @@ export async function inviteSavedAccounts(scope: InvitationScope, emails: string
       if (result.status === "rejected") failed.push(batch[index]);
     });
   }
+  return failed;
+}
+
+export async function inviteSavedAccounts(scope: InvitationScope, emails: string[]) {
+  const failed = await sendInvitations(scope, emails);
   if (failed.length) throw new SavedInvitationError(
     `Los permisos se guardaron. No se pudo enviar el acceso a: ${failed.join(", ")}. Usa «Enviar acceso» para reintentarlo.`,
   );

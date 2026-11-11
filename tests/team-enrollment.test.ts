@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { before, after, test } from "node:test";
+import { before, after, mock, test } from "node:test";
 import { POST } from "../app/api/team-enrollment/route";
 import { adminServices } from "../lib/server/firebase-admin";
 import type { TeamEnrollmentInput } from "../lib/team-enrollment";
@@ -9,6 +9,7 @@ assert.ok(process.env.FIRESTORE_EMULATOR_HOST, "Ejecuta npm run test:enrollment"
 assert.ok(process.env.FIREBASE_AUTH_EMULATOR_HOST, "Falta el emulador de Auth");
 process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID = "demo-code";
 process.env.NEXT_PUBLIC_USE_EMULATORS = "true";
+process.env.NEXT_PUBLIC_FIREBASE_API_KEY = "fake-key";
 const { auth, db } = adminServices();
 const prefix = `enroll-${Date.now()}`;
 const email = (id: string) => `${prefix}-${id}@example.com`;
@@ -46,6 +47,12 @@ async function send(data: unknown, token = orgToken) {
     method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(data),
   }));
   return { status: response.status, data: await response.json(), cache: response.headers.get("cache-control") };
+}
+
+async function codesFor(address: string) {
+  const response = await fetch(`http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/emulator/v1/projects/demo-code/oobCodes`);
+  assert.equal(response.status, 200);
+  return ((await response.json()).oobCodes as { email: string; oobCode: string; oobLink: string }[]).filter(code => code.email === address);
 }
 
 before(async () => {
@@ -88,7 +95,8 @@ test("el organizador da de alta solo el correo y deja proyecto, categoría e int
   const result = await send({ ...data, email: ` ${data.email.toUpperCase()} ` });
   assert.equal(result.status, 200);
   assert.equal(result.cache, "no-store");
-  assert.equal(result.data.createdAccounts.length, 1);
+  assert.equal(result.data.invitation, "sent");
+  assert.deepEqual(Object.keys(result.data).sort(), ["invitation", "projectId"]);
   const project = (await db.doc(`events/${eventId}/projects/${result.data.projectId}`).get()).data()!;
   const user = await auth.getUserByEmail(data.email);
   assert.equal(project.registrationPending, true);
@@ -103,7 +111,16 @@ test("el organizador da de alta solo el correo y deja proyecto, categoría e int
   assert.equal((await db.doc(`events/${eventId}/access/participants`).get()).data()?.members[data.email], true);
   assert.equal((await db.doc(`users/${user.uid}`).get()).data()?.lastLoginAt, null);
   assert.equal((await db.doc(`fingerprints/${result.data.projectId}`).get()).exists, false);
-  await login(data.email, result.data.createdAccounts[0].password);
+  const [code] = await codesFor(data.email);
+  const next = new URL(new URL(code.oobLink).searchParams.get("continueUrl")!);
+  assert.equal(next.searchParams.get("next"), `/eventos/${eventId}/proyectos/${result.data.projectId}`);
+  const activation = await fetch(`http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:resetPassword?key=fake-key`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ oobCode: code.oobCode, newPassword: password }),
+  });
+  assert.equal(activation.status, 200);
+  const activated = await auth.verifyIdToken(await login(data.email));
+  assert.equal(activated.uid, project.leaderId);
+  assert.equal(activated.email_verified, true);
 });
 
 test("admin reutiliza cuenta, perfil y contraseña en distintos eventos", async () => {
@@ -111,11 +128,12 @@ test("admin reutiliza cuenta, perfil y contraseña en distintos eventos", async 
   await db.doc(`users/${existing.user.uid}`).set({ displayName: "Nombre personal", lastLoginAt: "conservar" });
   const first = await send(input({ email: existing.user.email! }), adminToken);
   assert.equal(first.status, 200);
-  assert.deepEqual(first.data.createdAccounts, []);
+  assert.equal(first.data.invitation, "sent");
   const secondEvent = `${prefix}-second`;
   await seedEvent(secondEvent);
   const second = await send(input({ eventId: secondEvent, email: existing.user.email! }), adminToken);
   assert.equal(second.status, 200);
+  assert.equal(second.data.invitation, "sent");
   const project = (await db.doc(`events/${secondEvent}/projects/${second.data.projectId}`).get()).data()!;
   assert.equal(project.leaderId, existing.user.uid);
   assert.equal(project.registrationPending, true);
@@ -176,9 +194,7 @@ test("dos altas concurrentes del mismo correo no duplican al líder", async () =
   assert.deepEqual(results.map((result) => result.status).sort(), [200, 409]);
   const projects = await db.collection(`events/${eventId}/projects`).where("leaderEmail", "==", data.email).get();
   assert.equal(projects.size, 1);
-  const credentials = results.flatMap((result) => result.data.createdAccounts);
-  assert.equal(credentials.length, 1);
-  await login(data.email, credentials[0].password);
+  assert.equal((await codesFor(data.email)).length, 1);
 });
 
 test("cuentas deshabilitadas fallan sin registrar al líder", async () => {
@@ -187,6 +203,22 @@ test("cuentas deshabilitadas fallan sin registrar al líder", async () => {
   const data = input({ email: disabled.user.email! });
   const result = await send(data);
   assert.equal(result.status, 409);
-  assert.deepEqual(result.data.createdAccounts, []);
+  assert.equal((await codesFor(data.email)).length, 0);
   assert.equal((await db.collection(`events/${eventId}/projects`).where("leaderEmail", "==", data.email).get()).size, 0);
+});
+
+test("un fallo de correo conserva el alta y no devuelve una contraseña", async () => {
+  const data = input();
+  const original = globalThis.fetch;
+  const sending = mock.method(globalThis, "fetch", (url: string | URL | Request, options?: RequestInit) => {
+    if (String(url).includes("accounts:sendOobCode")) return Promise.resolve(new Response(null, { status: 503 }));
+    return original(url, options);
+  });
+  try {
+    const result = await send(data);
+    assert.equal(result.status, 200);
+    assert.deepEqual(result.data, { projectId: result.data.projectId, invitation: "failed" });
+    assert.equal((await db.doc(`events/${eventId}/projects/${result.data.projectId}`).get()).get("registrationPending"), true);
+    assert.equal((await codesFor(data.email)).length, 0);
+  } finally { sending.mock.restore(); }
 });

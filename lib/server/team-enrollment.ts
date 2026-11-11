@@ -1,15 +1,14 @@
 import "server-only";
 
-import { randomBytes } from "node:crypto";
 import { FieldValue, type Transaction } from "firebase-admin/firestore";
 import { validDocumentId } from "../submission-files";
-import type { CreatedTeamAccount, TeamEnrollmentInput } from "../team-enrollment";
+import type { TeamEnrollmentInput, TeamEnrollmentResult } from "../team-enrollment";
 import { SUPERADMIN_EMAIL, type EventDoc, type ParticipantRoster, type StaffDoc } from "../types";
 import { isEmail, normalizeEmail } from "../utils";
 import { adminServices } from "./firebase-admin";
+import { ensureInvitationAccount, sendAccountInvitation } from "./account-invitations";
 
 export class EnrollmentError extends Error {
-  createdAccounts: CreatedTeamAccount[] = [];
   constructor(public status: number, message: string) { super(message); }
 }
 
@@ -26,7 +25,7 @@ function parseInput(body: unknown): TeamEnrollmentInput {
   return { eventId: value.eventId, email: normalizeEmail(value.email) };
 }
 
-export async function handleTeamEnrollment(request: Request) {
+export async function handleTeamEnrollment(request: Request): Promise<TeamEnrollmentResult> {
   const header = request.headers.get("authorization") ?? "";
   if (!/^Bearer \S+$/.test(header) || header.length > 16384) throw new EnrollmentError(401, "Inicia sesión para dar de alta líderes.");
   if (Number(request.headers.get("content-length")) > 16384) throw new EnrollmentError(413, "La solicitud es demasiado grande.");
@@ -69,22 +68,8 @@ export async function handleTeamEnrollment(request: Request) {
 
   // Valida permisos y conflictos antes de crear una cuenta.
   await db.runTransaction(scope);
-  const createdAccounts: CreatedTeamAccount[] = [];
   try {
-    let account;
-    try { account = await auth.getUserByEmail(input.email); }
-    catch (error) {
-      if ((error as { code?: string }).code !== "auth/user-not-found") throw error;
-      const password = `Code!${randomBytes(18).toString("base64url")}9a`;
-      try {
-        account = await auth.createUser({ email: input.email, password, emailVerified: false });
-        createdAccounts.push({ email: input.email, password });
-      } catch (createError) {
-        // Otra alta simultánea puede haber creado la misma cuenta; conserva su acceso.
-        if ((createError as { code?: string }).code !== "auth/email-already-exists") throw createError;
-        account = await auth.getUserByEmail(input.email);
-      }
-    }
+    const account = await ensureInvitationAccount(auth, input.email);
     if (account.disabled) throw new EnrollmentError(409, `${input.email} tiene la cuenta deshabilitada.`);
     const leaderId = account.uid;
     const leaderName = account.displayName ?? "";
@@ -101,11 +86,15 @@ export async function handleTeamEnrollment(request: Request) {
       if (!profile.exists) tx.create(profileRef, { uid: leaderId, email: input.email,
         displayName: leaderName, photoURL: "", lastLoginAt: null });
     });
-    return { projectId: projectRef.id, createdAccounts };
   } catch (error) {
-    // Auth y Firestore no comparten transacciones: conserva accesos emitidos si falla el registro.
-    const known = error instanceof EnrollmentError ? error : new EnrollmentError(503, "No se pudo terminar el alta. Revisa los datos e intenta de nuevo.");
-    known.createdAccounts = createdAccounts;
-    throw known;
+    if (error instanceof EnrollmentError) throw error;
+    throw new EnrollmentError(503, "No se pudo terminar el alta. Revisa los datos e intenta de nuevo.");
+  }
+  // El correo se envía solo después de guardar el lugar en el equipo.
+  try {
+    const result = await sendAccountInvitation({ kind: "team", role: "leader", eventId: input.eventId, projectId: projectRef.id, email: input.email }, identity);
+    return { projectId: projectRef.id, invitation: result.status };
+  } catch {
+    return { projectId: projectRef.id, invitation: "failed" };
   }
 }

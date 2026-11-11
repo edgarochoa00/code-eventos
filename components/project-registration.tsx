@@ -12,12 +12,11 @@ export function ProjectRegistration({ event, project }: { event: EventDoc; proje
   const { user, updateName } = useAuth();
   const toast = useToast();
   const locked = event.resultsPublished || event.categoryLocked || event.judgingOpen || event.accessVersion !== 1;
-  const leader = { name: project.members.find((member) => member.email === project.leaderEmail)?.name || user?.displayName || "", email: project.leaderEmail };
+  const leader = { name: user?.displayName || project.members.find((member) => member.email === project.leaderEmail)?.name || "", email: project.leaderEmail };
   return (
     <Card className="sm:p-8">
       <SectionTitle title="Completa el registro de tu proyecto" subtitle={event.name} />
-      <p className="mb-5 text-sm text-muted">Te dieron de alta como alumno líder con tu correo. Ahora escribe tu nombre,
-        los datos del proyecto, elige su categoría y agrega a tus integrantes.</p>
+      <p className="mb-5 text-sm text-muted">Completa los datos del proyecto, elige su categoría y agrega a tus integrantes. Recibirán un correo para configurar su acceso.</p>
       {locked ? (
         <p role="alert" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
           {event.accessVersion !== 1 ? "El evento necesita una actualización de permisos."
@@ -30,8 +29,9 @@ export function ProjectRegistration({ event, project }: { event: EventDoc; proje
             try {
               const name = input.members.find((member) => member.email === project.leaderEmail)?.name ?? "";
               if (name && name !== user.displayName) await updateName(name);
-              await updateProjectInfo(event, project, input, user);
-              toast("Proyecto registrado. Ya puedes consultar las entregas de tu evento.");
+              const failedInvitations = await updateProjectInfo(event, project, input, user);
+              if (failedInvitations.length) toast(`Proyecto registrado. Reintenta enviar acceso a ${failedInvitations.join(", ")} desde el proyecto.`, "error");
+              else toast("Proyecto registrado. Ya puedes consultar las entregas de tu evento.");
             } catch (error) { toast(firestoreErrorMessage(error), "error"); }
           }} />
       )}

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mock, test } from "node:test";
 import { AccessEmailError, accessEmailConfig, renderAccessEmail, sendBrevoAccessEmail } from "../lib/server/access-email";
 import { feriaAccessLink } from "../lib/server/access-link";
+import { invitationProjectPath } from "../lib/account-invitations";
 
 const config = { apiKey: "key-for-unit-tests-only", from: "feria@example.com" };
 const context = { role: "judge" as const, eventName: "Feria de Ingeniería 2026" };
@@ -35,6 +36,12 @@ test("el mensaje usa el logo y la acción segura, escapa contenido y ofrece text
   const staff = await renderAccessEmail("admin@example.com", { role: "admin", eventName: null }, link);
   assert.match(staff.text, /administrador en la plataforma Feria 2026/);
   await assert.rejects(renderAccessEmail("juez@example.com", context, "javascript:alert(1)"), AccessEmailError);
+  const projectPath = "/eventos/evento/proyectos/proyecto";
+  const leaderLink = new URL(feriaAccessLink(link, projectPath));
+  assert.equal(invitationProjectPath(new URLSearchParams(leaderLink.hash.slice(1)).get("next")), projectPath);
+  assert.equal(invitationProjectPath("//example.com/eventos/e/proyectos/p"), null);
+  const leader = await renderAccessEmail("lider@example.com", { role: "leader", eventName: "Prueba", projectPath }, leaderLink.href);
+  assert.match(leader.html, /nombre completo.*formulario de tu proyecto/);
 });
 
 test("envía a un único destinatario sin listas de marketing y devuelve solo confirmación del proveedor", async () => {
