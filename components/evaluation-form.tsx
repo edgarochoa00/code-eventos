@@ -32,6 +32,7 @@ export function EvaluationForm({
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [commentError, setCommentError] = useState("");
   const locked = externallyLocked || !!initial || submitted;
   const total = weightedTotal(criteria, scores);
   const totalWeight = criteria.reduce((s, c) => s + c.weight, 0) || 1;
@@ -41,6 +42,11 @@ export function EvaluationForm({
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (locked || busy) return;
+    if (!comment.trim()) {
+      setCommentError("Escribe un comentario para el equipo antes de enviar la calificación.");
+      document.getElementById("comment")?.focus();
+      return;
+    }
     setConfirming(true);
   }
 
@@ -140,14 +146,16 @@ export function EvaluationForm({
         })}
       </div>
 
-      <Field label="Comentarios para el equipo" htmlFor="comment" hint="Se muestran al equipo cuando se publiquen los resultados (sin tu nombre).">
-        <Textarea id="comment" value={comment} disabled={locked || busy || confirming} onChange={(e) => setComment(e.target.value)} maxLength={2000} />
+      <Field label="Comentarios para el equipo (obligatorio)" htmlFor="comment" error={commentError || undefined}
+        hint="Obligatorio para enviar. Se muestra al equipo cuando se publiquen los resultados (sin tu nombre).">
+        <Textarea id="comment" required aria-required value={comment} disabled={locked || busy || confirming} maxLength={2000}
+          onChange={(e) => { setComment(e.target.value); if (e.target.value.trim()) setCommentError(""); }} />
       </Field>
       <Modal open={confirming} onClose={() => { if (!busy) setConfirming(false); }} title="¿Enviar calificación definitiva?">
         <p className="text-sm">Revisa tus calificaciones. Solo puedes enviar una evaluación por proyecto y etapa; después no podrás modificarla.</p>
         <ul className="my-4 space-y-2">{criteria.map(c => <li key={c.id} className="flex justify-between gap-4 text-sm"><span>{c.name}</span><strong>{scores[c.id] ?? 0}/10</strong></li>)}</ul>
         <p className="font-medium">Total: {total.toFixed(1)}/100</p>
-        {comment && <p className="mt-3 whitespace-pre-wrap text-sm">{comment}</p>}
+        <p className="mt-3 whitespace-pre-wrap text-sm">{comment.trim()}</p>
         <div className="mt-6 flex justify-end gap-2">
           <Button type="button" variant="ghost" disabled={busy} onClick={() => setConfirming(false)}>Seguir revisando</Button>
           <Button type="button" loading={busy} disabled={locked} onClick={submitConfirmed}>Confirmar envío</Button>

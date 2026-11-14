@@ -22,6 +22,11 @@ export type Release = { version: string; date: string; title: string; changes: s
 
 /** La primera entrada es la versión actual (debe coincidir con package.json). */
 export const RELEASES: Release[] = [
+  { version: "0.4.13", date: "13 de noviembre de 2026", title: "Comentario obligatorio, horarios de jueces y baja completa desde Administración", changes: [
+    "El juez debe escribir un comentario para el equipo antes de enviar su calificación.",
+    "«Horarios de los jueces» solo programa el horario de los proyectos que cada juez ya tiene asignados. La asignación se hace en «Asignación por proyecto».",
+    "El superadministrador puede revisar los vínculos de cualquier cuenta en Firebase y Authentication y eliminarla por completo desde Administración.",
+  ] },
   { version: "0.4.12", date: "13 de noviembre de 2026", title: "Bajas de alumnos y evaluaciones definitivas", changes: [
     "Al retirar un proyecto se elimina el perfil y el acceso de los alumnos que no participan ni tienen permisos en otros eventos, para permitir un nuevo registro.",
     "Los jueces empiezan sin proyectos asignados y la organización puede filtrar por categoría al asignarlos.",

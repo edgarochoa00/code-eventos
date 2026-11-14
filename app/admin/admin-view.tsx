@@ -13,10 +13,11 @@ import {
   Users,
 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { EmailListEditor } from "@/components/email-list-editor";
 import { AccountInvitationButton } from "@/components/account-invitation-button";
 import { TeamEnrollmentButton } from "@/components/team-enrollment";
+import { UserDeletionModal, type DeletionTarget } from "@/components/user-deletion-modal";
 import { EventStatus } from "@/components/event-card";
 import {
   Badge,
@@ -59,14 +60,19 @@ import {
   type StaffRole,
   type UserDoc,
 } from "@/lib/types";
+import type { AuthUserSummary } from "@/lib/user-deletion";
+import { listAdminAuthUsers } from "@/lib/user-deletion-client";
 import { cn, displayEmail, formatDate, initials, isEmail, normalizeEmail } from "@/lib/utils";
 
 type Tab = "people" | "events" | "roles";
 type Filter = "all" | "admins" | "organizers" | "judges" | "blocked" | "pending";
+type AuthUsersStatus = { loaded: boolean; error: string | null };
 
 type Person = {
+  key: string;
   email: string;
   user?: UserDoc;
+  authUser?: AuthUserSummary;
   role: GlobalRole;
   judgeIn: EventDoc[];
   organizerIn: EventDoc[];
@@ -89,16 +95,50 @@ const ROLE_TONE: Record<GlobalRole, "dark" | "lime" | "green" | "red" | "neutral
 };
 
 export function AdminView() {
+  const { user } = useAuth();
   const access = useAccess();
   const [tab, setTab] = useState<Tab>("people");
+  const [authUsers, setAuthUsers] = useState<{ data: AuthUserSummary[]; loaded: boolean; error: string | null }>({
+    data: [],
+    loaded: false,
+    error: null,
+  });
+  const [authVersion, setAuthVersion] = useState(0);
 
   const enabled = access.isAdmin;
+  const canInspectAuth = access.isSuperadmin && Boolean(user?.emailVerified);
   const users = useCollection<UserDoc>(enabled ? qAllUsers() : null, "admin:users");
   const staff = useCollection<StaffDoc>(enabled ? qAllStaff() : null, "admin:staff");
   const events = useCollection<EventDoc>(enabled ? qAllEvents() : null, "admin:events");
   const projects = useCollection<ProjectDoc>(enabled ? qAllProjects() : null, "admin:projects");
 
-  // Une usuarios registrados, permisos y jueces/organizadores invitados (aunque no se hayan registrado)
+  useEffect(() => {
+    if (!canInspectAuth) return;
+    let cancelled = false;
+    listAdminAuthUsers()
+      .then((data) => {
+        if (!cancelled) setAuthUsers({ data, loaded: true, error: null });
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setAuthUsers((prev) => ({
+            data: prev.data,
+            loaded: true,
+            error: err instanceof Error ? err.message : "No se pudieron cargar las cuentas de Authentication.",
+          }));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canInspectAuth, authVersion]);
+
+  const visibleAuthUsers = useMemo(
+    () => (canInspectAuth ? authUsers.data : []),
+    [canInspectAuth, authUsers.data],
+  );
+
+  // Une usuarios registrados, cuentas en Authentication, permisos y jueces/organizadores invitados
   const people = useMemo<Person[]>(() => {
     const map = new Map<string, Person>();
     const get = (raw: string) => {
@@ -106,7 +146,14 @@ export function AdminView() {
       if (!email) return null;
       let p = map.get(email);
       if (!p) {
-        p = { email, role: email === SUPERADMIN_EMAIL ? "superadmin" : "user", judgeIn: [], organizerIn: [], projects: 0 };
+        p = {
+          key: email,
+          email,
+          role: email === SUPERADMIN_EMAIL ? "superadmin" : "user",
+          judgeIn: [],
+          organizerIn: [],
+          projects: 0,
+        };
         map.set(email, p);
       }
       return p;
@@ -115,6 +162,28 @@ export function AdminView() {
     for (const u of users.data) {
       const p = get(u.email);
       if (p) p.user = u;
+    }
+    for (const au of visibleAuthUsers) {
+      const email = normalizeEmail(au.email);
+      if (email) {
+        const p = get(email);
+        if (p && (!p.authUser || (p.user?.uid && au.uid === p.user.uid))) {
+          p.authUser = au;
+        }
+      } else {
+        const key = `uid:${au.uid}`;
+        if (!map.has(key)) {
+          map.set(key, {
+            key,
+            email: "",
+            authUser: au,
+            role: "user",
+            judgeIn: [],
+            organizerIn: [],
+            projects: 0,
+          });
+        }
+      }
     }
     for (const s of staff.data) {
       const p = get(s.email);
@@ -125,8 +194,13 @@ export function AdminView() {
       e.organizerEmails.forEach((m) => get(m)?.organizerIn.push(e));
     }
     for (const pr of projects.data) pr.memberEmails.forEach((m) => get(m) && get(m)!.projects++);
-    return Array.from(map.values()).sort((a, b) => roleOrder(a.role) - roleOrder(b.role) || a.email.localeCompare(b.email));
-  }, [users.data, staff.data, events.data, projects.data]);
+    return Array.from(map.values()).sort((a, b) => roleOrder(a.role) - roleOrder(b.role) || a.key.localeCompare(b.key));
+  }, [users.data, visibleAuthUsers, staff.data, events.data, projects.data]);
+
+  const authUsersStatus: AuthUsersStatus = {
+    loaded: canInspectAuth && authUsers.loaded,
+    error: canInspectAuth ? authUsers.error : null,
+  };
 
   if (access.loading) return <Spinner />;
   if (!access.isAdmin) {
@@ -155,7 +229,7 @@ export function AdminView() {
           <h1 className="font-display text-3xl font-bold sm:text-4xl">Administración</h1>
           <p className="mt-2 max-w-md font-mono text-[11px] leading-relaxed text-white/75">
             {access.isSuperadmin
-              ? "Controlas quién es admin u organizador, suspendes cuentas y asignas jueces en cualquier evento."
+              ? "Controlas quién es admin u organizador, suspendes o eliminas cuentas y asignas jueces en cualquier evento."
               : "Administras todos los eventos y sus jueces. Solo el superadmin cambia permisos de la plataforma."}
           </p>
         </div>
@@ -183,7 +257,25 @@ export function AdminView() {
         <Spinner />
       ) : (
         <>
-          {tab === "people" && <PeopleTab people={people} events={events.data} />}
+          {tab === "people" && (
+            <PeopleTab
+              people={people}
+              events={events.data}
+              authUsersStatus={authUsersStatus}
+              onUserDeleted={(deletedEmail, deletedUid) => {
+                const cleanEmail = normalizeEmail(deletedEmail);
+                setAuthUsers((prev) => ({
+                  ...prev,
+                  data: prev.data.filter(
+                    (au) =>
+                      (!deletedUid || au.uid !== deletedUid) &&
+                      (!cleanEmail || normalizeEmail(au.email) !== cleanEmail),
+                  ),
+                }));
+                setAuthVersion((v) => v + 1);
+              }}
+            />
+          )}
           {tab === "events" && <EventsTab events={events.data} projects={projects.data} />}
           {tab === "roles" && <RolesTab people={people} />}
         </>
@@ -208,10 +300,23 @@ function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; va
 
 /* ---------- Usuarios ---------- */
 
-function PeopleTab({ people, events }: { people: Person[]; events: EventDoc[] }) {
+function PeopleTab({
+  people,
+  events,
+  authUsersStatus,
+  onUserDeleted,
+}: {
+  people: Person[];
+  events: EventDoc[];
+  authUsersStatus: AuthUsersStatus;
+  onUserDeleted: (deletedEmail: string, deletedUid?: string) => void;
+}) {
+  const access = useAccess();
+  const toast = useToast();
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<{ target: DeletionTarget; returnKey?: string } | null>(null);
 
   const counts: Record<Filter, number> = {
     all: people.length,
@@ -232,12 +337,20 @@ function PeopleTab({ people, events }: { people: Person[]; events: EventDoc[] })
       if (filter === "pending") return !p.user;
       return true;
     })
-    .filter((p) => !q || displayEmail(p.email).toLowerCase().includes(q) || (p.user?.displayName ?? "").toLowerCase().includes(q));
+    .filter(
+      (p) =>
+        !q ||
+        displayEmail(p.email).toLowerCase().includes(q) ||
+        (p.user?.displayName ?? "").toLowerCase().includes(q) ||
+        (p.authUser?.displayName ?? "").toLowerCase().includes(q) ||
+        (p.authUser?.uid ?? "").toLowerCase().includes(q),
+    );
 
-  const current = people.find((p) => p.email === selected) ?? null;
+  const current = people.find((p) => p.key === selected) ?? null;
 
   return (
     <div className="space-y-4">
+      {access.isSuperadmin && authUsersStatus.error && <ErrorNote code={authUsersStatus.error} />}
       <div className="relative">
         <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
         <Input
@@ -263,68 +376,164 @@ function PeopleTab({ people, events }: { people: Person[]; events: EventDoc[] })
 
       {list.length ? (
         <ul className="grid grid-cols-[minmax(0,1fr)] gap-3 md:grid-cols-[repeat(2,minmax(0,1fr))]">
-          {list.map((p) => (
-            <li key={p.email}>
-              <button
-                type="button"
-                onClick={() => setSelected(p.email)}
-                className="flex h-full w-full items-start gap-3 ui-panel ui-interactive rounded-3xl p-4 text-left transition hover:-translate-y-0.5 sm:p-5"
-              >
-                <span
-                  className={cn(
-                    "grid size-11 shrink-0 place-items-center rounded-full font-mono text-xs font-bold",
-                    p.role === "blocked" ? "bg-red-100 text-red-700" : p.user ? "bg-lime text-coal" : "bg-ink/5 text-muted",
-                  )}
-                  aria-hidden
+          {list.map((p) => {
+            const name = p.user?.displayName || p.authUser?.displayName || "Sin nombre";
+            const subtitle = p.email
+              ? displayEmail(p.email)
+              : p.authUser?.uid
+                ? `UID: ${p.authUser.uid}`
+                : "Sin correo";
+            const onlyAuth =
+              !p.user &&
+              Boolean(p.authUser) &&
+              p.role === "user" &&
+              !p.judgeIn.length &&
+              !p.organizerIn.length &&
+              !p.projects;
+            const missingAuth =
+              access.isSuperadmin && Boolean(p.user) && !p.authUser && authUsersStatus.loaded && !authUsersStatus.error;
+
+            return (
+              <li key={p.key}>
+                <button
+                  type="button"
+                  onClick={() => setSelected(p.key)}
+                  className="flex h-full w-full items-start gap-3 ui-panel ui-interactive rounded-3xl p-4 text-left transition hover:-translate-y-0.5 sm:p-5"
                 >
-                  {initials(p.user?.displayName || displayEmail(p.email))}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">{p.user?.displayName || "Sin nombre"}</span>
-                  <span className="block truncate font-mono text-[11px] text-muted">{displayEmail(p.email)}</span>
-                  <span className="mt-2 flex flex-wrap gap-1.5">
-                    <Badge tone={ROLE_TONE[p.role]}>
-                      {p.role === "superadmin" && <Crown className="size-3" />}
-                      {GLOBAL_ROLE_LABEL[p.role]}
-                    </Badge>
-                    {p.judgeIn.length > 0 && (
-                      <Badge>
-                        <Gavel className="size-3" /> Juez · {p.judgeIn.length}
-                      </Badge>
+                  <span
+                    className={cn(
+                      "grid size-11 shrink-0 place-items-center rounded-full font-mono text-xs font-bold",
+                      p.role === "blocked"
+                        ? "bg-red-100 text-red-700"
+                        : p.user
+                          ? "bg-lime text-coal"
+                          : "bg-ink/5 text-muted",
                     )}
-                    {p.organizerIn.length > 0 && <Badge>Organiza · {p.organizerIn.length}</Badge>}
-                    {p.projects > 0 && <Badge>{p.projects} proyecto(s)</Badge>}
-                    {!p.user && <Badge tone="amber">Sin registrarse</Badge>}
+                    aria-hidden
+                  >
+                    {initials(p.user?.displayName || p.authUser?.displayName || displayEmail(p.email) || p.authUser?.uid || "U")}
                   </span>
-                  {p.user?.lastLoginAt && (
-                    <span className="mt-2 block font-mono text-[10px] text-muted">
-                      Último acceso: {formatDate(p.user.lastLoginAt)}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">{name}</span>
+                    <span className="block truncate font-mono text-[11px] text-muted">{subtitle}</span>
+                    <span className="mt-2 flex flex-wrap gap-1.5">
+                      <Badge tone={ROLE_TONE[p.role]}>
+                        {p.role === "superadmin" && <Crown className="size-3" />}
+                        {GLOBAL_ROLE_LABEL[p.role]}
+                      </Badge>
+                      {p.judgeIn.length > 0 && (
+                        <Badge>
+                          <Gavel className="size-3" /> Juez · {p.judgeIn.length}
+                        </Badge>
+                      )}
+                      {p.organizerIn.length > 0 && <Badge>Organiza · {p.organizerIn.length}</Badge>}
+                      {p.projects > 0 && <Badge>{p.projects} proyecto(s)</Badge>}
+                      {onlyAuth ? (
+                        <Badge tone="amber">Solo en Authentication</Badge>
+                      ) : !p.user ? (
+                        <Badge tone="amber">Sin registrarse</Badge>
+                      ) : null}
+                      {missingAuth && <Badge tone="red">Sin cuenta en Auth</Badge>}
                     </span>
-                  )}
-                </span>
-                <UserCog className="size-5 shrink-0 text-muted" />
-              </button>
-            </li>
-          ))}
+                    {p.user?.lastLoginAt ? (
+                      <span className="mt-2 block font-mono text-[10px] text-muted">
+                        Último acceso: {formatDate(p.user.lastLoginAt)}
+                      </span>
+                    ) : (
+                      p.authUser?.lastSignInTime && (
+                        <span className="mt-2 block font-mono text-[10px] text-muted">
+                          Último Auth: {formatDate(p.authUser.lastSignInTime)}
+                        </span>
+                      )
+                    )}
+                  </span>
+                  <UserCog className="size-5 shrink-0 text-muted" />
+                </button>
+              </li>
+            );
+          })}
         </ul>
       ) : (
-        <EmptyState title="Sin resultados" text="Prueba con otro filtro o búsqueda." />
+        <EmptyState
+          title="Sin resultados"
+          text={
+            access.isSuperadmin && isEmail(search.trim())
+              ? "No aparece en la lista, pero puedes revisar si este correo tiene registros huérfanos en Firebase o Authentication."
+              : "Prueba con otro filtro o búsqueda."
+          }
+          action={
+            access.isSuperadmin && isEmail(search.trim()) ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDeleting({ target: { email: normalizeEmail(search) } })}
+              >
+                <Trash2 className="size-4" /> Revisar correo en Firebase y Auth
+              </Button>
+            ) : undefined
+          }
+        />
       )}
 
       <Modal open={!!current} onClose={() => setSelected(null)} title="Gestionar usuario">
-        {current && <PersonPanel person={current} events={events} />}
+        {current && (
+          <PersonPanel
+            person={current}
+            events={events}
+            authUsersStatus={authUsersStatus}
+            onRequestDelete={() => {
+              setDeleting({
+                target: {
+                  email: current.email,
+                  uid: current.user?.uid ?? current.authUser?.uid,
+                  displayName: current.user?.displayName || current.authUser?.displayName || "",
+                },
+                returnKey: current.key,
+              });
+              setSelected(null);
+            }}
+          />
+        )}
       </Modal>
+
+      <UserDeletionModal
+        target={deleting?.target ?? null}
+        onCancel={() => {
+          const returnKey = deleting?.returnKey;
+          setDeleting(null);
+          if (returnKey) setSelected(returnKey);
+        }}
+        onDeleted={(result) => {
+          const deletedUid = deleting?.target.uid;
+          setDeleting(null);
+          setSelected(null);
+          onUserDeleted(result.email, deletedUid);
+          toast("Usuario eliminado por completo de Firebase y Authentication.");
+        }}
+      />
     </div>
   );
 }
 
-function PersonPanel({ person, events }: { person: Person; events: EventDoc[] }) {
+function PersonPanel({
+  person,
+  events,
+  authUsersStatus,
+  onRequestDelete,
+}: {
+  person: Person;
+  events: EventDoc[];
+  authUsersStatus: AuthUsersStatus;
+  onRequestDelete: () => void;
+}) {
   const { user } = useAuth();
   const access = useAccess();
   const toast = useToast();
   const [busy, setBusy] = useState<string | null>(null);
   const isSuper = person.role === "superadmin";
-  const isMe = normalizeEmail(user?.email ?? "") === person.email;
+  const isMe =
+    (Boolean(person.email) && normalizeEmail(user?.email ?? "") === person.email) ||
+    Boolean(user?.uid && (person.user?.uid === user.uid || person.authUser?.uid === user.uid));
 
   async function run(key: string, fn: () => Promise<unknown>, ok: string) {
     setBusy(key);
@@ -341,103 +550,147 @@ function PersonPanel({ person, events }: { person: Person; events: EventDoc[] })
   const staffValue: StaffRole | "user" = person.role === "superadmin" ? "admin" : person.role;
   const sortedEvents = [...events].sort((a, b) => a.name.localeCompare(b.name));
   const invitationEvent = person.judgeIn[0] ?? person.organizerIn[0];
-  const invitationScope: InvitationScope | null = access.isSuperadmin && (person.role === "organizer" || person.role === "admin")
-    ? { kind: "staff", role: person.role }
-    : invitationEvent ? { kind: "event", eventId: invitationEvent.id,
-      role: invitationEvent.organizerEmails.includes(person.email) ? "organizer" : "judge" } : null;
+  const invitationScope: InvitationScope | null =
+    person.email && access.isSuperadmin && (person.role === "organizer" || person.role === "admin")
+      ? { kind: "staff", role: person.role }
+      : person.email && invitationEvent
+        ? {
+            kind: "event",
+            eventId: invitationEvent.id,
+            role: invitationEvent.organizerEmails.includes(person.email) ? "organizer" : "judge",
+          }
+        : null;
+
+  const displayName = person.user?.displayName || person.authUser?.displayName || "Sin nombre";
+  const identifier = person.email
+    ? displayEmail(person.email)
+    : person.authUser?.uid
+      ? `UID: ${person.authUser.uid}`
+      : "Sin correo";
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <span className="grid size-12 shrink-0 place-items-center rounded-full bg-lime font-mono text-sm font-bold text-coal">
-          {initials(person.user?.displayName || displayEmail(person.email))}
+          {initials(person.user?.displayName || person.authUser?.displayName || displayEmail(person.email) || person.authUser?.uid || "U")}
         </span>
         <div className="min-w-0">
-          <p className="truncate font-display text-lg font-bold">{person.user?.displayName || "Sin nombre"}</p>
-          <p className="truncate font-mono text-[11px] text-muted">{displayEmail(person.email)}</p>
-          {!person.user && (
+          <p className="truncate font-display text-lg font-bold">{displayName}</p>
+          <p className="truncate font-mono text-[11px] text-muted">{identifier}</p>
+          {!person.user && person.email && (
             <p className="font-mono text-[10px] text-amber-700">Aún no ha entrado a la plataforma. Puedes enviarle el acceso.</p>
+          )}
+          {access.isSuperadmin && person.authUser && (
+            <p className="font-mono text-[10px] text-muted">
+              Authentication activo · UID: {person.authUser.uid}
+              {person.authUser.disabled ? " (deshabilitada)" : ""}
+            </p>
+          )}
+          {access.isSuperadmin && !person.authUser && authUsersStatus.loaded && !authUsersStatus.error && (
+            <p className="font-mono text-[10px] text-muted">Sin cuenta en Firebase Authentication.</p>
           )}
         </div>
       </div>
       {invitationScope && <AccountInvitationButton scope={invitationScope} email={person.email} disabled={!!busy} />}
 
-      <section className="space-y-2">
-        <p className="text-sm font-medium">Permiso en la plataforma</p>
-        {isSuper ? (
-          <p className="rounded-2xl bg-paper p-3 font-mono text-[11px] text-muted">
-            Superadmin fijo de la plataforma. No se puede cambiar ni suspender.
-          </p>
-        ) : access.isSuperadmin ? (
-          <>
-            <Segmented<StaffRole | "user">
-              label="Permiso global"
-              value={staffValue}
-              disabled={!!busy || isMe}
-              onChange={(role) =>
-                run("role", () => setStaffRole(person.email, role, user!), `Permiso actualizado: ${GLOBAL_ROLE_LABEL[role]}.`)
-              }
-              options={[
-                { id: "user", label: "Usuario" },
-                { id: "organizer", label: "Organizador" },
-                { id: "admin", label: "Admin" },
-                { id: "blocked", label: "Suspendido" },
-              ]}
-            />
-            <p className="font-mono text-[11px] leading-relaxed text-muted">{ROLE_HELP[staffValue]}</p>
-          </>
-        ) : (
-          <p className="rounded-2xl bg-paper p-3 font-mono text-[11px] text-muted">
-            {GLOBAL_ROLE_LABEL[person.role]}. Solo el superadmin puede cambiar permisos.
-          </p>
-        )}
-      </section>
+      {!person.email ? (
+        <p className="rounded-2xl bg-paper p-3 font-mono text-[11px] text-muted">
+          Esta cuenta de Authentication no tiene correo asignado, por lo que no tiene permisos globales ni asignaciones en eventos.
+        </p>
+      ) : (
+        <>
+          <section className="space-y-2">
+            <p className="text-sm font-medium">Permiso en la plataforma</p>
+            {isSuper ? (
+              <p className="rounded-2xl bg-paper p-3 font-mono text-[11px] text-muted">
+                Superadmin fijo de la plataforma. No se puede cambiar ni suspender.
+              </p>
+            ) : access.isSuperadmin ? (
+              <>
+                <Segmented<StaffRole | "user">
+                  label="Permiso global"
+                  value={staffValue}
+                  disabled={!!busy || isMe}
+                  onChange={(role) =>
+                    run("role", () => setStaffRole(person.email, role, user!), `Permiso actualizado: ${GLOBAL_ROLE_LABEL[role]}.`)
+                  }
+                  options={[
+                    { id: "user", label: "Usuario" },
+                    { id: "organizer", label: "Organizador" },
+                    { id: "admin", label: "Admin" },
+                    { id: "blocked", label: "Suspendido" },
+                  ]}
+                />
+                <p className="font-mono text-[11px] leading-relaxed text-muted">{ROLE_HELP[staffValue]}</p>
+              </>
+            ) : (
+              <p className="rounded-2xl bg-paper p-3 font-mono text-[11px] text-muted">
+                {GLOBAL_ROLE_LABEL[person.role]}. Solo el superadmin puede cambiar permisos.
+              </p>
+            )}
+          </section>
 
-      <section>
-        <p className="text-sm font-medium">Juez en eventos</p>
-        <p className="font-mono text-[11px] text-muted">Activa los eventos donde esta persona calificará. Admins, superadmin y organizadores del evento no califican.</p>
-        <div className="mt-2 divide-y divide-line rounded-2xl bg-paper px-4">
-          {sortedEvents.map((e) => (
-            <Toggle
-              key={e.id}
-              label={e.name}
-              description={person.role === "admin" || isSuper ? "Administra la plataforma; no puede calificar." : e.organizerEmails.includes(person.email) ? "Ya organiza este evento; debe dejar ese rol antes de ser juez." : e.institution || undefined}
-              checked={e.judgeEmails.includes(person.email)}
-              disabled={!!busy || (!e.judgeEmails.includes(person.email) && (person.role === "admin" || isSuper || e.organizerEmails.includes(person.email)))}
-              onChange={(v) =>
-                run(`j:${e.id}`, () => setEventMembership(e, person.email, "judgeEmails", v), v ? "Agregado como juez." : "Quitado de jueces.")
-              }
-            />
-          ))}
-          {!sortedEvents.length && <p className="py-3 font-mono text-xs text-muted">No hay eventos.</p>}
-        </div>
-      </section>
+          <section>
+            <p className="text-sm font-medium">Juez en eventos</p>
+            <p className="font-mono text-[11px] text-muted">Activa los eventos donde esta persona calificará. Admins, superadmin y organizadores del evento no califican.</p>
+            <div className="mt-2 divide-y divide-line rounded-2xl bg-paper px-4">
+              {sortedEvents.map((e) => (
+                <Toggle
+                  key={e.id}
+                  label={e.name}
+                  description={person.role === "admin" || isSuper ? "Administra la plataforma; no puede calificar." : e.organizerEmails.includes(person.email) ? "Ya organiza este evento; debe dejar ese rol antes de ser juez." : e.institution || undefined}
+                  checked={e.judgeEmails.includes(person.email)}
+                  disabled={!!busy || (!e.judgeEmails.includes(person.email) && (person.role === "admin" || isSuper || e.organizerEmails.includes(person.email)))}
+                  onChange={(v) =>
+                    run(`j:${e.id}`, () => setEventMembership(e, person.email, "judgeEmails", v), v ? "Agregado como juez." : "Quitado de jueces.")
+                  }
+                />
+              ))}
+              {!sortedEvents.length && <p className="py-3 font-mono text-xs text-muted">No hay eventos.</p>}
+            </div>
+          </section>
 
-      <section>
-        <p className="text-sm font-medium">Organizador en eventos</p>
-        <p className="font-mono text-[11px] text-muted">Puede administrar ese evento aunque no sea admin global.</p>
-        <div className="mt-2 divide-y divide-line rounded-2xl bg-paper px-4">
-          {sortedEvents.map((e) => {
-            const owner = e.ownerEmail === person.email;
-            return (
-              <Toggle
-                key={e.id}
-                label={e.name}
-                description={owner ? "Creador del evento (no se puede quitar)" : e.institution || undefined}
-                checked={e.organizerEmails.includes(person.email)}
-                disabled={owner || busy === `o:${e.id}`}
-                onChange={(v) =>
-                  run(
-                    `o:${e.id}`,
-                    () => setEventMembership(e, person.email, "organizerEmails", v),
-                    v ? "Agregado como organizador." : "Quitado de organizadores.",
-                  )
-                }
-              />
-            );
-          })}
-        </div>
-      </section>
+          <section>
+            <p className="text-sm font-medium">Organizador en eventos</p>
+            <p className="font-mono text-[11px] text-muted">Puede administrar ese evento aunque no sea admin global.</p>
+            <div className="mt-2 divide-y divide-line rounded-2xl bg-paper px-4">
+              {sortedEvents.map((e) => {
+                const owner = e.ownerEmail === person.email;
+                return (
+                  <Toggle
+                    key={e.id}
+                    label={e.name}
+                    description={owner ? "Creador del evento (no se puede quitar)" : e.institution || undefined}
+                    checked={e.organizerEmails.includes(person.email)}
+                    disabled={owner || busy === `o:${e.id}`}
+                    onChange={(v) =>
+                      run(
+                        `o:${e.id}`,
+                        () => setEventMembership(e, person.email, "organizerEmails", v),
+                        v ? "Agregado como organizador." : "Quitado de organizadores.",
+                      )
+                    }
+                  />
+                );
+              })}
+            </div>
+          </section>
+        </>
+      )}
+
+      {access.isSuperadmin && !isSuper && !isMe && (
+        <section className="space-y-3 border-t border-line pt-5">
+          <div>
+            <p className="text-sm font-medium text-red-700">Eliminar usuario</p>
+            <p className="font-mono text-[11px] leading-relaxed text-muted">
+              Revisa primero si tiene proyectos, eventos, evaluaciones o archivos ligados y luego decide si se cancela o se borra por completo de Firebase y Authentication.
+            </p>
+          </div>
+          <Button variant="danger" size="sm" disabled={!!busy} onClick={onRequestDelete}>
+            <Trash2 className="size-4" /> Revisar vínculos y eliminar
+          </Button>
+        </section>
+      )}
     </div>
   );
 }
@@ -584,7 +837,7 @@ function RolesTab({ people }: { people: Person[] }) {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<StaffRole>("organizer");
   const [busy, setBusy] = useState(false);
-  const withRoles = people.filter((p) => p.role !== "user");
+  const withRoles = people.filter((p) => p.role !== "user" && Boolean(p.email));
 
   async function grant(e: FormEvent) {
     e.preventDefault();

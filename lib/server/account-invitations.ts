@@ -20,6 +20,9 @@ const HOUR_MS = 3_600_000;
 const MAX_PER_HOUR = 200;
 export const invitationDeliveryId = (email: string) => createHash("sha256").update(normalizeEmail(email)).digest("hex");
 
+export const teamInvitationDeliveryId = (eventId: string, projectId: string, role: "leader" | "member", email: string) =>
+  createHash("sha256").update(JSON.stringify([eventId, projectId, role, normalizeEmail(email)])).digest("hex");
+
 function parseInput(body: unknown): AccountInvitation {
   if (!body || typeof body !== "object") throw new InvitationError(400, "La solicitud no es válida.");
   const value = body as Record<string, unknown>;
@@ -109,7 +112,7 @@ export async function sendAccountInvitation(input: AccountInvitation, identity: 
   if (!identity.email || !identity.email_verified) throw new InvitationError(403, "Verifica tu correo antes de enviar accesos.");
   const actor = normalizeEmail(identity.email);
   const deliveryId = input.kind === "team"
-    ? createHash("sha256").update(JSON.stringify([input.eventId, input.projectId, input.role, input.email])).digest("hex")
+    ? teamInvitationDeliveryId(input.eventId, input.projectId, input.role, input.email)
     : invitationDeliveryId(input.email);
   const receiptRef = db.doc(`accountInvitationDeliveries/${deliveryId}`);
   const limitRef = db.doc(`accountInvitationLimits/${identity.uid}`);

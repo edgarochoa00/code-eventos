@@ -363,7 +363,7 @@ describe("proyectos", () => {
     await assertSucceeds(syncTeam(stu, "cross-event", { ...project, eventId: "e2" }, [], "e2"));
     await assertSucceeds(updateDoc(doc(superDb, "events/e2"), { judgingOpen: true, categoryLocked: true }));
     await assertSucceeds(setDoc(doc(org, "events/e2/evaluations/org_cross-event_prototype"), {
-      eventId: "e2", projectId: "cross-event", phase: "prototype", judgeId: "org", judgeEmail: "org@tec.mx", judgeName: "", scores: { a: 8 }, total: 80, comment: "",
+      eventId: "e2", projectId: "cross-event", phase: "prototype", judgeId: "org", judgeEmail: "org@tec.mx", judgeName: "", scores: { a: 8 }, total: 80, comment: "Buen trabajo",
     }));
   });
 
@@ -383,7 +383,7 @@ describe("proyectos", () => {
     await assertFails(getDoc(doc(mate, "events/e1/projects/legacy-conflict")));
     await assertFails(updateDoc(doc(mate, "events/e1/projects/p1"), { title: "Juez competidor" }));
     await assertFails(setDoc(doc(mate, "events/e1/evaluations/mate_legacy-conflict_prototype"), {
-      eventId: "e1", projectId: "legacy-conflict", phase: "prototype", judgeId: "mate", judgeEmail: "mate@tec.mx", judgeName: "", scores: { a: 8 }, total: 80, comment: "",
+      eventId: "e1", projectId: "legacy-conflict", phase: "prototype", judgeId: "mate", judgeEmail: "mate@tec.mx", judgeName: "", scores: { a: 8 }, total: 80, comment: "Buen trabajo",
     }));
     await assertSucceeds(updateDoc(doc(org, "events/e1"), { judgeEmails: ["judge@tec.mx"], judgingOpen: false, categoryLocked: true }));
     await assertSucceeds(syncTeam(outsider, "legacy-conflict", null, other.memberEmails));
@@ -489,7 +489,7 @@ describe("evaluaciones", () => {
     judgeName: "",
     scores: { a: 8 },
     total: 80,
-    comment: "",
+    comment: "Buen trabajo",
   };
 
   test("el juez solo califica con la evaluación abierta", async () => {
@@ -501,6 +501,9 @@ describe("evaluaciones", () => {
   test("validaciones de la evaluación", async () => {
     await assertFails(setDoc(doc(judge, "events/e1/evaluations/other_p1_prototype"), evalDoc));
     await assertFails(setDoc(doc(judge, "events/e1/evaluations/judge_p1_prototype"), { ...evalDoc, total: 150 }));
+    // El comentario para el equipo es obligatorio.
+    await assertFails(setDoc(doc(judge, "events/e1/evaluations/judge_p1_prototype"), { ...evalDoc, comment: "" }));
+    await assertFails(setDoc(doc(judge, "events/e1/evaluations/judge_p1_prototype"), { ...evalDoc, comment: "   " }));
     await assertFails(
       setDoc(doc(stu, "events/e1/evaluations/stu_p1_prototype"), { ...evalDoc, judgeId: "stu", judgeEmail: "stu@tec.mx" }),
     );
@@ -696,7 +699,7 @@ describe("rúbricas por categoría", () => {
   const eid = "rubricas-categorias";
   const scoreDoc = (projectId, scores) => ({
     eventId: eid, projectId, phase: "prototype", judgeId: "judge", judgeEmail: "judge@tec.mx", judgeName: "Juez",
-    scores, total: 80, comment: "",
+    scores, total: 80, comment: "Buen trabajo",
   });
 
   test("un evento guarda dos categorías con sus criterios independientes", async () => {
@@ -829,7 +832,7 @@ describe("alta por correo y formulario inicial del líder", () => {
     await assertFails(updateDoc(doc(stu, `events/${id}/projects/pending`), { prototype: { description: "Entrega prematura", files: [], links: [] } }));
     await assertFails(updateDoc(doc(stu, `events/${id}/projects/pending`), { ...completed, prototype: { description: "No junto con el registro" } }));
     await assertFails(setDoc(doc(judge, `events/${id}/evaluations/judge_pending_prototype`), {
-      eventId: id, projectId: "pending", phase: "prototype", judgeId: "judge", judgeEmail: "judge@tec.mx", scores: { a: 8 }, total: 80, comment: "" }));
+      eventId: id, projectId: "pending", phase: "prototype", judgeId: "judge", judgeEmail: "judge@tec.mx", scores: { a: 8 }, total: 80, comment: "Buen trabajo" }));
   });
   test("el formulario inicial respeta categoría bloqueada y resultados publicados", async () => {
     for (const [suffix, patch] of Object.entries({ locked: { categoryLocked: true }, published: { resultsPublished: true } })) {

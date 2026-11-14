@@ -40,7 +40,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return onAuthStateChanged(auth, (u) => {
       setSession({ user: u });
       setLoading(false);
-      if (u) upsertUserProfile(u).catch(() => undefined);
+      if (!u) return;
+      void u
+        .getIdToken(true)
+        .then(() => {
+          if (auth.currentUser?.uid === u.uid) return upsertUserProfile(u);
+        })
+        .catch((err) => {
+          const code = (err as { code?: string })?.code ?? "";
+          if (["auth/user-token-expired", "auth/user-not-found", "auth/user-disabled", "auth/invalid-user-token"].includes(code)) {
+            if (auth.currentUser?.uid === u.uid) return fbSignOut(auth).catch(() => undefined);
+          }
+        });
     });
   }, []);
 

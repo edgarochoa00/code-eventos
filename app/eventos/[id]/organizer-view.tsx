@@ -3,6 +3,7 @@
 import {
   AlertTriangle,
   ArrowUpRight,
+  CalendarClock,
   Download,
   EyeOff,
   Gavel,
@@ -11,7 +12,6 @@ import {
   ScanSearch,
   Search,
   ShieldCheck,
-  SlidersHorizontal,
   Trash2,
   Trophy,
   UserPlus,
@@ -534,12 +534,6 @@ function JudgesTab({ event, projects }: { event: EventDoc; projects: ProjectDoc[
   const ownerEmail = event.ownerEmail;
   const [editingJudge, setEditingJudge] = useState<string | null>(null);
 
-  const categories = useMemo(() => {
-    const set = new Set<string>(eventCategories(event));
-    for (const p of projects) if (p.category) set.add(p.category);
-    return Array.from(set);
-  }, [event, projects]);
-
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[repeat(2,minmax(0,1fr))]">
       <EmailListEditor
@@ -563,8 +557,8 @@ function JudgesTab({ event, projects }: { event: EventDoc; projects: ProjectDoc[
       {event.judgeEmails.length > 0 && (
         <Card className="lg:col-span-2">
           <SectionTitle
-            title="Agenda por juez"
-            subtitle="Programa horarios y revisa la carga de cada juez. En proyectos con máximo definido se respeta la selección de «Asignación por proyecto»; los demás requieren una asignación explícita por categoría o proyecto."
+            title="Horarios de los jueces"
+            subtitle="Opcional. Indica en qué horario califica cada juez los proyectos que ya tiene asignados. Para asignar o quitar proyectos usa «Asignación por proyecto»."
           />
           {!event.judgingOpen && !event.resultsPublished && (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-amber-50 p-4 text-amber-900">
@@ -591,31 +585,24 @@ function JudgesTab({ event, projects }: { event: EventDoc; projects: ProjectDoc[
           <ul className="divide-y divide-line">
             {event.judgeEmails.map((email) => {
               const key = normalizeEmail(email);
-              const hasCustom = hasJudgeAssignment(event, key);
-              const a = event.judgeAssignments?.[key];
-              const assignedCount = projects.filter((p) => isProjectAssignedToJudge(event, p, key)).length;
+              const assigned = projects.filter((p) => isProjectAssignedToJudge(event, p, key));
+              const slots = event.judgeAssignments?.[key]?.schedule ?? {};
+              const scheduled = assigned.filter((p) => slots[p.id]?.startsAt && slots[p.id]?.endsAt).length;
+              const legacy = hasJudgeAssignment(event, key);
               return (
                 <li key={key} className="flex flex-wrap items-center justify-between gap-3 py-3">
                   <div className="min-w-0">
                     <p className="truncate font-mono text-xs font-medium">{displayEmail(key)}</p>
                     <div className="mt-1 flex flex-wrap gap-1.5">
-                      {!hasCustom ? (
-                        <Badge>{assignedCount} proyecto(s) asignado(s)</Badge>
-                      ) : (
-                        <>
-                          <Badge tone="lime">{assignedCount} proyecto(s) asignado(s)</Badge>
-                          {(a?.categories ?? []).map((c) => (
-                            <Badge key={c}>{c}</Badge>
-                          ))}
-                          {(a?.projectIds?.length ?? 0) > 0 && (
-                            <Badge>{a!.projectIds!.length} proyecto(s) individual(es)</Badge>
-                          )}
-                        </>
-                      )}
+                      <Badge tone={assigned.length ? "lime" : undefined}>{assigned.length} proyecto(s) asignado(s)</Badge>
+                      {assigned.length > 0 && <Badge>{scheduled} de {assigned.length} con horario</Badge>}
                     </div>
+                    {!assigned.length && (
+                      <p className="mt-1 text-xs text-muted">Asígnale proyectos en «Asignación por proyecto» para programar su horario.</p>
+                    )}
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => setEditingJudge(key)}>
-                    <SlidersHorizontal className="size-3.5" /> Asignación y horario
+                  <Button variant="outline" size="sm" disabled={!assigned.length && !legacy} onClick={() => setEditingJudge(key)}>
+                    <CalendarClock className="size-3.5" /> Programar horario
                   </Button>
                 </li>
               );
@@ -632,19 +619,18 @@ function JudgesTab({ event, projects }: { event: EventDoc; projects: ProjectDoc[
         </p>
       </div>
 
-      <Modal open={!!editingJudge} onClose={() => setEditingJudge(null)} title="Asignar proyectos a juez">
+      <Modal open={!!editingJudge} onClose={() => setEditingJudge(null)} title="Horario de calificación">
         {editingJudge && (
-          <JudgeAssignmentModal
+          <JudgeScheduleModal
             event={event}
             judgeEmail={editingJudge}
-            categories={categories}
             projects={projects}
             initial={event.judgeAssignments?.[editingJudge]}
             onClose={() => setEditingJudge(null)}
             onSave={async (assignment) => {
               try {
                 await saveJudgeAssignment(event.id, editingJudge, assignment);
-                toast("Asignación guardada.");
+                toast("Horario guardado.");
                 setEditingJudge(null);
               } catch (err) {
                 toast(firestoreErrorMessage(err), "error");
@@ -657,10 +643,10 @@ function JudgesTab({ event, projects }: { event: EventDoc; projects: ProjectDoc[
   );
 }
 
-function JudgeAssignmentModal({
+/** Programa horarios solo para los proyectos que el juez ya tiene asignados. */
+function JudgeScheduleModal({
   event,
   judgeEmail,
-  categories,
   projects,
   initial,
   onSave,
@@ -668,123 +654,86 @@ function JudgeAssignmentModal({
 }: {
   event: EventDoc;
   judgeEmail: string;
-  categories: string[];
   projects: ProjectDoc[];
   initial?: JudgeAssignment;
   onSave: (assignment: JudgeAssignment) => Promise<void>;
   onClose: () => void;
 }) {
-  const [projectCategory, setProjectCategory] = useState("");
-  const [selectedCats, setSelectedCats] = useState<string[]>(initial?.categories ?? []);
-  const [selectedProjs, setSelectedProjs] = useState<string[]>(initial?.projectIds ?? []);
   const [schedule, setSchedule] = useState<NonNullable<JudgeAssignment["schedule"]>>(initial?.schedule ?? {});
   const [scheduleMessage, setScheduleMessage] = useState("");
-  const draftEvent = { ...event, judgeAssignments: { ...event.judgeAssignments, [judgeEmail]: { categories: selectedCats, projectIds: selectedProjs } } };
-  const scheduledProjects = projects.filter(p => isProjectAssignedToJudge(draftEvent, p, judgeEmail));
+  const [busy, setBusy] = useState(false);
+  // Asignaciones creadas con la versión anterior (por categoría o proyecto desde este panel).
+  const legacyCats = initial?.categories ?? [];
+  const legacyProjs = initial?.projectIds ?? [];
+  const hasLegacy = legacyCats.length > 0 || legacyProjs.length > 0;
+  const [clearLegacy, setClearLegacy] = useState(false);
+  const draftEvent = clearLegacy
+    ? { ...event, judgeAssignments: { ...event.judgeAssignments, [judgeEmail]: { categories: [], projectIds: [] } } }
+    : event;
+  const assigned = projects.filter((p) => isProjectAssignedToJudge(draftEvent, p, judgeEmail));
+
   function changeTime(projectId: string, field: "startsAt" | "endsAt", raw: string) {
     const iso = scheduleInputToIso(raw);
     if (raw && !iso) { setScheduleMessage("Revisa la fecha y hora del turno."); return; }
     setScheduleMessage("");
-    setSchedule(prev => ({ ...prev, [projectId]: { startsAt: prev[projectId]?.startsAt ?? "", endsAt: prev[projectId]?.endsAt ?? "",
+    setSchedule((prev) => ({ ...prev, [projectId]: { startsAt: prev[projectId]?.startsAt ?? "", endsAt: prev[projectId]?.endsAt ?? "",
       [field]: iso } }));
-  }
-  const [busy, setBusy] = useState(false);
-
-  const isAll = selectedCats.length === 0 && selectedProjs.length === 0;
-
-  function toggleCat(cat: string) {
-    setSelectedCats((prev) => (prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]));
-  }
-
-  function toggleProj(id: string) {
-    setSelectedProjs((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));
   }
 
   return (
     <div className="space-y-5">
       <div>
         <p className="font-mono text-xs font-medium">{displayEmail(judgeEmail)}</p>
-        <p className="mt-1 font-mono text-[11px] text-muted">
-          Evalúa {scheduledProjects.length} proyecto(s). Los proyectos configurados en «Asignación por proyecto» respetan sus jueces seleccionados. Los filtros de abajo se aplican a los demás.
+        <p className="mt-1 text-sm text-muted">
+          {assigned.length
+            ? `Tiene ${assigned.length} proyecto(s) asignado(s). Indica inicio y fin para cada uno (hora de Culiacán). Puedes dejar alguno sin horario.`
+            : "Este juez no tiene proyectos asignados. Asígnalos primero en «Asignación por proyecto»."}
         </p>
       </div>
 
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <p className="font-mono text-xs font-medium text-ink/80">Por categoría</p>
-          {!isAll && (
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedCats([]);
-                setSelectedProjs([]);
-              }}
-              className="font-mono text-[11px] text-muted underline hover:text-ink"
-            >
-              Quitar selección
-            </button>
-          )}
+      {hasLegacy && !clearLegacy && (
+        <div className="space-y-2 rounded-2xl bg-amber-50 p-4 text-amber-900">
+          <p className="text-xs leading-relaxed">
+            Este juez tiene una asignación anterior
+            {legacyCats.length > 0 && <> por categoría (<strong>{legacyCats.join(", ")}</strong>)</>}
+            {legacyCats.length > 0 && legacyProjs.length > 0 && " y"}
+            {legacyProjs.length > 0 && <> de {legacyProjs.length} proyecto(s) individual(es)</>}
+            . Por eso recibe proyectos que no elegiste en «Asignación por proyecto».
+          </p>
+          <Button variant="outline" size="sm" onClick={() => setClearLegacy(true)}>Quitar asignación anterior</Button>
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          {categories.map((cat) => {
-            const active = selectedCats.includes(cat);
-            return (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => toggleCat(cat)}
-                className={cn(
-                  "rounded-full px-3 py-1.5 font-mono text-xs transition",
-                  active ? "bg-ink text-surface" : "bg-paper text-muted hover:text-ink",
-                )}
-              >
-                {cat}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {projects.length > 0 && (
-        <div className="space-y-2">
-          <p className="font-mono text-xs font-medium text-ink/80">Proyectos específicos</p>
-          <select className="h-11 w-full rounded-xl border border-control bg-surface px-3 text-sm" aria-label="Filtrar proyectos para este juez por categoría" value={projectCategory} onChange={e => setProjectCategory(e.target.value)}>
-            <option value="">Todas las categorías</option>
-            {categories.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <p className="text-xs text-muted">El filtro solo cambia la lista visible; conserva las selecciones de otras categorías.</p>
-          <div className="max-h-52 divide-y divide-line overflow-y-auto rounded-2xl bg-paper px-3">
-            {projects.filter(p => !projectCategory || p.category === projectCategory).map((p) => {
-              const byCat = Boolean(p.category && selectedCats.includes(p.category));
-              const checked = p.judging ? p.judging.judgeEmails.includes(judgeEmail) : byCat || selectedProjs.includes(p.id);
-              return (
-                <Toggle
-                  key={p.id}
-                  label={p.title}
-                  description={p.judging ? "Jueces elegidos en Asignación por proyecto" : byCat ? `${p.category} (incluido por categoría)` : p.category}
-                  checked={checked}
-                  disabled={!!p.judging || byCat}
-                  onChange={() => toggleProj(p.id)}
-                />
-              );
-            })}
-          </div>
+      )}
+      {clearLegacy && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-paper p-4 text-xs">
+          <span>Al guardar, el juez solo conservará los proyectos elegidos en «Asignación por proyecto».</span>
+          <button type="button" className="font-mono underline" onClick={() => setClearLegacy(false)}>Deshacer</button>
         </div>
       )}
 
-      <section className="space-y-3">
-        <p className="text-sm font-medium">Fecha y hora para calificar · Culiacán</p>
-        <p className="text-xs text-muted">Programa cada proyecto asignado. El horario organiza el turno; el interruptor de evaluación del evento controla cuándo se pueden guardar notas.</p>
-        {scheduledProjects.map(p => <div key={p.id} className="space-y-2 rounded-xl bg-paper p-3">
-          <p className="text-sm font-medium">{p.title}</p>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Field label="Inicio" htmlFor={`start-${p.id}`}><Input id={`start-${p.id}`} type="datetime-local" value={scheduleInputValue(schedule[p.id]?.startsAt)} onChange={e=>changeTime(p.id,"startsAt",e.target.value)} /></Field>
-            <Field label="Fin" htmlFor={`end-${p.id}`}><Input id={`end-${p.id}`} type="datetime-local" value={scheduleInputValue(schedule[p.id]?.endsAt)} onChange={e=>changeTime(p.id,"endsAt",e.target.value)} /></Field>
-          </div>
-          <p className="text-xs text-muted">{scheduleLabel(schedule[p.id])}</p>
-        </div>)}
-        {scheduleMessage && <p role="alert" className="text-sm text-red-700">{scheduleMessage}</p>}
-      </section>
+      {assigned.length > 0 && (
+        <ul className="space-y-3">
+          {assigned.map((p) => (
+            <li key={p.id} className="space-y-2 rounded-xl bg-paper p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-medium">{p.title}</p>
+                {p.category && <Badge>{p.category}</Badge>}
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Field label="Inicio" htmlFor={`start-${p.id}`}>
+                  <Input id={`start-${p.id}`} type="datetime-local" value={scheduleInputValue(schedule[p.id]?.startsAt)}
+                    onChange={(e) => changeTime(p.id, "startsAt", e.target.value)} />
+                </Field>
+                <Field label="Fin" htmlFor={`end-${p.id}`}>
+                  <Input id={`end-${p.id}`} type="datetime-local" value={scheduleInputValue(schedule[p.id]?.endsAt)}
+                    onChange={(e) => changeTime(p.id, "endsAt", e.target.value)} />
+                </Field>
+              </div>
+              <p className="text-xs text-muted">{scheduleLabel(schedule[p.id])}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+      {scheduleMessage && <p role="alert" className="text-sm text-red-700">{scheduleMessage}</p>}
 
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={onClose}>
@@ -792,19 +741,24 @@ function JudgeAssignmentModal({
         </Button>
         <Button
           loading={busy}
+          disabled={!assigned.length && !clearLegacy}
           onClick={async () => {
             setBusy(true);
             try {
-              const activeSchedule = Object.fromEntries(Object.entries(schedule).filter(([id,slot]) => scheduledProjects.some(p=>p.id===id) && (slot.startsAt || slot.endsAt)));
+              const activeSchedule = Object.fromEntries(Object.entries(schedule).filter(([id, slot]) => assigned.some((p) => p.id === id) && (slot.startsAt || slot.endsAt)));
               const error = scheduleError(activeSchedule);
               if (error) { setScheduleMessage(error); return; }
-              await onSave({ categories: selectedCats, projectIds: selectedProjs, schedule: activeSchedule });
+              await onSave({
+                categories: clearLegacy ? [] : legacyCats,
+                projectIds: clearLegacy ? [] : legacyProjs,
+                schedule: activeSchedule,
+              });
             } finally {
               setBusy(false);
             }
           }}
         >
-          Guardar asignación
+          Guardar horario
         </Button>
       </div>
     </div>

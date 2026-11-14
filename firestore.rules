@@ -459,6 +459,7 @@ service cloud.firestore {
           && request.resource.data.total >= 0
           && request.resource.data.total <= 100
           && request.resource.data.comment is string
+          && request.resource.data.comment.trim().size() > 0
           && request.resource.data.comment.size() <= 2000;
 
         // Con resultados publicados las evaluaciones ya no se pueden borrar

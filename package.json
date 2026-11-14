@@ -1,6 +1,6 @@
 {
   "name": "code-eventos",
-  "version": "0.4.12",
+  "version": "0.4.13",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -20,7 +20,8 @@
     "docs:pdf": "node scripts/generate-manual-pdf.mjs",
     "detector:test": "tsc -p detector/tsconfig.json && npx -y tsx@4.23.15 --tsconfig detector/tsconfig.json --test detector/tests/logic.test.ts && npx -y firebase-tools@15 emulators:exec --project demo-code --only firestore \"RULES=detector/rules/firestore.rules node --test detector/tests/detector.rules.test.mjs\"",
     "test:enrollment": "NODE_ENV=test npx -y firebase-tools@15 emulators:exec --project demo-code --only auth,firestore \"node --conditions=react-server --import tsx --test tests/team-enrollment.test.ts\"",
-    "test:invitations": "node --conditions=react-server --import tsx --test tests/access-email.test.ts && NODE_ENV=test npx -y firebase-tools@15 emulators:exec --project demo-code --only auth,firestore \"node --conditions=react-server --import tsx --test tests/account-invitations.test.ts\""
+    "test:invitations": "node --conditions=react-server --import tsx --test tests/access-email.test.ts && NODE_ENV=test npx -y firebase-tools@15 emulators:exec --project demo-code --only auth,firestore \"node --conditions=react-server --import tsx --test tests/account-invitations.test.ts\"",
+    "test:user-deletion": "NODE_ENV=test npx -y firebase-tools@15 emulators:exec --project demo-code --only auth,firestore \"node --conditions=react-server --import tsx --test tests/user-deletion.test.ts\""
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",

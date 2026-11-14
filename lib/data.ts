@@ -462,6 +462,7 @@ export async function saveEvaluation(
   comment: string,
 ) {
   const projectId = project.id;
+  if (!comment.trim()) throw new Error("Escribe un comentario para el equipo antes de enviar la calificación.");
   return runTransaction(db, async (transaction) => {
     const [eventSnap, projectSnap] = await Promise.all([transaction.get(eventRef(event.id)), transaction.get(projectRef(event.id, projectId))]);
     if (!eventSnap.exists() || !projectSnap.exists()) throw new Error("El proyecto ya no existe.");
