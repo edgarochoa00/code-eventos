@@ -125,6 +125,7 @@ export type ProjectDoc = {
   /** Alta por correo: el líder aún debe completar el formulario de su proyecto. */
   registrationPending?: boolean;
   logo?: ProjectLogo | null;
+  stand?: string;
   title: string;
   summary: string;
   problem: string;

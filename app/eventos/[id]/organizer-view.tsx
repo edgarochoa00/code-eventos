@@ -7,6 +7,7 @@ import {
   Download,
   EyeOff,
   Gavel,
+  MapPin,
   Megaphone,
   RefreshCw,
   ScanSearch,
@@ -55,6 +56,7 @@ import {
   projectsCol,
   publishResults,
   saveCategoryCriteria,
+  saveProjectStand,
   saveEventEmails,
   saveJudgeAssignment,
   unpublishResults,
@@ -338,6 +340,9 @@ function ProjectsTab({
   analysis: Analysis;
   onReload: () => void;
 }) {
+  const { user } = useAuth();
+  const canAssignStand = event.organizerEmails.includes(normalizeEmail(user?.email ?? ""));
+  const [standProject, setStandProject] = useState<ProjectDoc | null>(null);
   const [sort, setSort] = useState<"name" | "similarity">("similarity");
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -362,7 +367,7 @@ function ProjectsTab({
     const inCat = p.category.toLowerCase().includes(q);
     const inTech = p.technologies.some((t) => t.toLowerCase().includes(q));
     const inMembers = p.members.some((m) => m.name.toLowerCase().includes(q) || displayEmail(m.email).toLowerCase().includes(q));
-    return inTitle || inSummary || inCat || inTech || inMembers;
+    return inTitle || inSummary || inCat || inTech || inMembers || Boolean(p.stand?.toLowerCase().includes(q));
   });
 
   const sorted = [...filtered].sort((a, b) =>
@@ -495,6 +500,7 @@ function ProjectsTab({
                       <h3 className="font-display text-lg font-bold">{p.title || displayEmail(p.leaderEmail)}</h3>
                       {p.registrationPending && <Badge>Registro pendiente del líder</Badge>}
                       {p.category && <Badge>{p.category}</Badge>}
+                      <Badge>{p.stand ? `Stand: ${p.stand}` : "Sin stand asignado"}</Badge>
                     </div>
                     <p className="mt-0.5 font-mono text-[11px] text-muted">
                       {p.members.length} integrante(s) · {p.members.map((m) => m.name || displayEmail(m.email)).join(", ")}
@@ -514,6 +520,14 @@ function ProjectsTab({
                     <p className="font-mono text-[10px] text-muted">{evs.length} evaluación(es)</p>
                   </div>
                 </Link>
+                {canAssignStand && (
+                  <div className="mt-2 flex justify-end">
+                    <Button variant="outline" size="sm" onClick={() => setStandProject(p)}
+                      aria-label={`${p.stand ? "Cambiar" : "Asignar"} stand de ${p.title || displayEmail(p.leaderEmail)}`}>
+                      <MapPin className="size-3.5" /> {p.stand ? "Cambiar stand" : "Asignar stand"}
+                    </Button>
+                  </div>
+                )}
               </li>
             );
           })}
@@ -523,7 +537,47 @@ function ProjectsTab({
           title={projects.length ? "Sin coincidencias" : "Aún no hay proyectos"}
           text={projects.length ? "Prueba con otra búsqueda o cambia los filtros." : "Da de alta el correo del alumno líder. Él completará su proyecto y agregará a sus integrantes al entrar."} />
       )}
+      <Modal open={canAssignStand && !!standProject} onClose={() => setStandProject(null)} title="Ubicación del stand">
+        {standProject && <StandForm key={standProject.id} project={standProject} onClose={() => setStandProject(null)} />}
+      </Modal>
     </div>
+  );
+}
+
+function StandForm({ project, onClose }: { project: ProjectDoc; onClose: () => void }) {
+  const [stand, setStand] = useState(project.stand ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const toast = useToast();
+
+  return (
+    <form className="space-y-4" onSubmit={async (e) => {
+      e.preventDefault();
+      if (saving) return;
+      setSaving(true);
+      setError("");
+      try {
+        await saveProjectStand(project.eventId, project.id, stand);
+        toast(stand.trim() ? "Stand guardado." : "Stand retirado.");
+        onClose();
+      } catch (err) {
+        setError(firestoreErrorMessage(err));
+      } finally {
+        setSaving(false);
+      }
+    }}>
+      <p className="font-medium">{project.title || displayEmail(project.leaderEmail)}</p>
+      <Field label="Stand y ubicación" htmlFor="project-stand"
+        hint="Escribe el identificador y la zona si hace falta. Deja el campo vacío para retirar la asignación.">
+        <Input id="project-stand" value={stand} maxLength={80} disabled={saving}
+          onChange={(e) => setStand(e.target.value)} placeholder="Ej. A-12 · Pasillo central" />
+      </Field>
+      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>Cancelar</Button>
+        <Button type="submit" loading={saving}>Guardar stand</Button>
+      </div>
+    </form>
   );
 }
 

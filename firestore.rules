@@ -354,7 +354,7 @@ service cloud.firestore {
             && event.resultsPublished != true
             && (event.registrationOpen == true || event.submissions.prototype == true
               || event.submissions.final == true || previous.get('registrationPending', false) == true)
-            && !keys.hasAny(['feedback', 'judging', 'leaderId', 'leaderEmail', 'eventId', 'createdAt'])
+            && !keys.hasAny(['feedback', 'judging', 'stand', 'leaderId', 'leaderEmail', 'eventId', 'createdAt'])
             && validTeam(data) && validInfo(data) && completedRegistration(event, keys)
             && (!keys.hasAny(['logo']) || (previous.leaderId == request.auth.uid
               && previous.get('registrationPending', false) != true && validLogo(data)))
@@ -391,6 +391,7 @@ service cloud.firestore {
           && request.resource.data.prototype == null
           && request.resource.data.final == null
           && request.resource.data.get('logo', null) == null
+          && !('stand' in request.resource.data)
           && !('judging' in request.resource.data)
           && !('feedback' in request.resource.data);
 
@@ -406,7 +407,15 @@ service cloud.firestore {
             && !judging.judgeEmails.hasAny(resource.data.memberEmails);
         }
 
-        // El organizador gestiona retroalimentación y jueces, sin modificar el contenido del equipo.
+        function canSetStand() {
+          let stand = request.resource.data.get('stand', '');
+          return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stand'])
+            && verified() && myEmail() in ev().organizerEmails
+            && stand is string && stand.size() <= 80 && stand.matches('.*');
+        }
+
+        // El organizador gestiona retroalimentación, jueces y stands.
+        allow update: if canSetStand();
         allow update: if participantUpdate()
           || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['feedback']) && isOrganizer(eid))
           || (isOrganizer(eid) && ev().resultsPublished != true

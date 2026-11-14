@@ -128,6 +128,7 @@ export function JudgeView({ event }: { event: EventDoc }) {
                   <p className="text-sm font-medium">{scheduleLabel(event.judgeAssignments?.[email]?.schedule?.[p.id])}</p>
                   <div className="flex flex-wrap gap-1.5">
                     {p.category && <Badge>{p.category}</Badge>}
+                    <Badge>{p.stand ? `Stand: ${p.stand}` : "Sin stand asignado"}</Badge>
                     {!isProjectAssignedToJudge(event, p, email) && <Badge>Solo consulta</Badge>}
                     {phases.map((ph) => {
                       const ev = evaluated(p, ph);

@@ -68,6 +68,7 @@ export function StudentView({ event }: { event: EventDoc }) {
                 {project.category && <Badge tone="lime">{project.category}</Badge>}
               </div>
               <h2 className="mt-1 break-words font-display text-2xl font-bold leading-tight">{project.title}</h2>
+              <p className="mt-2 text-sm font-medium">{project.stand ? `Stand: ${project.stand}` : "Sin stand asignado"}</p>
               <p className="mt-1 line-clamp-2 font-mono text-[11px] text-white/75">{project.summary}</p>
               <div className="mt-4">
                 <SubmissionBadges project={project} event={event} onDark />

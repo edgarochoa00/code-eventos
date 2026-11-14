@@ -223,6 +223,7 @@ describe("cuenta suspendida", () => {
 describe("proyectos", () => {
   test("alumno registra su proyecto", async () => {
     await assertFails(setDoc(doc(stu, "events/e1/projects/p1"), project));
+    await assertFails(syncTeam(stu, "p1", { ...project, stand: "A-12" }));
     await assertSucceeds(syncTeam(stu, "p1", project));
   });
 
@@ -387,6 +388,27 @@ describe("proyectos", () => {
     }));
     await assertSucceeds(updateDoc(doc(org, "events/e1"), { judgeEmails: ["judge@tec.mx"], judgingOpen: false, categoryLocked: true }));
     await assertSucceeds(syncTeam(outsider, "legacy-conflict", null, other.memberEmails));
+  });
+
+  test("solo un organizador del evento puede asignar, cambiar o retirar el stand", async () => {
+    const path = "events/e1/projects/p1";
+    const ref = doc(org, path);
+    for (const actor of [stu, mate, judge, admin, superDb, outsider]) {
+      await assertFails(updateDoc(doc(actor, path), { stand: "B-99" }));
+    }
+    await assertFails(updateDoc(ref, { stand: 12 }));
+    await assertFails(updateDoc(ref, { stand: "A".repeat(81) }));
+    await assertFails(updateDoc(ref, { stand: "A-12\nPasillo" }));
+    await assertFails(updateDoc(ref, { stand: "A-12", title: "Cambio ajeno a la ubicación" }));
+    await assertSucceeds(updateDoc(ref, { stand: "A-12 · Pasillo central" }));
+    for (const actor of [stu, mate, judge]) {
+      const snapshot = await assertSucceeds(getDoc(doc(actor, path)));
+      assert.equal(snapshot.data().stand, "A-12 · Pasillo central");
+    }
+    await assertFails(updateDoc(doc(stu, path), { stand: deleteField() }));
+    await assertSucceeds(updateDoc(ref, { stand: "B-03" }));
+    await assertSucceeds(updateDoc(ref, { stand: deleteField() }));
+    assert.equal((await getDoc(ref)).data().stand, undefined);
   });
 
   test("el organizador no edita el contenido del proyecto", async () => {

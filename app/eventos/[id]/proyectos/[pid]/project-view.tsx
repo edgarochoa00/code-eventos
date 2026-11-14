@@ -177,6 +177,7 @@ function ProjectBody({
           {isOrganizer && seeOriginality && !fingerprints.loading && <SimilarityBadge match={matches[0]} state={state} />}
         </div>
         <h1 className="mt-4 break-words font-display text-3xl font-bold leading-tight sm:text-4xl">{project.title || "Registro pendiente del líder"}</h1>
+        <p className="mt-2 text-sm font-medium">{project.stand ? `Stand: ${project.stand}` : "Sin stand asignado"}</p>
         {project.registrationPending && <p className="mt-2 text-sm text-muted">El alumno líder completará los datos del proyecto y registrará a sus integrantes al entrar.</p>}
         <p className="mt-2 max-w-3xl text-sm leading-relaxed text-ink/75">{project.summary}</p>
         <ul className="mt-5 flex flex-wrap gap-2">

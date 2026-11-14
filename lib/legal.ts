@@ -22,6 +22,10 @@ export type Release = { version: string; date: string; title: string; changes: s
 
 /** La primera entrada es la versión actual (debe coincidir con package.json). */
 export const RELEASES: Release[] = [
+  { version: "0.4.14", date: "14 de noviembre de 2026", title: "Asignación de stands", changes: [
+    "Los organizadores del evento pueden asignar, cambiar o retirar el stand de cada proyecto.",
+    "Los alumnos y jueces pueden consultar la ubicación asignada.",
+  ] },
   { version: "0.4.13", date: "13 de noviembre de 2026", title: "Comentario obligatorio, horarios de jueces y baja completa desde Administración", changes: [
     "El juez debe escribir un comentario para el equipo antes de enviar su calificación.",
     "«Horarios de los jueces» solo programa el horario de los proyectos que cada juez ya tiene asignados. La asignación se hace en «Asignación por proyecto».",

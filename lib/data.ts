@@ -150,6 +150,12 @@ export async function saveJudgeAssignment(eventId: string, email: string, assign
   });
 }
 
+export function saveProjectStand(eventId: string, projectId: string, value: string) {
+  const stand = value.trim();
+  if (stand.length > 80 || /[\r\n]/.test(stand)) throw new Error("Escribe la ubicación en una línea de hasta 80 caracteres.");
+  return updateDoc(projectRef(eventId, projectId), { stand: stand || deleteField() });
+}
+
 export async function saveProjectJudges(eventId: string, projectId: string, judging: NonNullable<ProjectDoc["judging"]>) {
   const next = { maxJudges: judging.maxJudges, judgeEmails: judging.judgeEmails.map(normalizeEmail) };
   await runTransaction(db, async tx => {
