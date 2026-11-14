@@ -18,7 +18,8 @@ service cloud.firestore {
     // ---------- Identidad ----------
 
     function signedIn() {
-      return request.auth != null;
+      return request.auth != null
+        && !exists(/databases/$(database)/documents/withdrawnAccounts/$(request.auth.uid));
     }
 
     // Correo verificado: evita que alguien se haga pasar por un juez
@@ -437,14 +438,15 @@ service cloud.firestore {
             && event.judgingOpen == true && event.resultsPublished != true
             && (('judging' in project)
               ? myEmail() in project.judging.judgeEmails
-              : ((categories.size() == 0 && projectIds.size() == 0)
-                || project.get('category', '') in categories || data.projectId in projectIds));
+              : (project.get('category', '') in categories || data.projectId in projectIds));
         }
 
+        allow get: if verified() && resource == null;
         allow read: if isOrganizer(eid)
           || (verified() && resource.data.judgeId == request.auth.uid);
 
-        allow create, update: if canEvaluate(request.resource.data)
+        allow update: if false;
+        allow create: if canEvaluate(request.resource.data)
           && request.resource.data.judgeId == request.auth.uid
           && request.resource.data.judgeEmail == myEmail()
           && request.resource.data.eventId == eid

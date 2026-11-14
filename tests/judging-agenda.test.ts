@@ -45,10 +45,10 @@ test("pendientes de registro y conflictos de equipo no generan tareas; sin tarea
   assert.equal(row.total, 0); assert.equal(row.percent, 0);
   assert.equal(judgeProgress(event, projects.map(p=>({...p,memberEmails:[email]})), [], email, now).total, 0);
 });
-test("un horario sin categorías ni proyectos mantiene la asignación a todos", () => {
+test("un horario sin categorías ni proyectos no asigna proyectos", () => {
   const all = { ...event, judgeAssignments: { [email]: { schedule: event.judgeAssignments![email].schedule } } };
   const row = judgeProgress(all, projects, [], email, now);
-  assert.equal(row.total, 3); assert.equal(row.tasks.find(t=>t.project.id==='unassigned')?.status, 'unscheduled');
+  assert.equal(row.total, 0); assert.deepEqual(row.tasks, []);
 });
 test("respeta inicio y fin exactos y muestra hora de Culiacán", () => {
   assert.equal(judgeProgress(event, projects, [], email, Date.parse('2026-11-05T17:00:00Z')).tasks[0].status,'due');

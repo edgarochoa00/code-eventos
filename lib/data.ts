@@ -17,7 +17,7 @@ import {
   writeBatch,
   type Transaction,
 } from "firebase/firestore";
-import type { User } from "firebase/auth";
+import { signOut, type User } from "firebase/auth";
 import { auth, db } from "./firebase";
 import { inviteSavedAccounts, sendInvitations } from "./account-invitation-client";
 import { scheduleError } from "./judging-agenda";
@@ -300,7 +300,7 @@ export async function deleteEvent(eventId: string) {
   if (event.data().resultsPublished) throw new Error("Oculta los resultados antes de eliminar el evento.");
   if (event.data().accessVersion !== 1) throw new Error("Actualiza los permisos del evento antes de eliminarlo.");
   const projects = await getDocs(projectsCol(eventId));
-  for (const project of projects.docs) await deleteProject(eventId, { ...project.data(), id: project.id } as ProjectDoc, true);
+  for (const project of projects.docs) await deleteProject(eventId, { ...project.data(), id: project.id } as ProjectDoc);
   const evaluations = await getDocs(evaluationsCol(eventId));
   for (let i = 0; i < evaluations.docs.length; i += 400) {
     const batch = writeBatch(db);
@@ -404,22 +404,23 @@ export async function updateProjectInfo(event: EventDoc, project: ProjectDoc, in
   return sendInvitations({ kind: "team", role: "member", eventId: event.id, projectId: project.id }, added);
 }
 
-export async function deleteProject(eventId: string, project: ProjectDoc, asOrganizer = false) {
+export async function deleteProject(eventId: string, project: ProjectDoc) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Inicia sesión para dar de baja el proyecto.");
+  const token = await user.getIdToken();
   const event = await getDoc(eventRef(eventId));
   if (!event.exists()) throw new Error("El evento ya no existe.");
   if (event.data().resultsPublished) throw new Error("Oculta los resultados antes de eliminar proyectos.");
-  if (event.data().accessVersion !== 1) throw new Error("El superadmin debe actualizar los permisos antes de eliminar proyectos.");
-  const evaluations = asOrganizer ? (await getDocs(query(evaluationsCol(eventId), where("projectId", "==", project.id)))).docs : [];
   const files = [...(project.prototype?.files ?? []), ...(project.final?.files ?? [])];
   if (project.logo) await projectLogoRequest(eventId, project.id, "DELETE", undefined, true);
   await Promise.all(files.map(file => removeSubmissionFile(file)));
-  await runTransaction(db, async (tx) => {
-    const current = await tx.get(projectRef(eventId, project.id));
-    if (!current.exists()) return;
-    tx.delete(current.ref);
-    syncParticipants(tx, eventId, project.id, (current.data() as ProjectDoc).memberEmails, []);
-    evaluations.forEach((evaluation) => tx.delete(evaluation.ref));
+  const response = await fetch("/api/project-withdrawal", {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ eventId, projectId: project.id }),
   });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error ?? "No se pudo completar la baja.");
+  if (result.accountDeleted) await signOut(auth);
 }
 
 export async function saveSubmission(event: EventDoc, project: ProjectDoc, phase: Phase, submission: Submission) {
@@ -477,6 +478,8 @@ export async function saveEvaluation(
     const error = evaluationScoresError(criteria, scores);
     if (error) throw new Error(error);
     const id = evaluationId(user.uid, projectId, phase);
+    const previous = await transaction.get(doc(evaluationsCol(event.id), id));
+    if (previous.exists()) throw new Error("Ya enviaste esta calificación. No se puede modificar.");
     const data: Omit<EvaluationDoc, "id" | "updatedAt"> = {
       eventId: event.id,
       projectId,

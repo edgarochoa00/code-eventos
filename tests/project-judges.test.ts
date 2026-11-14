@@ -32,6 +32,6 @@ test("la selección por proyecto manda sobre filtros, no permite acceso automát
   assert.equal(isProjectAssignedToJudge(event, { ...selected, judging: { maxJudges: 1, judgeEmails: [] } }, "two@example.com"), false);
   assert.equal(isProjectAssignedToJudge({ ...event, judgeEmails: [] }, selected, "one@example.com"), false);
   assert.equal(isProjectAssignedToJudge(event, { ...selected, memberEmails: ["one@example.com"] }, "one@example.com"), false);
-  // Los proyectos anteriores conservan la asignación general hasta que el organizador los configure.
-  assert.equal(isProjectAssignedToJudge(event, project, "two@example.com"), true);
+  // Sin selección explícita tampoco se asignan los proyectos anteriores.
+  assert.equal(isProjectAssignedToJudge(event, project, "two@example.com"), false);
 });

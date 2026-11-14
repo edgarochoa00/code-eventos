@@ -4,7 +4,7 @@ import { Lock, Minus, Plus } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import type { Criterion, EvaluationDoc } from "@/lib/types";
 import { weightedTotal } from "@/lib/utils";
-import { Button, Field, Textarea } from "./ui";
+import { Button, Field, Modal, Textarea } from "./ui";
 
 const STEP = 0.5;
 
@@ -15,7 +15,7 @@ function clamp(v: number) {
 export function EvaluationForm({
   criteria,
   initial,
-  locked,
+  locked: externallyLocked,
   lockReason,
   onSave,
 }: {
@@ -26,10 +26,13 @@ export function EvaluationForm({
   onSave: (scores: Record<string, number>, comment: string) => Promise<void>;
 }) {
   const [scores, setScores] = useState<Record<string, number>>(
-    () => Object.fromEntries(criteria.map((c) => [c.id, initial?.scores[c.id] ?? 5])),
+    () => Object.fromEntries(criteria.map((c) => [c.id, initial?.scores[c.id] ?? 0])),
   );
   const [comment, setComment] = useState(initial?.comment ?? "");
   const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const locked = externallyLocked || !!initial || submitted;
   const total = weightedTotal(criteria, scores);
   const totalWeight = criteria.reduce((s, c) => s + c.weight, 0) || 1;
 
@@ -37,9 +40,19 @@ export function EvaluationForm({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (locked || busy) return;
+    setConfirming(true);
+  }
+
+  async function submitConfirmed() {
+    if (locked || busy) return;
     setBusy(true);
     try {
       await onSave(scores, comment);
+      setSubmitted(true);
+      setConfirming(false);
+    } catch {
+      // La pantalla del proyecto muestra el error y permite reintentar.
     } finally {
       setBusy(false);
     }
@@ -49,7 +62,7 @@ export function EvaluationForm({
     <form onSubmit={handleSubmit} className="space-y-6">
       {locked && (
         <p className="flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-2.5 font-mono text-[11px] text-amber-800">
-          <Lock className="size-3.5 shrink-0" /> {lockReason ?? "La evaluación está cerrada por el organizador. Puedes ver tu calificación pero no cambiarla."}
+          <Lock className="size-3.5 shrink-0" /> {initial || submitted ? "Calificación enviada. Puedes consultarla, pero no modificarla." : lockReason ?? "La evaluación está cerrada por el organizador. Puedes ver tu calificación pero no cambiarla."}
         </p>
       )}
 
@@ -60,8 +73,8 @@ export function EvaluationForm({
             {total.toFixed(1)} <span className="text-sm font-normal text-white/75">/100</span>
           </p>
         </div>
-        <Button type="submit" variant="accent" loading={busy} disabled={locked}>
-          {initial ? "Actualizar" : "Guardar"}
+        <Button type="submit" variant="accent" loading={busy} disabled={locked || busy || confirming}>
+          {initial || submitted ? "Enviada" : "Enviar calificación"}
         </Button>
       </div>
 
@@ -86,7 +99,7 @@ export function EvaluationForm({
               <div className="mt-3 flex items-center gap-2">
                 <button
                   type="button"
-                  disabled={locked || value <= 0}
+                  disabled={locked || busy || confirming || value <= 0}
                   onClick={() => set(c.id, value - STEP)}
                   className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-surface text-ink transition hover:bg-ink/5 disabled:opacity-40"
                   aria-label={`Bajar ${c.name}`}
@@ -101,7 +114,7 @@ export function EvaluationForm({
                     max={10}
                     step={STEP}
                     value={value}
-                    disabled={locked}
+                    disabled={locked || busy || confirming}
                     onChange={(e) => set(c.id, Number(e.target.value))}
                     className="score-range w-full"
                     style={{ "--fill": `${value * 10}%` } as React.CSSProperties}
@@ -114,7 +127,7 @@ export function EvaluationForm({
                 </div>
                 <button
                   type="button"
-                  disabled={locked || value >= 10}
+                  disabled={locked || busy || confirming || value >= 10}
                   onClick={() => set(c.id, value + STEP)}
                   className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-surface text-ink transition hover:bg-ink/5 disabled:opacity-40"
                   aria-label={`Subir ${c.name}`}
@@ -128,8 +141,18 @@ export function EvaluationForm({
       </div>
 
       <Field label="Comentarios para el equipo" htmlFor="comment" hint="Se muestran al equipo cuando se publiquen los resultados (sin tu nombre).">
-        <Textarea id="comment" value={comment} disabled={locked} onChange={(e) => setComment(e.target.value)} maxLength={2000} />
+        <Textarea id="comment" value={comment} disabled={locked || busy || confirming} onChange={(e) => setComment(e.target.value)} maxLength={2000} />
       </Field>
+      <Modal open={confirming} onClose={() => { if (!busy) setConfirming(false); }} title="¿Enviar calificación definitiva?">
+        <p className="text-sm">Revisa tus calificaciones. Solo puedes enviar una evaluación por proyecto y etapa; después no podrás modificarla.</p>
+        <ul className="my-4 space-y-2">{criteria.map(c => <li key={c.id} className="flex justify-between gap-4 text-sm"><span>{c.name}</span><strong>{scores[c.id] ?? 0}/10</strong></li>)}</ul>
+        <p className="font-medium">Total: {total.toFixed(1)}/100</p>
+        {comment && <p className="mt-3 whitespace-pre-wrap text-sm">{comment}</p>}
+        <div className="mt-6 flex justify-end gap-2">
+          <Button type="button" variant="ghost" disabled={busy} onClick={() => setConfirming(false)}>Seguir revisando</Button>
+          <Button type="button" loading={busy} disabled={locked} onClick={submitConfirmed}>Confirmar envío</Button>
+        </div>
+      </Modal>
     </form>
   );
 }

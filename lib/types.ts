@@ -32,7 +32,7 @@ export type ResultRow = {
 
 /**
  * Asignación opcional de un juez a categorías o proyectos específicos.
- * Si ambas listas están vacías (o el juez no aparece en judgeAssignments), evalúa todos los proyectos.
+ * Si ambas listas están vacías (o el juez no aparece en judgeAssignments), no tiene proyectos asignados.
  */
 export type JudgeAssignment = {
   categories?: string[];

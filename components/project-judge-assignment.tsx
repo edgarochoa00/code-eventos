@@ -9,12 +9,22 @@ import type { EventDoc, ProjectDoc } from "@/lib/types";
 
 export function ProjectJudgeAssignments({ event, projects }: { event: EventDoc; projects: ProjectDoc[] }) {
   const [editing, setEditing] = useState<string | null>(null);
+  const [category, setCategory] = useState("");
+  const categories = [...new Set(projects.map(p => p.category))].sort();
+  const visibleProjects = projects.filter(p => !category || p.category === category);
   const project = projects.find(p => p.id === editing);
   return <Card className="lg:col-span-2">
     <SectionTitle title="Asignación por proyecto" subtitle="Define el máximo y elige qué jueces califican cada proyecto. La selección guardada tiene prioridad sobre las asignaciones por categoría o por juez." />
     {!projects.length && <EmptyState title="Sin proyectos registrados" text="Los proyectos aparecerán aquí cuando los equipos completen su registro." />}
+    <Field label="Filtrar proyectos por categoría" htmlFor="assignment-category">
+      <select className="h-11 w-full rounded-xl border border-control bg-surface px-3 text-sm" id="assignment-category" value={category} onChange={e => setCategory(e.target.value)}>
+        <option value="">Todas las categorías</option>
+        {categories.filter(Boolean).map(c => <option key={c} value={c}>{c}</option>)}
+      </select>
+    </Field>
+    {!!projects.length && !visibleProjects.length && <p className="mt-4 text-sm text-muted">No hay proyectos en esta categoría.</p>}
     <ul className="divide-y divide-line">
-      {projects.map(p => {
+      {visibleProjects.map(p => {
         const judges = event.judgeEmails.filter(email => isProjectAssignedToJudge(event, p, email));
         return <li key={p.id} className="space-y-3 py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">

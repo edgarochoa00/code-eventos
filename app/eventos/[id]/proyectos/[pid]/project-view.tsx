@@ -347,7 +347,7 @@ function ProjectBody({
               )}
               <p className="mb-4 rounded-xl bg-paper p-3 text-sm font-medium">Tu horario: {scheduleLabel(event.judgeAssignments?.[normalizeEmail(user.email ?? "")]?.schedule?.[project.id])}</p>
               <EvaluationForm
-                key={`${evalPhase}:${project.category}:${JSON.stringify(getCategoryCriteria(event, project.category))}`}
+                key={`${evalPhase}:${project.category}:${evaluations.data.find(e => e.id === evaluationId(user.uid, project.id, evalPhase))?.id ?? "new"}:${JSON.stringify(getCategoryCriteria(event, project.category))}`}
                 criteria={getCategoryCriteria(event, project.category)}
                 locked={!assigned || !event.judgingOpen || event.resultsPublished || event.accessVersion !== 1}
                 lockReason={!assigned ? "Este proyecto no está asignado a tu evaluación. Puedes revisarlo." : event.resultsPublished ? "Los resultados están publicados. Tus calificaciones ya no se pueden cambiar." : event.accessVersion !== 1 ? "El superadmin debe actualizar los permisos de este evento antes de habilitar la evaluación." : undefined}
@@ -355,9 +355,10 @@ function ProjectBody({
                 onSave={async (scores, comment) => {
                   try {
                     await saveEvaluation(event, project, evalPhase, user, scores, comment);
-                    toast("Calificación guardada.");
+                    toast("Calificación enviada. Ya no se puede modificar.");
                   } catch (err) {
                     toast(firestoreErrorMessage(err), "error");
+                    throw err;
                   }
                 }}
               />
@@ -446,7 +447,7 @@ function ProjectBody({
 
       <Modal open={confirmDeleteProject} onClose={() => setConfirmDeleteProject(false)} title="¿Eliminar proyecto?">
         <p className="font-mono text-xs leading-relaxed text-muted">
-          Se eliminará el proyecto «{project.title}» y sus entregas de este evento. Esta acción no se puede deshacer.
+          Se eliminará el proyecto «{project.title}» y sus entregas. También se eliminarán el perfil y la cuenta de acceso de los alumnos que no participen ni tengan permisos en otros eventos. Para volver deberán registrarse de nuevo. Esta acción no se puede deshacer.
         </p>
         <div className="mt-6 flex justify-end gap-2">
           <Button variant="ghost" onClick={() => setConfirmDeleteProject(false)}>
@@ -458,7 +459,7 @@ function ProjectBody({
             onClick={async () => {
               setDeletingProject(true);
               try {
-                await deleteProject(event.id, project, isOrganizer);
+                await deleteProject(event.id, project);
                 toast("Proyecto eliminado.");
                 router.push(`/eventos/${event.id}`);
               } catch (err) {

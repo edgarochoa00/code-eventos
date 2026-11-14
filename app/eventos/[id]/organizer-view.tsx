@@ -564,7 +564,7 @@ function JudgesTab({ event, projects }: { event: EventDoc; projects: ProjectDoc[
         <Card className="lg:col-span-2">
           <SectionTitle
             title="Agenda por juez"
-            subtitle="Programa horarios y revisa la carga de cada juez. En proyectos con máximo definido se respeta la selección de «Asignación por proyecto»; los demás conservan la asignación general."
+            subtitle="Programa horarios y revisa la carga de cada juez. En proyectos con máximo definido se respeta la selección de «Asignación por proyecto»; los demás requieren una asignación explícita por categoría o proyecto."
           />
           {!event.judgingOpen && !event.resultsPublished && (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-amber-50 p-4 text-amber-900">
@@ -674,6 +674,7 @@ function JudgeAssignmentModal({
   onSave: (assignment: JudgeAssignment) => Promise<void>;
   onClose: () => void;
 }) {
+  const [projectCategory, setProjectCategory] = useState("");
   const [selectedCats, setSelectedCats] = useState<string[]>(initial?.categories ?? []);
   const [selectedProjs, setSelectedProjs] = useState<string[]>(initial?.projectIds ?? []);
   const [schedule, setSchedule] = useState<NonNullable<JudgeAssignment["schedule"]>>(initial?.schedule ?? {});
@@ -720,7 +721,7 @@ function JudgeAssignmentModal({
               }}
               className="font-mono text-[11px] text-muted underline hover:text-ink"
             >
-              Evaluar todos
+              Quitar selección
             </button>
           )}
         </div>
@@ -747,8 +748,13 @@ function JudgeAssignmentModal({
       {projects.length > 0 && (
         <div className="space-y-2">
           <p className="font-mono text-xs font-medium text-ink/80">Proyectos específicos</p>
+          <select className="h-11 w-full rounded-xl border border-control bg-surface px-3 text-sm" aria-label="Filtrar proyectos para este juez por categoría" value={projectCategory} onChange={e => setProjectCategory(e.target.value)}>
+            <option value="">Todas las categorías</option>
+            {categories.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <p className="text-xs text-muted">El filtro solo cambia la lista visible; conserva las selecciones de otras categorías.</p>
           <div className="max-h-52 divide-y divide-line overflow-y-auto rounded-2xl bg-paper px-3">
-            {projects.map((p) => {
+            {projects.filter(p => !projectCategory || p.category === projectCategory).map((p) => {
               const byCat = Boolean(p.category && selectedCats.includes(p.category));
               const checked = p.judging ? p.judging.judgeEmails.includes(judgeEmail) : byCat || selectedProjs.includes(p.id);
               return (
@@ -1070,7 +1076,7 @@ function SettingsTab({ event }: { event: EventDoc }) {
 
       <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)} title="¿Eliminar evento?">
         <p className="font-mono text-xs leading-relaxed text-muted">
-          Se eliminará «{event.name}» junto con todos sus proyectos y evaluaciones. Esta acción no se puede deshacer.
+          Se eliminará «{event.name}» junto con todos sus proyectos y evaluaciones. También se eliminarán el perfil y el acceso de los alumnos que no participen ni tengan permisos en otros eventos. Esta acción no se puede deshacer.
         </p>
         <div className="mt-6 flex justify-end gap-2">
           <Button variant="ghost" onClick={() => setConfirmDelete(false)}>

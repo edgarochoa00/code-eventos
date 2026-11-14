@@ -36,6 +36,7 @@ const eventFor = (ownerId, ownerEmail) => ({
   ownerEmail,
   organizerEmails: [ownerEmail],
   judgeEmails: [],
+  judgeAssignments: { "judge@tec.mx": { categories: ["Software", "Carteles", "Prototipos", "Sin personalizar", "Categoría 19"] }, "org@tec.mx": { projectIds: ["cross-event"] } },
   phases: { prototype: true, final: true },
   submissions: { prototype: true, final: false },
   registrationOpen: true,
@@ -505,16 +506,30 @@ describe("evaluaciones", () => {
     );
   });
 
-  test("la asignación limita las escrituras por categoría o proyecto y admite listas vacías", async () => {
+  test("la asignación limita las escrituras y las listas vacías no dan acceso", async () => {
     const ref = doc(judge, "events/e1/evaluations/judge_p1_prototype");
-    await assertSucceeds(updateDoc(doc(org, "events/e1"), { judgeAssignments: { "judge@tec.mx": { categories: ["Hardware"] } } }));
+    for (const [assignment, allowed] of [
+      [{ categories: ["Hardware"] }, false],
+      [{ categories: ["Hardware"], projectIds: ["p1"] }, true],
+      [{ categories: ["Software"] }, true],
+      [{ categories: [], projectIds: [] }, false],
+      [{}, false],
+    ]) {
+      await env.withSecurityRulesDisabled(c => deleteDoc(doc(c.firestore(), "events/e1/evaluations/judge_p1_prototype")));
+      await assertSucceeds(updateDoc(doc(org, "events/e1"), { judgeAssignments: { "judge@tec.mx": assignment } }));
+      await (allowed ? assertSucceeds : assertFails)(setDoc(ref, evalDoc));
+    }
+    await updateDoc(doc(org, "events/e1"), { judgeAssignments: { "judge@tec.mx": { projectIds: ["p1"] } } });
+  });
+
+  test("solo se admite el primer envío, incluso con escrituras simultáneas", async () => {
+    const ref = doc(judge, "events/e1/evaluations/judge_p1_prototype");
+    await assertSucceeds(getDoc(ref)); // La transacción puede comprobar que todavía no existe.
+    const results = await Promise.allSettled([setDoc(ref, evalDoc), setDoc(ref, { ...evalDoc, scores: { a: 0 }, total: 0 })]);
+    assert.equal(results.filter(r => r.status === "fulfilled").length, 1);
+    await assertFails(updateDoc(ref, { comment: "Otro envío" }));
+    await assertFails(deleteDoc(ref));
     await assertFails(setDoc(ref, evalDoc));
-    await assertSucceeds(updateDoc(doc(org, "events/e1"), { judgeAssignments: { "judge@tec.mx": { categories: ["Hardware"], projectIds: ["p1"] } } }));
-    await assertSucceeds(setDoc(ref, evalDoc));
-    await assertSucceeds(updateDoc(doc(org, "events/e1"), { judgeAssignments: { "judge@tec.mx": { categories: ["Software"] } } }));
-    await assertSucceeds(setDoc(ref, evalDoc));
-    await assertSucceeds(updateDoc(doc(org, "events/e1"), { judgeAssignments: { "judge@tec.mx": { categories: [], projectIds: [] } } }));
-    await assertSucceeds(setDoc(ref, evalDoc));
   });
 
   test("no se califican etapas deshabilitadas", async () => {
@@ -540,6 +555,7 @@ describe("evaluaciones", () => {
       await assertFails(updateDoc(doc(stu, "events/e1/projects/p1"), { judging: { maxJudges: 2, judgeEmails: [] } }));
       await assertFails(updateDoc(doc(judge, "events/e1/projects/p1"), { judging: { maxJudges: 2, judgeEmails: [] } }));
       await assertFails(updateDoc(projectRef, { judging, title: "Cambio de contenido no permitido" }));
+      await env.withSecurityRulesDisabled(c => deleteDoc(doc(c.firestore(), "events/e1/evaluations/judge_p1_prototype")));
       await assertSucceeds(setDoc(doc(judge, "events/e1/evaluations/judge_p1_prototype"), evalDoc));
       await assertFails(setDoc(doc(outsider, "events/e1/evaluations/out_p1_prototype"), { ...evalDoc, judgeId: "out", judgeEmail: "out@tec.mx" }));
       // Ni siquiera la asignación general del juez vuelve a darle permiso.
@@ -822,4 +838,12 @@ describe("alta por correo y formulario inicial del líder", () => {
       await assertFails(updateDoc(doc(stu, `events/${id}/projects/pending`), completed));
     }
   });
+});
+
+
+test("una sesión retirada no recrea el perfil ni registra proyectos con su token antiguo", async () => {
+  const retired = ctx("retired-student", "retired@tec.mx");
+  await env.withSecurityRulesDisabled(c => setDoc(doc(c.firestore(), "withdrawnAccounts/retired-student"), { withdrawnAt: 1 }));
+  await assertFails(setDoc(doc(retired, "users/retired-student"), { email: "retired@tec.mx" }));
+  await assertFails(syncTeam(retired, "retired", { ...project, leaderId: "retired-student", leaderEmail: "retired@tec.mx", memberEmails: ["retired@tec.mx"] }));
 });

@@ -22,6 +22,11 @@ export type Release = { version: string; date: string; title: string; changes: s
 
 /** La primera entrada es la versión actual (debe coincidir con package.json). */
 export const RELEASES: Release[] = [
+  { version: "0.4.12", date: "13 de noviembre de 2026", title: "Bajas de alumnos y evaluaciones definitivas", changes: [
+    "Al retirar un proyecto se elimina el perfil y el acceso de los alumnos que no participan ni tienen permisos en otros eventos, para permitir un nuevo registro.",
+    "Los jueces empiezan sin proyectos asignados y la organización puede filtrar por categoría al asignarlos.",
+    "Las calificaciones comienzan en cero y requieren confirmar un único envío por proyecto y etapa. Una evaluación enviada no se puede modificar.",
+  ] },
   { version: "0.4.11", date: "10 de noviembre de 2026", title: "Originalidad exclusiva para organización y administración", changes: [
     "El análisis de originalidad y las coincidencias solo se muestran a organizadores y administradores.",
     "Corrección al actualizar o guardar calificaciones de jueces cuando cambian el orden de campos en la rúbrica.",

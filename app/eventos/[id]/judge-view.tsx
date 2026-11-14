@@ -13,12 +13,11 @@ import { judgeProgress, scheduleLabel } from "@/lib/judging-agenda";
 import { PHASES, type EvaluationDoc, type EventDoc, type ProjectDoc } from "@/lib/types";
 import {
   effectiveEvaluationTotal,
-  hasJudgeAssignment,
   isProjectAssignedToJudge,
   normalizeEmail,
 } from "@/lib/utils";
 
-type Filter = "pending" | "assigned" | "all";
+type Filter = "pending" | "assigned";
 
 export function JudgeView({ event }: { event: EventDoc }) {
   const { user } = useAuth();
@@ -38,13 +37,12 @@ export function JudgeView({ event }: { event: EventDoc }) {
   const evaluated = (p: ProjectDoc, phase: (typeof phases)[number]) =>
     mine.data.find((e) => e.projectId === p.id && e.phase === phase);
 
-  const hasCustom = hasJudgeAssignment(event, email) || projects.data.some(p => !!p.judging);
   const assignedProjects = projects.data.filter((p) => isProjectAssignedToJudge(event, p, email));
 
   const agenda = judgeProgress(event, projects.data, mine.data, email, now ?? 0);
 
   const q = search.trim().toLowerCase();
-  const sourceProjects = filter === "all" ? projects.data : assignedProjects;
+  const sourceProjects = assignedProjects;
   const list = sourceProjects
     .filter((p) => !q || p.title.toLowerCase().includes(q) || p.category.toLowerCase().includes(q))
     .filter((p) => filter !== "pending" || phases.some((ph) => !evaluated(p, ph)))
@@ -76,12 +74,10 @@ export function JudgeView({ event }: { event: EventDoc }) {
           <div className="mt-4 h-2 rounded-full bg-white/10">
             <div className="h-full rounded-full bg-lime transition-all" style={{ width: `${agenda.percent}%` }} />
           </div>
-          {hasCustom && (
-            <p className="mt-3 font-mono text-[11px] text-white/75">
-              Asignado a {assignedProjects.length} proyecto(s)
-              {assignmentCategories.length > 0 ? ` · ${assignmentCategories.join(", ")}` : ""}
-            </p>
-          )}
+          <p className="mt-3 font-mono text-[11px] text-white/75">
+            Asignado a {assignedProjects.length} proyecto(s)
+            {assignmentCategories.length > 0 ? ` · ${assignmentCategories.join(", ")}` : ""}
+          </p>
         </div>
         {(!event.judgingOpen || event.resultsPublished) && (
           <div className="flex max-w-sm items-start gap-3 rounded-3xl bg-amber-50 p-5 text-amber-900">
@@ -102,8 +98,7 @@ export function JudgeView({ event }: { event: EventDoc }) {
           <Tabs
             tabs={[
               { id: "pending", label: "Pendientes", count: agenda.pending },
-              ...(hasCustom ? [{ id: "assigned" as Filter, label: "Asignados", count: assignedProjects.length }] : []),
-              { id: "all", label: "Todos", count: projects.data.length },
+              { id: "assigned", label: "Asignados", count: assignedProjects.length },
             ]}
             value={filter}
             onChange={setFilter}
@@ -165,9 +160,9 @@ export function JudgeView({ event }: { event: EventDoc }) {
             }
             text={
               !projects.data.length
-                ? "Cuando los equipos se registren aparecerán aquí."
+                ? "Los proyectos aparecerán aquí cuando el organizador te los asigne."
                 : filter === "pending" && !agenda.total
-                  ? "Aún no tienes proyectos o etapas por evaluar. Puedes consultar los proyectos en «Todos»."
+                  ? "El organizador todavía no te ha asignado proyectos para evaluar."
                   : filter === "pending"
                     ? "Ya calificaste todas las entregas disponibles."
                     : "Prueba con otra búsqueda."

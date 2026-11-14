@@ -213,11 +213,11 @@ describe("Casos de uso · Asignación de jueces por categoría y proyecto", () =
   const projSoftware = makeProject({ id: "p-sw", category: "Software" });
   const projSalud = makeProject({ id: "p-med", category: "Salud" });
 
-  test("CU-05: Juez sin asignación específica puede evaluar todos los proyectos del evento", () => {
+  test("CU-05: Juez sin asignación específica no puede evaluar proyectos del evento", () => {
     assert.equal(hasJudgeAssignment(baseEvent, "juez1@tec.mx"), false);
-    assert.equal(isProjectAssignedToJudge(baseEvent, projHardware, "juez1@tec.mx"), true);
-    assert.equal(isProjectAssignedToJudge(baseEvent, projSoftware, "juez1@tec.mx"), true);
-    assert.equal(isProjectAssignedToJudge(baseEvent, projSalud, "juez1@tec.mx"), true);
+    assert.equal(isProjectAssignedToJudge(baseEvent, projHardware, "juez1@tec.mx"), false);
+    assert.equal(isProjectAssignedToJudge(baseEvent, projSoftware, "juez1@tec.mx"), false);
+    assert.equal(isProjectAssignedToJudge(baseEvent, projSalud, "juez1@tec.mx"), false);
   });
 
   test("CU-06: Juez asignado por categoría o proyecto específico solo evalúa los que le corresponden", () => {
@@ -540,7 +540,7 @@ describe("Rúbricas distintas dentro del mismo evento", () => {
 test("un alta pendiente no se asigna a jueces ni entra en resultados aunque tenga evaluaciones anteriores", () => {
   const pending = makeProject({ registrationPending: true });
   const active = makeProject({ id: "completed", registrationPending: false });
-  const event = { ...baseEvent, judgingOpen: true };
+  const event = { ...baseEvent, judgingOpen: true, judgeAssignments: { "juez1@tec.mx": { projectIds: [pending.id, active.id] } } };
   assert.equal(isProjectAssignedToJudge(event, pending, "juez1@tec.mx"), false);
   assert.equal(isProjectAssignedToJudge(event, active, "juez1@tec.mx"), true);
   const evaluation: EvaluationDoc = { id: "old", eventId: event.id, projectId: pending.id, phase: "prototype", judgeId: "judge",

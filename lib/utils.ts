@@ -155,7 +155,7 @@ export function isProjectAssignedToJudge(event: EventDoc, project: ProjectDoc, j
   // Un juez nunca califica un proyecto del que forma parte.
   if (project.memberEmails?.includes(email)) return false;
   if (project.judging) return project.judging.judgeEmails.includes(email);
-  if (!hasJudgeAssignment(event, email)) return true;
+  if (!hasJudgeAssignment(event, email)) return false;
   const a = event.judgeAssignments?.[email];
   const byCat = Boolean(project.category && a?.categories?.includes(project.category));
   const byProj = Boolean(a?.projectIds?.includes(project.id));
