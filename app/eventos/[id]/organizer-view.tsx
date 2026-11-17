@@ -23,7 +23,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { JudgingControl } from "@/components/judging-agenda";
 import { ProjectJudgeAssignments } from "@/components/project-judge-assignment";
-import { scheduleLabel, scheduleError, scheduleInputValue, scheduleInputToIso } from "@/lib/judging-agenda";
+import { scheduleBounds, scheduleLabel, scheduleError, scheduleInputValue, scheduleInputToIso } from "@/lib/judging-agenda";
 import { CategoryCriteriaEditor } from "@/components/category-criteria-editor";
 import { EmailListEditor } from "@/components/email-list-editor";
 import { EventSettingsForm } from "@/components/event-settings-form";
@@ -40,6 +40,7 @@ import {
   Input,
   Modal,
   SectionTitle,
+  Select,
   Spinner,
   Tabs,
   Toggle,
@@ -147,7 +148,7 @@ export function OrganizerView({ event }: { event: EventDoc }) {
   );
 }
 
-/* ---------- Resumen y etapas ---------- */
+/* ---------- Resumen ---------- */
 
 function Summary({
   event,
@@ -160,16 +161,7 @@ function Summary({
   analysis: Analysis;
   onGo: (t: Tab) => void;
 }) {
-  const toast = useToast();
   const phases = PHASES.filter((p) => event.phases[p]);
-
-  async function toggle(patch: Partial<EventDoc>) {
-    try {
-      await updateEvent(event.id, patch);
-    } catch (err) {
-      toast(firestoreErrorMessage(err), "error");
-    }
-  }
 
   const stats = [
     { label: "Proyectos", value: projects.length },
@@ -183,59 +175,27 @@ function Summary({
   ];
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[1fr_1.1fr]">
-      <Card>
-        <SectionTitle title="Etapas" subtitle="Abre y cierra cada etapa cuando quieras. Los cambios son inmediatos." />
-        <div className="divide-y divide-line">
-          <Toggle
-            label="Registro de proyectos"
-            description="Los equipos pueden registrarse y editar su información."
-            checked={event.registrationOpen}
-            onChange={(v) => toggle({ registrationOpen: v })}
-          />
-          {phases.map((ph) => {
-            const label = getPhaseLabel(event, ph);
-            return (
-              <Toggle
-                key={ph}
-                label={phases.length === 1 && label.toLowerCase() === "entrega" ? "Recepción de entregas" : `Recibir: ${label}`}
-                description="Los equipos pueden subir o actualizar esta entrega."
-                checked={event.submissions[ph]}
-                onChange={(v) => toggle({ submissions: { ...event.submissions, [ph]: v } })}
-              />
-            );
-          })}
-          <Toggle
-            label="Evaluación de jueces"
-            description={event.resultsPublished ? "Oculta los resultados antes de reabrir la evaluación." : event.judgeEmails.length ? "Los jueces pueden calificar." : "Primero invita jueces."}
-            checked={event.judgingOpen}
-            disabled={event.resultsPublished || event.accessVersion !== 1}
-            onChange={(v) => toggle({ judgingOpen: v })}
-          />
-        </div>
-      </Card>
-
-      <div className="space-y-4">
-        <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3">
-          {stats.map((s) => (
-            <div key={s.label} className="ui-panel rounded-3xl p-5">
-              <p className="font-display text-3xl font-bold tabular-nums">{s.value}</p>
-              <p className="mt-1 font-mono text-[11px] text-muted">{s.label}</p>
-            </div>
-          ))}
-        </div>
-        <OriginalityCard event={event} projects={projects} analysis={analysis} onGo={onGo} />
-        {!event.judgeEmails.length && (
-          <button onClick={() => onGo("judges")} className="flex w-full items-center gap-4 rounded-3xl bg-lime p-5 text-left">
-            <UserPlus className="size-5" />
-            <span className="flex-1 font-mono text-xs">Invita a tus jueces para que puedan calificar</span>
-            <ArrowUpRight className="size-5" />
-          </button>
-        )}
+    <div className="space-y-4">
+      <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3">
+        {stats.map((s) => (
+          <div key={s.label} className="ui-panel rounded-3xl p-5">
+            <p className="font-display text-3xl font-bold tabular-nums">{s.value}</p>
+            <p className="mt-1 font-mono text-[11px] text-muted">{s.label}</p>
+          </div>
+        ))}
       </div>
+      <OriginalityCard event={event} projects={projects} analysis={analysis} onGo={onGo} />
+      {!event.judgeEmails.length && (
+        <button onClick={() => onGo("judges")} className="flex w-full items-center gap-4 rounded-3xl bg-lime p-5 text-left">
+          <UserPlus className="size-5" />
+          <span className="flex-1 font-mono text-xs">Invita a tus jueces para que puedan calificar</span>
+          <ArrowUpRight className="size-5" />
+        </button>
+      )}
     </div>
   );
 }
+
 
 /* ---------- Originalidad ---------- */
 
@@ -451,11 +411,11 @@ function ProjectsTab({
             className="bg-surface pl-9"
           />
         </div>
-        <select
+        <Select
           aria-label="Filtrar por categoría"
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-          className="h-11 w-full rounded-xl border border-control bg-surface px-3 font-mono text-base text-ink sm:text-xs outline-none focus:border-ink/40"
+          className="bg-surface"
         >
           <option value="all">Todas las categorías</option>
           {categories.map((c) => (
@@ -463,12 +423,12 @@ function ProjectsTab({
               {c}
             </option>
           ))}
-        </select>
-        <select
+        </Select>
+        <Select
           aria-label="Filtrar por estado de entrega"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-          className="h-11 w-full rounded-xl border border-control bg-surface px-3 font-mono text-base text-ink sm:text-xs outline-none focus:border-ink/40"
+          className="bg-surface"
         >
           <option value="all">Todas las entregas</option>
           {PHASES.filter((phase) => event.phases[phase]).map((phase) => {
@@ -480,7 +440,7 @@ function ProjectsTab({
             );
           })}
           <option value="none">Sin entregas</option>
-        </select>
+        </Select>
       </div>
 
       {sorted.length ? (
@@ -490,19 +450,19 @@ function ProjectsTab({
             const avg = evs.length ? evs.reduce((s, e) => s + effectiveEvaluationTotal(getCategoryCriteria(event, p.category), e), 0) / evs.length : null;
             const match = topMatch.get(p.id);
             return (
-              <li key={p.id}>
+              <li key={p.id} className="relative grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 ui-panel ui-interactive rounded-3xl p-4 hover:-translate-y-0.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:p-5">
                 <Link
                   href={`/eventos/${event.id}/proyectos/${p.id}`}
-                  className="grid gap-3 ui-panel ui-interactive rounded-3xl p-5 transition hover:-translate-y-0.5 sm:grid-cols-[1fr_auto] sm:items-center"
+                  className="min-w-0 after:absolute after:inset-0 after:rounded-3xl focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-ink"
                 >
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-display text-lg font-bold">{p.title || displayEmail(p.leaderEmail)}</h3>
+                      <h3 className="min-w-0 font-display text-lg font-bold wrap-anywhere">{p.title || displayEmail(p.leaderEmail)}</h3>
                       {p.registrationPending && <Badge>Registro pendiente del líder</Badge>}
                       {p.category && <Badge>{p.category}</Badge>}
                       <Badge>{p.stand ? `Stand: ${p.stand}` : "Sin stand asignado"}</Badge>
                     </div>
-                    <p className="mt-0.5 font-mono text-[11px] text-muted">
+                    <p className="mt-0.5 break-words font-mono text-[11px] text-muted">
                       {p.members.length} integrante(s) · {p.members.map((m) => m.name || displayEmail(m.email)).join(", ")}
                     </p>
                     <div className="mt-3 flex flex-wrap gap-1.5">
@@ -515,19 +475,19 @@ function ProjectsTab({
                       </p>
                     )}
                   </div>
+                </Link>
+                <div className="flex flex-wrap items-center justify-between gap-3 sm:flex-col sm:items-end">
                   <div className="flex items-center gap-4 sm:flex-col sm:items-end sm:gap-1">
                     <p className="font-display text-2xl font-bold tabular-nums">{avg !== null ? avg.toFixed(1) : "—"}</p>
                     <p className="font-mono text-[10px] text-muted">{evs.length} evaluación(es)</p>
                   </div>
-                </Link>
-                {canAssignStand && (
-                  <div className="mt-2 flex justify-end">
-                    <Button variant="outline" size="sm" onClick={() => setStandProject(p)}
+                  {canAssignStand && (
+                    <Button variant="outline" size="sm" className="relative z-10" onClick={() => setStandProject(p)}
                       aria-label={`${p.stand ? "Cambiar" : "Asignar"} stand de ${p.title || displayEmail(p.leaderEmail)}`}>
                       <MapPin className="size-3.5" /> {p.stand ? "Cambiar stand" : "Asignar stand"}
                     </Button>
-                  </div>
-                )}
+                  )}
+                </div>
               </li>
             );
           })}
@@ -612,41 +572,20 @@ function JudgesTab({ event, projects }: { event: EventDoc; projects: ProjectDoc[
         <Card className="lg:col-span-2">
           <SectionTitle
             title="Horarios de los jueces"
-            subtitle="Opcional. Indica en qué horario califica cada juez los proyectos que ya tiene asignados. Para asignar o quitar proyectos usa «Asignación por proyecto»."
+            subtitle="Ajusta aquí las excepciones de un juez. Para dar el mismo horario a todos los jueces de un proyecto, usa «Programar turno» en «Asignación por proyecto»."
           />
-          {!event.judgingOpen && !event.resultsPublished && (
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-amber-50 p-4 text-amber-900">
-              <p className="font-mono text-xs leading-relaxed">
-                La evaluación de jueces está cerrada. Aunque asignes un horario, los jueces verán sus proyectos bloqueados hasta que abras la evaluación.
-              </p>
-              <Button
-                variant="dark"
-                size="sm"
-                disabled={event.accessVersion !== 1}
-                onClick={async () => {
-                  try {
-                    await updateEvent(event.id, { judgingOpen: true });
-                    toast("Evaluación de jueces abierta.");
-                  } catch (err) {
-                    toast(firestoreErrorMessage(err), "error");
-                  }
-                }}
-              >
-                Abrir evaluación ahora
-              </Button>
-            </div>
-          )}
+          {event.resultsPublished && <p className="mb-4 text-sm text-muted">Oculta los resultados para cambiar los horarios.</p>}
           <ul className="divide-y divide-line">
             {event.judgeEmails.map((email) => {
               const key = normalizeEmail(email);
               const assigned = projects.filter((p) => isProjectAssignedToJudge(event, p, key));
               const slots = event.judgeAssignments?.[key]?.schedule ?? {};
-              const scheduled = assigned.filter((p) => slots[p.id]?.startsAt && slots[p.id]?.endsAt).length;
+              const scheduled = assigned.filter((p) => scheduleBounds(slots[p.id])).length;
               const legacy = hasJudgeAssignment(event, key);
               return (
                 <li key={key} className="flex flex-wrap items-center justify-between gap-3 py-3">
                   <div className="min-w-0">
-                    <p className="truncate font-mono text-xs font-medium">{displayEmail(key)}</p>
+                    <p className="font-mono text-xs font-medium wrap-anywhere">{displayEmail(key)}</p>
                     <div className="mt-1 flex flex-wrap gap-1.5">
                       <Badge tone={assigned.length ? "lime" : undefined}>{assigned.length} proyecto(s) asignado(s)</Badge>
                       {assigned.length > 0 && <Badge>{scheduled} de {assigned.length} con horario</Badge>}
@@ -655,7 +594,7 @@ function JudgesTab({ event, projects }: { event: EventDoc; projects: ProjectDoc[
                       <p className="mt-1 text-xs text-muted">Asígnale proyectos en «Asignación por proyecto» para programar su horario.</p>
                     )}
                   </div>
-                  <Button variant="outline" size="sm" disabled={!assigned.length && !legacy} onClick={() => setEditingJudge(key)}>
+                  <Button variant="outline" size="sm" disabled={event.resultsPublished || event.accessVersion !== 1 || (!assigned.length && !legacy)} onClick={() => setEditingJudge(key)}>
                     <CalendarClock className="size-3.5" /> Programar horario
                   </Button>
                 </li>
@@ -673,26 +612,25 @@ function JudgesTab({ event, projects }: { event: EventDoc; projects: ProjectDoc[
         </p>
       </div>
 
-      <Modal open={!!editingJudge} onClose={() => setEditingJudge(null)} title="Horario de calificación">
-        {editingJudge && (
-          <JudgeScheduleModal
-            event={event}
-            judgeEmail={editingJudge}
-            projects={projects}
-            initial={event.judgeAssignments?.[editingJudge]}
-            onClose={() => setEditingJudge(null)}
-            onSave={async (assignment) => {
-              try {
-                await saveJudgeAssignment(event.id, editingJudge, assignment);
-                toast("Horario guardado.");
-                setEditingJudge(null);
-              } catch (err) {
-                toast(firestoreErrorMessage(err), "error");
-              }
-            }}
-          />
-        )}
-      </Modal>
+      {editingJudge && (
+        <JudgeScheduleModal
+          key={editingJudge}
+          event={event}
+          judgeEmail={editingJudge}
+          projects={projects}
+          initial={event.judgeAssignments?.[editingJudge]}
+          onClose={() => setEditingJudge(null)}
+          onSave={async (assignment) => {
+            try {
+              await saveJudgeAssignment(event.id, editingJudge, assignment);
+              toast("Horario guardado.");
+              setEditingJudge(null);
+            } catch (err) {
+              toast(firestoreErrorMessage(err), "error");
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -734,88 +672,99 @@ function JudgeScheduleModal({
       [field]: iso } }));
   }
 
+  async function saveSchedule() {
+    const activeSchedule = Object.fromEntries(
+      Object.entries(schedule).filter(([id, slot]) => assigned.some((project) => project.id === id) && (slot.startsAt || slot.endsAt)),
+    );
+    const error = scheduleError(activeSchedule);
+    if (error) {
+      setScheduleMessage(error);
+      return;
+    }
+
+    setBusy(true);
+    try {
+      await onSave({
+        categories: clearLegacy ? [] : legacyCats,
+        projectIds: clearLegacy ? [] : legacyProjs,
+        schedule: activeSchedule,
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
-    <div className="space-y-5">
-      <div>
-        <p className="font-mono text-xs font-medium">{displayEmail(judgeEmail)}</p>
-        <p className="mt-1 text-sm text-muted">
-          {assigned.length
-            ? `Tiene ${assigned.length} proyecto(s) asignado(s). Indica inicio y fin para cada uno (hora de Culiacán). Puedes dejar alguno sin horario.`
-            : "Este juez no tiene proyectos asignados. Asígnalos primero en «Asignación por proyecto»."}
-        </p>
-      </div>
-
-      {hasLegacy && !clearLegacy && (
-        <div className="space-y-2 rounded-2xl bg-amber-50 p-4 text-amber-900">
-          <p className="text-xs leading-relaxed">
-            Este juez tiene una asignación anterior
-            {legacyCats.length > 0 && <> por categoría (<strong>{legacyCats.join(", ")}</strong>)</>}
-            {legacyCats.length > 0 && legacyProjs.length > 0 && " y"}
-            {legacyProjs.length > 0 && <> de {legacyProjs.length} proyecto(s) individual(es)</>}
-            . Por eso recibe proyectos que no elegiste en «Asignación por proyecto».
+    <Modal
+      open
+      onClose={onClose}
+      title="Horario de calificación"
+      footer={
+        <>
+          {scheduleMessage && <p role="alert" className="mb-2 text-sm text-red-700 dark:text-red-300">{scheduleMessage}</p>}
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+            <Button loading={busy} disabled={event.resultsPublished || (!assigned.length && !clearLegacy)} onClick={saveSchedule}>
+              Guardar horario
+            </Button>
+          </div>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div>
+          <p className="font-mono text-xs font-medium">{displayEmail(judgeEmail)}</p>
+          <p className="mt-1 text-sm text-muted">
+            {assigned.length
+              ? "Horas de Culiacán. Los proyectos sin turno quedan pendientes."
+              : "Este juez no tiene proyectos asignados. Asígnalos primero en «Asignación por proyecto»."}
           </p>
-          <Button variant="outline" size="sm" onClick={() => setClearLegacy(true)}>Quitar asignación anterior</Button>
         </div>
-      )}
-      {clearLegacy && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-paper p-4 text-xs">
-          <span>Al guardar, el juez solo conservará los proyectos elegidos en «Asignación por proyecto».</span>
-          <button type="button" className="font-mono underline" onClick={() => setClearLegacy(false)}>Deshacer</button>
-        </div>
-      )}
 
-      {assigned.length > 0 && (
-        <ul className="space-y-3">
-          {assigned.map((p) => (
-            <li key={p.id} className="space-y-2 rounded-xl bg-paper p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm font-medium">{p.title}</p>
-                {p.category && <Badge>{p.category}</Badge>}
-              </div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Field label="Inicio" htmlFor={`start-${p.id}`}>
-                  <Input id={`start-${p.id}`} type="datetime-local" value={scheduleInputValue(schedule[p.id]?.startsAt)}
-                    onChange={(e) => changeTime(p.id, "startsAt", e.target.value)} />
-                </Field>
-                <Field label="Fin" htmlFor={`end-${p.id}`}>
-                  <Input id={`end-${p.id}`} type="datetime-local" value={scheduleInputValue(schedule[p.id]?.endsAt)}
-                    onChange={(e) => changeTime(p.id, "endsAt", e.target.value)} />
-                </Field>
-              </div>
-              <p className="text-xs text-muted">{scheduleLabel(schedule[p.id])}</p>
-            </li>
-          ))}
-        </ul>
-      )}
-      {scheduleMessage && <p role="alert" className="text-sm text-red-700">{scheduleMessage}</p>}
+        {hasLegacy && !clearLegacy && (
+          <div className="space-y-2 rounded-2xl bg-amber-50 p-4 text-amber-900">
+            <p className="text-xs leading-relaxed">
+              Este juez tiene una asignación anterior
+              {legacyCats.length > 0 && <> por categoría (<strong>{legacyCats.join(", ")}</strong>)</>}
+              {legacyCats.length > 0 && legacyProjs.length > 0 && " y"}
+              {legacyProjs.length > 0 && <> de {legacyProjs.length} proyecto(s) individual(es)</>}
+              . Por eso recibe proyectos que no elegiste en «Asignación por proyecto».
+            </p>
+            <Button variant="outline" size="sm" onClick={() => setClearLegacy(true)}>Quitar asignación anterior</Button>
+          </div>
+        )}
+        {clearLegacy && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-paper p-4 text-xs">
+            <span>Al guardar, el juez solo conservará los proyectos elegidos en «Asignación por proyecto».</span>
+            <button type="button" className="font-mono underline" onClick={() => setClearLegacy(false)}>Deshacer</button>
+          </div>
+        )}
 
-      <div className="flex justify-end gap-2">
-        <Button variant="ghost" onClick={onClose}>
-          Cancelar
-        </Button>
-        <Button
-          loading={busy}
-          disabled={!assigned.length && !clearLegacy}
-          onClick={async () => {
-            setBusy(true);
-            try {
-              const activeSchedule = Object.fromEntries(Object.entries(schedule).filter(([id, slot]) => assigned.some((p) => p.id === id) && (slot.startsAt || slot.endsAt)));
-              const error = scheduleError(activeSchedule);
-              if (error) { setScheduleMessage(error); return; }
-              await onSave({
-                categories: clearLegacy ? [] : legacyCats,
-                projectIds: clearLegacy ? [] : legacyProjs,
-                schedule: activeSchedule,
-              });
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          Guardar horario
-        </Button>
+        {assigned.length > 0 && (
+          <ul className="space-y-3">
+            {assigned.map((p) => (
+              <li key={p.id} className="space-y-2 rounded-xl bg-paper p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="min-w-0 text-sm font-medium wrap-anywhere">{p.title}</p>
+                  {p.category && <Badge>{p.category}</Badge>}
+                </div>
+                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2 sm:grid-cols-2">
+                  <Field label="Inicio" htmlFor={`start-${p.id}`}>
+                    <Input id={`start-${p.id}`} type="datetime-local" value={scheduleInputValue(schedule[p.id]?.startsAt)}
+                      onChange={(e) => changeTime(p.id, "startsAt", e.target.value)} />
+                  </Field>
+                  <Field label="Fin" htmlFor={`end-${p.id}`}>
+                    <Input id={`end-${p.id}`} type="datetime-local" value={scheduleInputValue(schedule[p.id]?.endsAt)}
+                      onChange={(e) => changeTime(p.id, "endsAt", e.target.value)} />
+                  </Field>
+                </div>
+                <p className="text-xs text-muted">{scheduleLabel(schedule[p.id])}</p>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -1018,6 +967,45 @@ function ResultsTab({ event, projects, evaluations }: { event: EventDoc; project
 
 /* ---------- Ajustes ---------- */
 
+function RegistrationAndSubmissions({ event }: { event: EventDoc }) {
+  const toast = useToast();
+  const phases = PHASES.filter((phase) => event.phases[phase]);
+
+  async function toggle(patch: Pick<Partial<EventDoc>, "registrationOpen" | "submissions">) {
+    try {
+      await updateEvent(event.id, patch);
+    } catch (err) {
+      toast(firestoreErrorMessage(err), "error");
+    }
+  }
+
+  return (
+    <Card>
+      <SectionTitle title="Registro y entregas" />
+      <div className="divide-y divide-line">
+        <Toggle
+          label="Registro de proyectos"
+          description="Los equipos pueden registrarse y editar su información."
+          checked={event.registrationOpen}
+          onChange={(v) => toggle({ registrationOpen: v })}
+        />
+        {phases.map((ph) => {
+          const label = getPhaseLabel(event, ph);
+          return (
+            <Toggle
+              key={ph}
+              label={phases.length === 1 && label.toLowerCase() === "entrega" ? "Recepción de entregas" : `Recibir: ${label}`}
+              description="Los equipos pueden subir o actualizar esta entrega."
+              checked={event.submissions[ph]}
+              onChange={(v) => toggle({ submissions: { ...event.submissions, [ph]: v } })}
+            />
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
 function SettingsTab({ event }: { event: EventDoc }) {
   const { user } = useAuth();
   const access = useAccess();
@@ -1045,6 +1033,7 @@ function SettingsTab({ event }: { event: EventDoc }) {
         />
       </Card>
       <div className="space-y-4">
+        <RegistrationAndSubmissions event={event} />
         <OriginalitySettingsCard />
         <Card className="h-fit">
           <SectionTitle title="Código" subtitle="Genera uno nuevo si el actual se compartió donde no debía." />

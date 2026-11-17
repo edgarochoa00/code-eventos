@@ -102,40 +102,37 @@ service cloud.firestore {
     function validCategoryRubrics(data) {
       let rubricMap = data.get('categoryCriteria', {});
       let rubrics = rubricMap.values();
-      return rubricMap is map && rubrics.size() <= 20
-        && (rubrics.size() <= 0 || (rubrics[0] is list && rubrics[0].size() >= 1 && rubrics[0].size() <= 20))
-        && (rubrics.size() <= 1 || (rubrics[1] is list && rubrics[1].size() >= 1 && rubrics[1].size() <= 20))
-        && (rubrics.size() <= 2 || (rubrics[2] is list && rubrics[2].size() >= 1 && rubrics[2].size() <= 20))
-        && (rubrics.size() <= 3 || (rubrics[3] is list && rubrics[3].size() >= 1 && rubrics[3].size() <= 20))
-        && (rubrics.size() <= 4 || (rubrics[4] is list && rubrics[4].size() >= 1 && rubrics[4].size() <= 20))
-        && (rubrics.size() <= 5 || (rubrics[5] is list && rubrics[5].size() >= 1 && rubrics[5].size() <= 20))
-        && (rubrics.size() <= 6 || (rubrics[6] is list && rubrics[6].size() >= 1 && rubrics[6].size() <= 20))
-        && (rubrics.size() <= 7 || (rubrics[7] is list && rubrics[7].size() >= 1 && rubrics[7].size() <= 20))
-        && (rubrics.size() <= 8 || (rubrics[8] is list && rubrics[8].size() >= 1 && rubrics[8].size() <= 20))
-        && (rubrics.size() <= 9 || (rubrics[9] is list && rubrics[9].size() >= 1 && rubrics[9].size() <= 20))
-        && (rubrics.size() <= 10 || (rubrics[10] is list && rubrics[10].size() >= 1 && rubrics[10].size() <= 20))
-        && (rubrics.size() <= 11 || (rubrics[11] is list && rubrics[11].size() >= 1 && rubrics[11].size() <= 20))
-        && (rubrics.size() <= 12 || (rubrics[12] is list && rubrics[12].size() >= 1 && rubrics[12].size() <= 20))
-        && (rubrics.size() <= 13 || (rubrics[13] is list && rubrics[13].size() >= 1 && rubrics[13].size() <= 20))
-        && (rubrics.size() <= 14 || (rubrics[14] is list && rubrics[14].size() >= 1 && rubrics[14].size() <= 20))
-        && (rubrics.size() <= 15 || (rubrics[15] is list && rubrics[15].size() >= 1 && rubrics[15].size() <= 20))
-        && (rubrics.size() <= 16 || (rubrics[16] is list && rubrics[16].size() >= 1 && rubrics[16].size() <= 20))
-        && (rubrics.size() <= 17 || (rubrics[17] is list && rubrics[17].size() >= 1 && rubrics[17].size() <= 20))
-        && (rubrics.size() <= 18 || (rubrics[18] is list && rubrics[18].size() >= 1 && rubrics[18].size() <= 20))
-        && (rubrics.size() <= 19 || (rubrics[19] is list && rubrics[19].size() >= 1 && rubrics[19].size() <= 20))
+      let count = rubrics.size();
+      return rubricMap is map && count <= 20
+        && (count <= 0 || (rubrics[0] is list && rubrics[0].size() >= 1 && rubrics[0].size() <= 20))
+        && (count <= 1 || (rubrics[1] is list && rubrics[1].size() >= 1 && rubrics[1].size() <= 20))
+        && (count <= 2 || (rubrics[2] is list && rubrics[2].size() >= 1 && rubrics[2].size() <= 20))
+        && (count <= 3 || (rubrics[3] is list && rubrics[3].size() >= 1 && rubrics[3].size() <= 20))
+        && (count <= 4 || (rubrics[4] is list && rubrics[4].size() >= 1 && rubrics[4].size() <= 20))
+        && (count <= 5 || (rubrics[5] is list && rubrics[5].size() >= 1 && rubrics[5].size() <= 20))
+        && (count <= 6 || (rubrics[6] is list && rubrics[6].size() >= 1 && rubrics[6].size() <= 20))
+        && (count <= 7 || (rubrics[7] is list && rubrics[7].size() >= 1 && rubrics[7].size() <= 20))
+        && (count <= 8 || (rubrics[8] is list && rubrics[8].size() >= 1 && rubrics[8].size() <= 20))
+        && (count <= 9 || (rubrics[9] is list && rubrics[9].size() >= 1 && rubrics[9].size() <= 20))
+        && (count <= 10 || (rubrics[10] is list && rubrics[10].size() >= 1 && rubrics[10].size() <= 20))
+        && (count <= 11 || (rubrics[11] is list && rubrics[11].size() >= 1 && rubrics[11].size() <= 20))
+        && (count <= 12 || (rubrics[12] is list && rubrics[12].size() >= 1 && rubrics[12].size() <= 20))
+        && (count <= 13 || (rubrics[13] is list && rubrics[13].size() >= 1 && rubrics[13].size() <= 20))
+        && (count <= 14 || (rubrics[14] is list && rubrics[14].size() >= 1 && rubrics[14].size() <= 20))
+        && (count <= 15 || (rubrics[15] is list && rubrics[15].size() >= 1 && rubrics[15].size() <= 20))
+        && (count <= 16 || (rubrics[16] is list && rubrics[16].size() >= 1 && rubrics[16].size() <= 20))
+        && (count <= 17 || (rubrics[17] is list && rubrics[17].size() >= 1 && rubrics[17].size() <= 20))
+        && (count <= 18 || (rubrics[18] is list && rubrics[18].size() >= 1 && rubrics[18].size() <= 20))
+        && (count <= 19 || (rubrics[19] is list && rubrics[19].size() >= 1 && rubrics[19].size() <= 20))
         ;
     }
 
     function validScore(value) {
-      return value is number && value >= 0 && value <= 10;
+      return 0 <= value && value <= 10;
     }
 
-    function validEvaluationScores(eid, data) {
-      let event = eventData(eid);
-      let project = get(/databases/$(database)/documents/events/$(eid)/projects/$(data.projectId)).data;
-      let criteria = event.get('categoryCriteria', {}).get(project.get('category', ''), event.criteria);
+    function validEvaluationScores(criteria, scores) {
       let count = criteria.size();
-      let scores = data.scores;
       return scores is map && validCriteria(criteria) && scores.size() == count
         && (count <= 0 || validScore(scores[criteria[0].id]))
         && (count <= 1 || validScore(scores[criteria[1].id]))
@@ -212,7 +209,7 @@ service cloud.firestore {
           && !get(rosterPath(eid)).data.members.keys().hasAny(request.resource.data.organizerEmails)
           && !get(rosterPath(eid)).data.members.keys().hasAny(request.resource.data.judgeEmails)
         ))
-        && (!changed(['criteria', 'categoryCriteria']) || resource.data.resultsPublished != true)
+        && (!changed(['criteria', 'categoryCriteria', 'judgeAssignments']) || resource.data.resultsPublished != true)
         && (!changed(['categoryLocked']) || resource.data.get('categoryLocked', false) != true)
         && (!changed(['judgingOpen']) || (!resource.data.judgingOpen && !request.resource.data.judgingOpen) || request.resource.data.get('categoryLocked', false) == true)
         && (!changed(['accessVersion']) || (
@@ -225,6 +222,18 @@ service cloud.firestore {
         && request.resource.data.maxTeamSize <= 15
         && validCriteria(request.resource.data.criteria)
         && (!changed(['categoryCriteria']) || validCategoryRubrics(request.resource.data));
+
+      // La primera calificación y el bloqueo permanente de categoría se guardan juntos.
+      function locksCategoryWithEvaluation() {
+        let id = request.resource.data.get('categoryLockedByEvaluation', '');
+        let evaluation = /databases/$(database)/documents/events/$(eid)/evaluations/$(id);
+        return id is string && id.size() > 0
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['categoryLocked', 'categoryLockedByEvaluation'])
+          && resource.data.get('categoryLocked', false) != true && request.resource.data.categoryLocked == true
+          && !exists(evaluation) && getAfter(evaluation).data.judgeId == request.auth.uid;
+      }
+
+      allow update: if verified() && locksCategoryWithEvaluation();
 
       allow delete: if (isSuperadmin() || (verified() && resource.data.ownerId == request.auth.uid))
         && hasRoster(eid) && get(rosterPath(eid)).data.members.size() == 0;
@@ -430,24 +439,55 @@ service cloud.firestore {
 
       // ---------- Evaluaciones ----------
       match /evaluations/{evid} {
-        // Reutiliza el contexto para admitir 20 criterios sin agotar las 1000 expresiones por escritura.
+        // Los horarios anteriores ya se guardan como cadenas ISO en UTC.
+        function isUtcInstant(value) {
+          return value is string && value.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]([.][0-9]{3})?Z');
+        }
+
+        function utcInstant(value) {
+          let parts = value.replace('Z$', '').split('[-T:.]');
+          let day = timestamp.date(int(parts[0]), int(parts[1]), int(parts[2]));
+          let millis = ((int(parts[3]) * 60 + int(parts[4])) * 60 + int(parts[5])) * 1000
+            + (parts.size() == 7 ? int(parts[6]) : 0);
+          return timestamp.value(day.toMillis() + millis);
+        }
+
+        function inScheduledTurn(slot) {
+          let start = slot.get('startsAt', '');
+          let end = slot.get('endsAt', '');
+          return isUtcInstant(start) && isUtcInstant(end)
+            && utcInstant(start) <= request.time && request.time < utcInstant(end);
+        }
+
+        // Reutiliza evento, proyecto e identidad para mantener el límite con 20 criterios.
         function canEvaluate(data) {
           let event = eventData(eid);
-          let project = get(/databases/$(database)/documents/events/$(eid)/projects/$(data.projectId)).data;
-          let role = exists(staffPath()) ? get(staffPath()).data.role : 'user';
-          let assignment = event.get('judgeAssignments', {}).get(myEmail(), {});
-          let categories = assignment.get('categories', []);
-          let projectIds = assignment.get('projectIds', []);
-          return authed() && myEmail() != 'edgarochoa0173@gmail.com' && !(role in ['admin', 'blocked'])
-            && !(myEmail() in event.organizerEmails) && myEmail() in event.judgeEmails
-            && event.get('accessVersion', 0) == 1 && exists(rosterPath(eid))
-            && !(myEmail() in get(rosterPath(eid)).data.members)
-            && !(myEmail() in project.memberEmails)
-            && project.get('registrationPending', false) != true
-            && event.judgingOpen == true && event.resultsPublished != true
+          let pid = data.projectId;
+          let project = get(/databases/$(database)/documents/events/$(eid)/projects/$(pid)).data;
+          let email = myEmail();
+          let staff = /databases/$(database)/documents/staff/$(email);
+          let role = exists(staff) ? get(staff).data.role : 'user';
+          let assignment = event.get('judgeAssignments', {}).get(email, {});
+          let category = project.get('category', '');
+          let phase = data.phase;
+          let criteria = event.get('categoryCriteria', {}).get(category, event.criteria);
+          return authed() && email != 'edgarochoa0173@gmail.com' && !(role in ['admin', 'blocked'])
+            && !(email in event.organizerEmails) && email in event.judgeEmails
+            && event.get('accessVersion', 0) == 1 && !(email in get(rosterPath(eid)).data.members)
+            && !(email in project.memberEmails) && project.get('registrationPending', false) != true
+            && event.resultsPublished != true
             && (('judging' in project)
-              ? myEmail() in project.judging.judgeEmails
-              : (project.get('category', '') in categories || data.projectId in projectIds));
+              ? email in project.judging.judgeEmails
+              : (category in assignment.get('categories', []) || pid in assignment.get('projectIds', [])))
+            && inScheduledTurn(assignment.get('schedule', {}).get(pid, {}))
+            && (event.get('categoryLocked', false) == true
+              || getAfter(/databases/$(database)/documents/events/$(eid)).data.get('categoryLocked', false) == true)
+            && data.judgeId == request.auth.uid && data.judgeEmail == email && data.eventId == eid
+            && phase in ['prototype', 'final'] && event.phases[phase] == true
+            && evid == request.auth.uid + '_' + pid + '_' + phase
+            && data.total is number && data.total >= 0 && data.total <= 100
+            && data.comment is string && data.comment.trim().size() > 0 && data.comment.size() <= 2000
+            && validEvaluationScores(criteria, data.scores);
         }
 
         allow get: if verified() && resource == null;
@@ -455,21 +495,7 @@ service cloud.firestore {
           || (verified() && resource.data.judgeId == request.auth.uid);
 
         allow update: if false;
-        allow create: if canEvaluate(request.resource.data)
-          && request.resource.data.judgeId == request.auth.uid
-          && request.resource.data.judgeEmail == myEmail()
-          && request.resource.data.eventId == eid
-          && request.resource.data.phase in ['prototype', 'final']
-          && eventData(eid).phases[request.resource.data.phase] == true
-          && evid == request.auth.uid + '_' + request.resource.data.projectId + '_' + request.resource.data.phase
-          && exists(/databases/$(database)/documents/events/$(eid)/projects/$(request.resource.data.projectId))
-          && validEvaluationScores(eid, request.resource.data)
-          && request.resource.data.total is number
-          && request.resource.data.total >= 0
-          && request.resource.data.total <= 100
-          && request.resource.data.comment is string
-          && request.resource.data.comment.trim().size() > 0
-          && request.resource.data.comment.size() <= 2000;
+        allow create: if canEvaluate(request.resource.data);
 
         // Con resultados publicados las evaluaciones ya no se pueden borrar
         allow delete: if isOrganizer(eid) && eventData(eid).resultsPublished != true;

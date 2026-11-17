@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { judgeProgress, scheduleError, scheduleLabel, scheduleInputValue, scheduleInputToIso } from "../lib/judging-agenda";
+import { judgeProgress, scheduleStatus, scheduleError, scheduleLabel, scheduleInputValue, scheduleInputToIso } from "../lib/judging-agenda";
 import type { EventDoc, ProjectDoc, EvaluationDoc } from "../lib/types";
 
 const email = "judge@example.com";
@@ -62,4 +62,17 @@ test("rechaza turnos incompletos, invertidos y traslapados; acepta turnos consec
   assert.ok(scheduleError({ p1: { startsAt: slots.p1.startsAt, endsAt: '' } }));
   assert.ok(scheduleError({ p1: { startsAt: slots.p1.endsAt, endsAt: slots.p1.startsAt } }));
   assert.ok(scheduleError({ ...slots, p2: { startsAt: slots.p1.startsAt, endsAt: slots.p2.endsAt } }));
+});
+
+test("bloquea la calificación si falta el turno, todavía no empieza o ya terminó", () => {
+  const slot = { startsAt: "2026-11-16T22:00:00.125Z", endsAt: "2026-11-16T22:01:00.000Z" };
+  const start = Date.parse(slot.startsAt);
+  const end = Date.parse(slot.endsAt);
+  assert.equal(scheduleStatus(slot, start - 1), "upcoming");
+  assert.equal(scheduleStatus(slot, start), "due");
+  assert.equal(scheduleStatus(slot, end - 1), "due");
+  assert.equal(scheduleStatus(slot, end), "overdue");
+  assert.equal(scheduleStatus(undefined, start), "unscheduled");
+  assert.equal(scheduleStatus({ startsAt: slot.endsAt, endsAt: slot.startsAt }, start), "unscheduled");
+  assert.equal(scheduleStatus({ startsAt: "2026-02-30T22:00:00Z", endsAt: slot.endsAt }, start), "unscheduled");
 });

@@ -26,6 +26,13 @@ const tok = (email, verified = true) => ({ email, email_verified: verified });
 const ctx = (uid, email, verified = true) => env.authenticatedContext(uid, tok(email, verified)).firestore();
 
 const criteria = [{ id: "a", name: "A", description: "", weight: 100 }];
+const turn = (startOffset, endOffset) => {
+  const now = Date.now();
+  return { startsAt: new Date(now + startOffset).toISOString(), endsAt: new Date(now + endOffset).toISOString() };
+};
+const activeTurn = () => turn(-3_600_000, 3_600_000);
+const judgeSchedule = (...ids) => Object.fromEntries(ids.map(id => [id, activeTurn()]));
+
 const eventFor = (ownerId, ownerEmail) => ({
   accessVersion: 1,
   name: "Expo",
@@ -36,7 +43,11 @@ const eventFor = (ownerId, ownerEmail) => ({
   ownerEmail,
   organizerEmails: [ownerEmail],
   judgeEmails: [],
-  judgeAssignments: { "judge@tec.mx": { categories: ["Software", "Carteles", "Prototipos", "Sin personalizar", "Categoría 19"] }, "org@tec.mx": { projectIds: ["cross-event"] } },
+  judgeAssignments: {
+    "judge@tec.mx": { categories: ["Software", "Carteles", "Prototipos", "Sin personalizar", "Categoría 19"],
+      schedule: judgeSchedule("p1", "p9", "cartel", "proto", "legacy", "pmax") },
+    "org@tec.mx": { projectIds: ["cross-event"], schedule: judgeSchedule("cross-event") },
+  },
   phases: { prototype: true, final: true },
   submissions: { prototype: true, final: false },
   registrationOpen: true,
@@ -514,10 +525,54 @@ describe("evaluaciones", () => {
     comment: "Buen trabajo",
   };
 
-  test("el juez solo califica con la evaluación abierta", async () => {
-    await assertFails(setDoc(doc(judge, "events/e1/evaluations/judge_p1_prototype"), evalDoc));
-    await updateDoc(doc(org, "events/e1"), { judgingOpen: true, categoryLocked: true });
-    await assertSucceeds(setDoc(doc(judge, "events/e1/evaluations/judge_p1_prototype"), evalDoc));
+  test("Firestore habilita cada turno y bloquea la categoría con el primer envío válido", async () => {
+    const eid = "turnos-automaticos";
+    const uid = "judge";
+    const id = "judge_p1_prototype";
+    const ref = doc(judge, `events/${eid}/evaluations/${id}`);
+    const eventRef = doc(judge, `events/${eid}`);
+    const organizerRef = doc(org, `events/${eid}`);
+    const score = { ...evalDoc, eventId: eid };
+    const assign = (schedule) => updateDoc(organizerRef, {
+      judgeAssignments: { "judge@tec.mx": { projectIds: ["p1", "p2"], schedule } },
+    });
+    const submit = () => {
+      const batch = writeBatch(judge);
+      batch.set(ref, score);
+      batch.update(eventRef, { categoryLocked: true, categoryLockedByEvaluation: id });
+      return batch.commit();
+    };
+
+    await assertSucceeds(createEvent(org, eid, { ...eventFor("org", "org@tec.mx"), judgeAssignments: {} }));
+    await env.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      for (const pid of ["p1", "p2", "p3"]) await setDoc(doc(db, `events/${eid}/projects/${pid}`), { ...project, eventId: eid });
+    });
+    await assertSucceeds(updateDoc(organizerRef, { judgeEmails: ["judge@tec.mx"] }));
+    await assertFails(updateDoc(eventRef, { categoryLocked: true, categoryLockedByEvaluation: id }));
+
+    for (const p1 of [undefined, turn(60_000, 120_000), turn(-120_000, -60_000),
+      { startsAt: "2026-02-30T00:00:00Z", endsAt: activeTurn().endsAt },
+      { startsAt: activeTurn().startsAt, endsAt: "" }]) {
+      await assertSucceeds(assign({ p2: activeTurn(), ...(p1 ? { p1 } : {}) }));
+      await assertFails(submit());
+    }
+    await assertSucceeds(assign({ p1: activeTurn(), p2: activeTurn(), p3: activeTurn() }));
+    await assertFails(setDoc(ref, score));
+    await assertSucceeds(submit());
+    const event = (await getDoc(eventRef)).data();
+    assert.equal(event.categoryLocked, true);
+    assert.equal(event.judgingOpen, false);
+    assert.equal((await getDoc(ref)).data().judgeId, uid);
+    await assertFails(setDoc(doc(judge, `events/${eid}/evaluations/judge_p3_prototype`), { ...score, projectId: "p3" }));
+    await assertFails(setDoc(doc(fakeJudge, `events/${eid}/evaluations/judge_p2_prototype`), { ...score, projectId: "p2" }));
+    await assertSucceeds(setDoc(doc(judge, `events/${eid}/evaluations/judge_p2_prototype`), { ...score, projectId: "p2" }));
+  });
+
+  test("los eventos con categoría bloqueada conservan la calificación en turnos programados", async () => {
+    const ref = doc(judge, "events/e1/evaluations/judge_p1_prototype");
+    await updateDoc(doc(org, "events/e1"), { judgingOpen: false, categoryLocked: true });
+    await assertSucceeds(setDoc(ref, evalDoc));
   });
 
   test("validaciones de la evaluación", async () => {
@@ -541,10 +596,10 @@ describe("evaluaciones", () => {
       [{}, false],
     ]) {
       await env.withSecurityRulesDisabled(c => deleteDoc(doc(c.firestore(), "events/e1/evaluations/judge_p1_prototype")));
-      await assertSucceeds(updateDoc(doc(org, "events/e1"), { judgeAssignments: { "judge@tec.mx": assignment } }));
+      await assertSucceeds(updateDoc(doc(org, "events/e1"), { judgeAssignments: { "judge@tec.mx": { ...assignment, schedule: judgeSchedule("p1") } } }));
       await (allowed ? assertSucceeds : assertFails)(setDoc(ref, evalDoc));
     }
-    await updateDoc(doc(org, "events/e1"), { judgeAssignments: { "judge@tec.mx": { projectIds: ["p1"] } } });
+    await updateDoc(doc(org, "events/e1"), { judgeAssignments: { "judge@tec.mx": { projectIds: ["p1"], schedule: judgeSchedule("p1") } } });
   });
 
   test("solo se admite el primer envío, incluso con escrituras simultáneas", async () => {
@@ -790,10 +845,21 @@ describe("rúbricas por categoría", () => {
     await env.withSecurityRulesDisabled(async (c) => {
       await setDoc(doc(c.firestore(), "events/rubricas-maximo/projects/pmax"), { ...project, eventId: "rubricas-maximo", category: categories[19] });
     });
-    await assertSucceeds(updateDoc(doc(org, "events/rubricas-maximo"), { judgeEmails: ["judge@tec.mx"], judgingOpen: true, categoryLocked: true }));
-    await assertSucceeds(setDoc(doc(judge, "events/rubricas-maximo/evaluations/judge_pmax_prototype"), {
-      ...scoreDoc("pmax", Object.fromEntries(fullCriteria.map((c) => [c.id, 8]))), eventId: "rubricas-maximo",
-    }));
+    await assertSucceeds(updateDoc(doc(org, "events/rubricas-maximo"), { judgeEmails: ["judge@tec.mx"] }));
+    const ref = doc(judge, "events/rubricas-maximo/evaluations/judge_pmax_prototype");
+    const validScores = Object.fromEntries(fullCriteria.map((c) => [c.id, 8.5]));
+    const submit = (scores) => {
+      const batch = writeBatch(judge);
+      batch.set(ref, { ...scoreDoc("pmax", scores), eventId: "rubricas-maximo" });
+      batch.update(doc(judge, "events/rubricas-maximo"), {
+        categoryLocked: true, categoryLockedByEvaluation: ref.id,
+      });
+      return batch.commit();
+    };
+    for (const invalid of ["8", true, null, -Number.MIN_VALUE, 11]) {
+      await assertFails(submit({ ...validScores, c19: invalid }));
+    }
+    await assertSucceeds(submit(validScores));
   });
 });
 

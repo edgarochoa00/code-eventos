@@ -29,16 +29,16 @@ export function Leaderboard({
               {i < 3 ? <Medal className="size-4" aria-label={`Lugar ${i + 1}`} /> : i + 1}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate font-medium">{r.title}</span>
+              <span className="block font-medium wrap-anywhere">{r.title}</span>
               <span className="font-mono text-[10px] text-muted">
                 {r.judges} {r.judges === 1 ? "juez" : "jueces"}
               </span>
             </span>
-            <span className="font-display text-xl font-bold tabular-nums">{r.score.toFixed(1)}</span>
+            <span className="shrink-0 font-display text-lg font-bold tabular-nums sm:text-xl">{r.score.toFixed(1)}</span>
           </>
         );
         const cls = cn(
-          "flex items-center gap-3 rounded-2xl border px-3 py-2.5",
+          "flex items-center gap-2 rounded-2xl border px-3 py-2.5 sm:gap-3",
           r.projectId === highlightId ? "border-sage bg-lime/30 dark:bg-lime/10" : "border-line bg-surface",
         );
         return (

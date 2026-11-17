@@ -18,7 +18,7 @@ El alta reserva al líder en el registro privado del evento y crea un documento 
 
 Solo el líder puede completar ese registro. Puede hacerlo aunque el registro público esté cerrado, pues el responsable ya lo inscribió. El formulario valida los datos completos y sincroniza los integrantes con el registro privado en una transacción. Las reglas impiden que otro usuario complete el registro o que un alumno se conceda por sí mismo un alta pendiente para eludir el cierre del registro público.
 
-No se admiten nuevas altas ni la elección inicial de categoría cuando ya comenzó la evaluación (incluso si luego se cierra), ni con resultados publicados. Los eventos antiguos requieren la actualización de permisos existente del superadmin. Una cuenta solo puede pertenecer a un equipo por evento; puede participar en eventos distintos con la misma cuenta. El registro autónomo de alumnos continúa disponible cuando el organizador lo abre.
+No se admiten nuevas altas ni la elección inicial de categoría desde que se guarda la primera calificación, ni con resultados publicados. Los eventos antiguos requieren la actualización de permisos existente del superadmin. Una cuenta solo puede pertenecer a un equipo por evento; puede participar en eventos distintos con la misma cuenta. El registro autónomo de alumnos continúa disponible cuando el organizador lo abre.
 
 ## Servidor y pruebas
 

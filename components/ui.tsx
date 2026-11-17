@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, X } from "lucide-react";
+import { ChevronDown, Loader2, X } from "lucide-react";
 import Link from "next/link";
 import {
   createContext,
@@ -15,6 +15,7 @@ import {
   type InputHTMLAttributes,
   type KeyboardEvent,
   type ReactNode,
+  type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from "react";
 import { cn } from "@/lib/utils";
@@ -96,14 +97,14 @@ export function ButtonLink({
 /* ---------- Contenedores ---------- */
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
-  return <div className={cn("ui-panel min-w-0 rounded-3xl p-5 sm:p-6", className)}>{children}</div>;
+  return <div className={cn("ui-panel min-w-0 rounded-3xl p-4 sm:p-6", className)}>{children}</div>;
 }
 
 export function SectionTitle({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
   return (
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <h2 className="font-display text-xl font-extrabold uppercase tracking-[0.04em] sm:text-2xl">{title}</h2>
+      <div className="min-w-0 wrap-anywhere">
+        <h2 className="font-display text-lg font-extrabold uppercase tracking-[0.04em] sm:text-2xl">{title}</h2>
         {subtitle && <p className="mt-1 font-sans text-xs font-medium text-muted">{subtitle}</p>}
       </div>
       {action}
@@ -132,7 +133,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex max-w-full items-center gap-1 rounded-full px-3 py-1 font-display text-[10px] font-bold uppercase leading-relaxed tracking-[0.06em] [&>svg]:shrink-0",
+        "inline-flex min-w-0 max-w-full items-center gap-1 rounded-full px-3 py-1 font-display text-[10px] font-bold uppercase leading-relaxed tracking-[0.06em] wrap-anywhere [&>svg]:shrink-0",
         tones[tone],
         className,
       )}
@@ -197,6 +198,20 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
   ref,
 ) {
   return <input ref={ref} className={cn(inputBase, "h-11 py-0", className)} {...props} />;
+});
+
+export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(function Select(
+  { className, children, ...props },
+  ref,
+) {
+  return (
+    <div className="relative min-w-0">
+      <select ref={ref} className={cn(inputBase, "h-11 appearance-none truncate py-0 pr-10", className)} {...props}>
+        {children}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
+    </div>
+  );
 });
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(
@@ -273,9 +288,13 @@ export function Tabs<T extends string>({
   value: T;
   onChange: (id: T) => void;
 }) {
+  const scrollable = tabs.length > 7;
   return (
-    <div className="min-w-0 max-w-full overflow-x-auto pb-2" role="tablist">
-      <div className="inline-flex gap-1.5 rounded-2xl border border-line bg-surface p-1.5 shadow-xs">
+    <div className={cn("min-w-0 max-w-full pb-1", scrollable && "overflow-x-auto pb-2")} role="tablist">
+      <div className={cn(
+        "inline-flex gap-1 rounded-2xl border border-line bg-surface p-1 shadow-xs sm:gap-1.5 sm:p-1.5",
+        scrollable ? "w-max" : "max-w-full flex-wrap",
+      )}>
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -284,21 +303,18 @@ export function Tabs<T extends string>({
             aria-selected={value === t.id}
             tabIndex={value === t.id ? 0 : -1}
             onKeyDown={(e) => navigateOptions(e, "tab")}
-            onClick={(e) => {
-              onChange(t.id);
-              // En celular, desplaza la pestaña elegida a la vista
-              e.currentTarget.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
-            }}
+            onClick={() => onChange(t.id)}
             className={cn(
-              "flex min-h-11 items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 font-display text-xs font-bold uppercase tracking-[0.06em] transition-shadow",
+              "flex min-h-11 min-w-0 max-w-full items-center gap-1.5 rounded-xl px-2.5 py-2 text-left font-display text-xs font-bold uppercase tracking-[0.04em] transition-shadow sm:gap-2 sm:px-4 sm:tracking-[0.06em]",
+              scrollable ? "whitespace-nowrap" : "wrap-anywhere",
               value === t.id
                 ? "bg-ink text-surface shadow-sm"
                 : "text-muted hover:bg-field hover:text-ink",
             )}
           >
-            {t.label}
+            <span className="min-w-0">{t.label}</span>
             {typeof t.count === "number" && (
-              <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-extrabold", value === t.id ? "bg-lime text-coal" : "bg-ink/10")}>
+              <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-extrabold sm:px-2", value === t.id ? "bg-lime text-coal" : "bg-ink/10")}>
                 {t.count}
               </span>
             )}
@@ -357,13 +373,16 @@ export function Modal({
   onClose,
   title,
   children,
+  footer,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
+  footer?: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
@@ -374,18 +393,27 @@ export function Modal({
   return (
     <dialog
       ref={ref}
+      aria-labelledby={titleId}
       onClose={onClose}
       onCancel={(e) => { e.preventDefault(); onClose(); }}
       onClick={(e) => e.target === ref.current && onClose()}
-      className="ui-panel m-auto w-[calc(100%-2rem)] max-w-lg rounded-3xl p-0 text-ink backdrop:bg-black/55 backdrop:backdrop-blur-sm max-sm:mb-0 max-sm:w-full max-sm:max-w-none max-sm:rounded-b-none"
+      className="ui-panel m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg overflow-hidden rounded-3xl p-0 text-ink open:flex open:flex-col backdrop:bg-black/55 backdrop:backdrop-blur-sm max-sm:mb-0 max-sm:max-h-[calc(100dvh-env(safe-area-inset-top))] max-sm:w-full max-sm:max-w-none max-sm:rounded-b-none"
     >
-      <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
-        <h2 className="font-display text-lg font-bold">{title}</h2>
-        <button onClick={onClose} className="grid size-11 shrink-0 place-items-center rounded-lg hover:bg-ink/5" aria-label="Cerrar">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-2.5 sm:px-5">
+        <h2 id={titleId} className="min-w-0 font-display text-lg font-bold wrap-anywhere">{title}</h2>
+        <button type="button" onClick={onClose} className="grid size-11 shrink-0 place-items-center rounded-lg hover:bg-ink/5" aria-label="Cerrar">
           <X className="size-4" />
         </button>
       </div>
-      <div className="max-h-[75vh] overflow-y-auto p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">{children}</div>
+      <div className={cn(
+        "min-h-0 overflow-y-auto overscroll-contain px-4 pt-4 wrap-anywhere sm:px-5 sm:pt-5",
+        footer ? "pb-4" : "pb-[max(1rem,env(safe-area-inset-bottom))]",
+      )}>{children}</div>
+      {footer && (
+        <div className="shrink-0 border-t border-line px-4 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-5">
+          {footer}
+        </div>
+      )}
     </dialog>
   );
 }

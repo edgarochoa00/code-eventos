@@ -32,20 +32,47 @@ export function scheduleInputToIso(raw: string) {
   return localTimestamp(new Date(instant)) === local ? new Date(instant).toISOString() : "";
 }
 
-export function scheduleLabel(slot?: { startsAt: string; endsAt: string }) {
-  if (!slot || !Number.isFinite(Date.parse(slot.startsAt)) || !Number.isFinite(Date.parse(slot.endsAt))) return "Sin horario asignado";
-  const format = new Intl.DateTimeFormat("es-MX", { timeZone: JUDGING_TIME_ZONE, dateStyle: "medium", timeStyle: "short" });
-  return `${format.format(new Date(slot.startsAt))} – ${format.format(new Date(slot.endsAt))} · Culiacán`;
+type Schedule = NonNullable<JudgeAssignment["schedule"]>;
+type Slot = Schedule[string];
+
+function scheduleInstant(value: string | undefined) {
+  if (typeof value !== "string" || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{3})?Z$/.test(value)) return NaN;
+  const millis = Date.parse(value);
+  if (!Number.isFinite(millis) || value.startsWith("0000-")) return NaN;
+  const canonical = new Date(millis).toISOString();
+  return value === canonical || value === canonical.replace(".000Z", "Z") ? millis : NaN;
 }
+
+export function scheduleBounds(slot?: Slot) {
+  const start = scheduleInstant(slot?.startsAt);
+  const end = scheduleInstant(slot?.endsAt);
+  return end > start ? { start, end } : null;
+}
+
+export function scheduleStatus(slot: Slot | undefined, now: number) {
+  const bounds = scheduleBounds(slot);
+  if (!bounds) return "unscheduled";
+  if (now < bounds.start) return "upcoming";
+  return now < bounds.end ? "due" : "overdue";
+}
+
+export function scheduleLabel(slot?: Slot) {
+  const bounds = scheduleBounds(slot);
+  if (!bounds) return "Sin horario asignado";
+  const format = new Intl.DateTimeFormat("es-MX", { timeZone: JUDGING_TIME_ZONE, dateStyle: "medium", timeStyle: "short" });
+  return `${format.format(bounds.start)} – ${format.format(bounds.end)} · Culiacán`;
+}
+
 export function scheduleError(schedule: JudgeAssignment["schedule"]) {
-  const slots = Object.values(schedule ?? {}).sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
-  for (let i = 0; i < slots.length; i++) {
-    const start = Date.parse(slots[i].startsAt), end = Date.parse(slots[i].endsAt);
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return "La hora de fin debe ser posterior al inicio.";
-    if (i && start < Date.parse(slots[i - 1].endsAt)) return "Hay horarios que se cruzan para este juez. Ajusta los turnos.";
+  const bounds = Object.values(schedule ?? {}).map(scheduleBounds);
+  if (bounds.some(slot => slot === null)) return "Captura el inicio y el fin de cada turno. El fin debe ser posterior al inicio.";
+  const ordered = bounds.filter(slot => slot !== null).sort((a, b) => a.start - b.start);
+  if (ordered.some((slot, index) => index > 0 && slot.start < ordered[index - 1].end)) {
+    return "Hay horarios que se cruzan para este juez. Ajusta los turnos.";
   }
   return null;
 }
+
 export function judgeProgress(event: EventDoc, projects: ProjectDoc[], evaluations: EvaluationDoc[], email: string, now: number) {
   const key = normalizeEmail(email);
   const assignment = event.judgeAssignments?.[key];
@@ -53,9 +80,7 @@ export function judgeProgress(event: EventDoc, projects: ProjectDoc[], evaluatio
     PHASES.filter(phase => event.phases[phase]).map(phase => {
       const done = evaluations.some(e => normalizeEmail(e.judgeEmail) === key && e.projectId === project.id && e.phase === phase);
       const slot = assignment?.schedule?.[project.id];
-      const start = slot ? Date.parse(slot.startsAt) : NaN, end = slot ? Date.parse(slot.endsAt) : NaN;
-      const status = done ? "done" : !Number.isFinite(start) || !Number.isFinite(end) ? "unscheduled"
-        : now < start ? "upcoming" : now < end ? "due" : "overdue";
+      const status = done ? "done" : scheduleStatus(slot, now);
       return { project, phase, slot, done, status };
     }));
   const done = tasks.filter(t => t.done).length;

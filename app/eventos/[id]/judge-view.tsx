@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/auth";
 import { projectsCol, qMyEvaluations } from "@/lib/data";
 import { useCollection } from "@/lib/hooks";
 import { getCategoryCriteria, getPhaseLabel } from "@/lib/event-config";
-import { judgeProgress, scheduleLabel } from "@/lib/judging-agenda";
+import { judgeProgress, scheduleBounds, scheduleLabel } from "@/lib/judging-agenda";
 import { PHASES, type EvaluationDoc, type EventDoc, type ProjectDoc } from "@/lib/types";
 import {
   effectiveEvaluationTotal,
@@ -27,7 +27,8 @@ export function JudgeView({ event }: { event: EventDoc }) {
   // Un juez nunca ve para calificar un proyecto del que forma parte.
   const projects = { ...allProjects, data: allProjects.data.filter((p) => !p.registrationPending && !p.memberEmails?.includes(email)) };
   const mine = useCollection<EvaluationDoc>(qMyEvaluations(event.id, uid), `myevals:${event.id}:${uid}`);
-  const now = useAgendaClock();
+  const schedule = event.judgeAssignments?.[email]?.schedule;
+  const now = useAgendaClock(schedule);
   const [filter, setFilter] = useState<Filter>("pending");
   const [search, setSearch] = useState("");
 
@@ -47,9 +48,8 @@ export function JudgeView({ event }: { event: EventDoc }) {
     .filter((p) => !q || p.title.toLowerCase().includes(q) || p.category.toLowerCase().includes(q))
     .filter((p) => filter !== "pending" || phases.some((ph) => !evaluated(p, ph)))
     .sort((a, b) => {
-      const slots = event.judgeAssignments?.[email]?.schedule;
-      const left = slots?.[a.id] ? Date.parse(slots[a.id].startsAt) : Infinity;
-      const right = slots?.[b.id] ? Date.parse(slots[b.id].startsAt) : Infinity;
+      const left = scheduleBounds(schedule?.[a.id])?.start ?? Infinity;
+      const right = scheduleBounds(schedule?.[b.id])?.start ?? Infinity;
       return (left - right) || a.title.localeCompare(b.title);
     });
 
@@ -79,11 +79,11 @@ export function JudgeView({ event }: { event: EventDoc }) {
             {assignmentCategories.length > 0 ? ` · ${assignmentCategories.join(", ")}` : ""}
           </p>
         </div>
-        {(!event.judgingOpen || event.resultsPublished) && (
+        {event.resultsPublished && (
           <div className="flex max-w-sm items-start gap-3 rounded-3xl bg-amber-50 p-5 text-amber-900">
             <Info className="mt-0.5 size-4 shrink-0" />
             <p className="font-mono text-[11px] leading-relaxed">
-              {event.resultsPublished ? "Los resultados están publicados. Tus calificaciones ya no se pueden cambiar." : "La evaluación está cerrada. Puedes revisar los proyectos y calificar cuando el organizador la abra."}
+              Los resultados están publicados. Tus calificaciones ya no se pueden cambiar.
             </p>
           </div>
         )}
@@ -124,8 +124,8 @@ export function JudgeView({ event }: { event: EventDoc }) {
                     </div>
                     <ArrowUpRight className="size-5 shrink-0 opacity-40 group-hover:opacity-100" />
                   </div>
-                  {now !== null && agenda.tasks.some(t=>t.project.id===p.id && !t.done && (t.status==='due' || t.status==='overdue')) && <Badge tone={agenda.tasks.some(t=>t.project.id===p.id && t.status==='overdue') ? 'red' : 'lime'}>{agenda.tasks.some(t=>t.project.id===p.id && t.status==='overdue') ? 'Turno vencido · pendiente' : 'Te toca calificar ahora'}</Badge>}
-                  <p className="text-sm font-medium">{scheduleLabel(event.judgeAssignments?.[email]?.schedule?.[p.id])}</p>
+                  {!event.resultsPublished && now !== null && agenda.tasks.some(t=>t.project.id===p.id && !t.done && (t.status==='due' || t.status==='overdue')) && <Badge tone={agenda.tasks.some(t=>t.project.id===p.id && t.status==='overdue') ? 'red' : 'lime'}>{agenda.tasks.some(t=>t.project.id===p.id && t.status==='overdue') ? 'Turno vencido · pendiente' : 'Te toca calificar ahora'}</Badge>}
+                  <p className="text-sm font-medium">{scheduleLabel(schedule?.[p.id])}</p>
                   <div className="flex flex-wrap gap-1.5">
                     {p.category && <Badge>{p.category}</Badge>}
                     <Badge>{p.stand ? `Stand: ${p.stand}` : "Sin stand asignado"}</Badge>

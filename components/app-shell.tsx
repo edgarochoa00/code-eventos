@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, Lock, LogOut, MailCheck, RefreshCw, ShieldCheck } from "lucide-react";
+import { Ban, ChevronDown, Lock, LogOut, MailCheck, RefreshCw, ShieldCheck, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -69,17 +69,38 @@ function Header() {
   const router = useRouter();
   const pathname = usePathname();
   const showAdmin = access.isAdmin && user?.emailVerified;
+  const [accountOpen, setAccountOpen] = useState(false);
+  const account = useRef<HTMLDivElement>(null);
+  const accountButton = useRef<HTMLButtonElement>(null);
+  const accountInitials = initials(user?.displayName || displayEmail(user?.email ?? ""));
+
+  useEffect(() => {
+    if (!accountOpen) return;
+    function closeOutside(event: PointerEvent) {
+      if (event.target instanceof Node && !account.current?.contains(event.target)) setAccountOpen(false);
+    }
+    document.addEventListener("pointerdown", closeOutside);
+    return () => document.removeEventListener("pointerdown", closeOutside);
+  }, [accountOpen]);
+
+  async function handleSignOut() {
+    setAccountOpen(false);
+    await signOut();
+    router.replace("/");
+  }
+
+  const accountAction = "flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-left text-sm font-medium hover:bg-field [&>svg]:shrink-0";
 
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-surface pt-[env(safe-area-inset-top)] shadow-xs">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-4 sm:px-6">
         <Logo href="/panel" />
-        <div className="flex min-w-0 items-center gap-1 sm:gap-2">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           {showAdmin && (
             <Link
               href="/admin"
               className={cn(
-                "flex size-11 shrink-0 items-center justify-center gap-1.5 rounded-full border-2 font-display text-[11px] font-bold uppercase tracking-[0.08em] transition sm:w-auto sm:px-3.5",
+                "hidden min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-full border-2 px-3.5 font-display text-[11px] font-bold uppercase tracking-[0.08em] transition sm:flex",
                 pathname.startsWith("/admin")
                   ? "border-ink bg-ink text-surface"
                   : "border-line bg-surface text-ink hover:border-ink/40",
@@ -87,7 +108,7 @@ function Header() {
               aria-label="Administración"
             >
               <ShieldCheck className="size-4" />
-              <span className="hidden sm:inline">Administración</span>
+              <span>Administración</span>
             </Link>
           )}
           <ThemeToggle />
@@ -95,7 +116,7 @@ function Header() {
             <>
               <Link
                 href="/panel/perfil"
-                className="flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full px-1 hover:bg-field focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink md:max-w-60 md:pl-3"
+                className="hidden min-h-11 min-w-11 items-center justify-center gap-2 rounded-full px-1 hover:bg-field focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink sm:flex md:max-w-60 md:pl-3"
                 aria-label="Mi perfil"
                 aria-current={pathname === "/panel/perfil" ? "page" : undefined}
                 title="Mi perfil"
@@ -105,21 +126,61 @@ function Header() {
                   <span className="block truncate font-mono text-[10px] text-muted">{displayEmail(user.email ?? "")}</span>
                 </span>
                 <span className="grid size-9 shrink-0 place-items-center rounded-full bg-lime font-mono text-xs font-bold text-coal" aria-hidden>
-                  {initials(user.displayName || displayEmail(user.email ?? ""))}
+                  {accountInitials}
                 </span>
               </Link>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="size-11 px-0"
+              <button
+                type="button"
+                className="hidden size-11 shrink-0 place-items-center rounded-full hover:bg-field sm:grid"
                 aria-label="Cerrar sesión"
-                onClick={async () => {
-                  await signOut();
-                  router.replace("/");
-                }}
+                onClick={handleSignOut}
               >
                 <LogOut className="size-4" />
-              </Button>
+              </button>
+              <div
+                ref={account}
+                className="relative sm:hidden"
+                onKeyDown={(event) => {
+                  if (event.key === "Escape" && accountOpen) {
+                    setAccountOpen(false);
+                    accountButton.current?.focus();
+                  }
+                }}
+              >
+                <button
+                  ref={accountButton}
+                  type="button"
+                  className="flex min-h-11 min-w-11 items-center justify-center gap-0.5 rounded-full px-1 hover:bg-field"
+                  aria-label="Menú de cuenta"
+                  aria-expanded={accountOpen}
+                  onClick={() => setAccountOpen((open) => !open)}
+                >
+                  <span className="grid size-8 place-items-center rounded-full bg-lime text-xs font-bold text-coal" aria-hidden>
+                    {accountInitials}
+                  </span>
+                  <ChevronDown className="size-3 text-muted" aria-hidden />
+                </button>
+                {accountOpen && (
+                  <div className="ui-panel absolute right-0 top-full mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-2xl p-1.5">
+                    <Link
+                      href="/panel/perfil"
+                      className={accountAction}
+                      aria-current={pathname === "/panel/perfil" ? "page" : undefined}
+                      onClick={() => setAccountOpen(false)}
+                    >
+                      <UserRound className="size-4" aria-hidden /> Mi perfil
+                    </Link>
+                    {showAdmin && (
+                      <Link href="/admin" className={accountAction} onClick={() => setAccountOpen(false)}>
+                        <ShieldCheck className="size-4" aria-hidden /> Administración
+                      </Link>
+                    )}
+                    <button type="button" className={accountAction} onClick={handleSignOut}>
+                      <LogOut className="size-4" aria-hidden /> Cerrar sesión
+                    </button>
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>

@@ -107,38 +107,38 @@ function EventHeader({ event, role, viaAdmin }: { event: EventDoc; role: EventRo
 
   return (
     <section className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[1.6fr_1fr]">
-      <div className="min-w-0 ui-panel rounded-3xl p-6 sm:p-8">
+      <div className="min-w-0 ui-panel rounded-3xl p-4 sm:p-8">
         <div className="flex flex-wrap gap-1.5">
           <EventStatus event={event} />
           <Badge tone={role === "organizer" ? "dark" : role === "judge" ? "lime" : "neutral"}>
             {role === "organizer" ? (viaAdmin ? "Admin" : "Organizas") : role === "judge" ? "Eres juez" : "Participante"}
           </Badge>
         </div>
-        <h1 className="mt-4 break-words font-display text-3xl font-bold leading-tight sm:text-4xl">{event.name}</h1>
-        {event.institution && <p className="mt-1 font-mono text-xs text-muted">{event.institution}</p>}
+        <h1 className="mt-3 font-display text-2xl font-bold leading-tight wrap-anywhere sm:mt-4 sm:text-4xl">{event.name}</h1>
+        {event.institution && <p className="mt-1 font-mono text-xs text-muted wrap-anywhere">{event.institution}</p>}
         {event.description && (
-          <p className="mt-4 max-w-2xl whitespace-pre-line text-sm leading-relaxed text-ink/80">{event.description}</p>
+          <p className="mt-3 max-w-2xl whitespace-pre-line text-sm leading-relaxed text-ink/80 wrap-anywhere sm:mt-4">{event.description}</p>
         )}
         {(event.startDate || event.endDate) && (
           <p className="mt-4 flex items-center gap-1.5 font-mono text-[11px] text-muted">
-            <CalendarDays className="size-3.5" /> {formatDate(event.startDate)}
+            <CalendarDays className="size-3.5 shrink-0" /> {formatDate(event.startDate)}
             {event.endDate && ` – ${formatDate(event.endDate)}`}
           </p>
         )}
       </div>
       {role === "organizer" ? (
         // Solo el organizador necesita el código para invitar equipos
-        <div className="flex flex-col justify-between gap-6 rounded-3xl bg-lime p-6 sm:p-8">
-          <div>
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-3xl bg-lime p-4 sm:p-8 lg:flex-col lg:items-start lg:gap-6">
+          <div className="min-w-0 flex-1 lg:flex-none">
             <p className="font-mono text-[11px] text-muted">Código para los equipos</p>
-            <p className="mt-1 font-mono text-4xl font-bold tracking-[0.2em]">{event.code}</p>
+            <p className="mt-1 font-mono text-2xl font-bold tracking-[0.12em] wrap-anywhere sm:text-4xl sm:tracking-[0.2em]">{event.code}</p>
             <p className="mt-2 font-mono text-[11px] text-muted">
               {PHASES.filter((phase) => event.phases[phase]).length > 1
                 ? `Entregas: ${phaseNames(event)} · Equipos de hasta ${event.maxTeamSize}`
                 : `Equipos de hasta ${event.maxTeamSize} integrantes`}
             </p>
           </div>
-          <Button variant="dark" onClick={share} className="self-start">
+          <Button variant="dark" size="sm" onClick={share}>
             {copied ? <Check className="size-4" /> : <Share2 className="size-4" />}
             {copied ? "Copiado" : "Compartir"}
           </Button>
@@ -159,7 +159,6 @@ function StatusCard({ event, role }: { event: EventDoc; role: EventRole }) {
   const rows: { label: string; open: boolean; on: string; off: string }[] =
     role === "judge"
       ? [
-          { label: "Evaluación", open: event.judgingOpen, on: "Abierta, ya puedes calificar", off: "Aún no abre" },
           ...PHASES.filter((p) => event.phases[p]).map((p) => ({
             label: getPhaseLabel(event, p),
             open: event.submissions[p],
@@ -183,14 +182,14 @@ function StatusCard({ event, role }: { event: EventDoc; role: EventRole }) {
         ];
 
   return (
-    <div className="rounded-3xl bg-lime p-6 sm:p-8">
-      <p className="font-mono text-[11px] text-muted">{role === "judge" ? "Tu evaluación" : "Etapas del evento"}</p>
+    <div className="min-w-0 rounded-3xl bg-lime p-4 sm:p-8">
+      <p className="font-mono text-[11px] text-muted">Etapas del evento</p>
       <ul className="mt-3 divide-y divide-line">
         {rows.map((r) => (
           <li key={r.label} className="flex items-center justify-between gap-3 py-2.5">
-            <span className="text-sm font-medium">{r.label}</span>
-            <span className="flex items-center gap-1.5 text-right font-mono text-[11px]">
-              <span className={r.open ? "size-2 rounded-full bg-coal" : "size-2 rounded-full border border-coal/40"} aria-hidden />
+            <span className="min-w-0 text-sm font-medium wrap-anywhere">{r.label}</span>
+            <span className="flex min-w-0 items-center gap-1.5 text-right font-mono text-[11px] wrap-anywhere">
+              <span className={r.open ? "size-2 shrink-0 rounded-full bg-coal" : "size-2 shrink-0 rounded-full border border-coal/40"} aria-hidden />
               {r.open ? r.on : r.off}
             </span>
           </li>

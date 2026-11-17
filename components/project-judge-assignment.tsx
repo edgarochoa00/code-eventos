@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { CalendarClock } from "lucide-react";
+import { ProjectJudgingScheduleEditor, projectScheduleSummary } from "./project-judging-schedule";
 import { Badge, Button, Card, EmptyState, Field, Input, Modal, SectionTitle, Toggle, firestoreErrorMessage, useToast } from "./ui";
 import { saveProjectJudges } from "@/lib/data";
 import { projectJudgesError } from "@/lib/project-judges";
@@ -9,12 +11,14 @@ import type { EventDoc, ProjectDoc } from "@/lib/types";
 
 export function ProjectJudgeAssignments({ event, projects }: { event: EventDoc; projects: ProjectDoc[] }) {
   const [editing, setEditing] = useState<string | null>(null);
+  const [scheduling, setScheduling] = useState<string | null>(null);
   const [category, setCategory] = useState("");
   const categories = [...new Set(projects.map(p => p.category))].sort();
   const visibleProjects = projects.filter(p => !category || p.category === category);
   const project = projects.find(p => p.id === editing);
+  const scheduledProject = projects.find(p => p.id === scheduling);
   return <Card className="lg:col-span-2">
-    <SectionTitle title="Asignación por proyecto" subtitle="Define el máximo y elige qué jueces califican cada proyecto. La selección guardada tiene prioridad sobre las asignaciones por categoría o por juez." />
+    <SectionTitle title="Asignación por proyecto" subtitle="Elige los jueces y programa un solo turno para todos los del mismo proyecto. Puedes ajustar excepciones en «Horarios de los jueces»." />
     {!projects.length && <EmptyState title="Sin proyectos registrados" text="Los proyectos aparecerán aquí cuando los equipos completen su registro." />}
     <Field label="Filtrar proyectos por categoría" htmlFor="assignment-category">
       <select className="h-11 w-full rounded-xl border border-control bg-surface px-3 text-sm" id="assignment-category" value={category} onChange={e => setCategory(e.target.value)}>
@@ -32,8 +36,14 @@ export function ProjectJudgeAssignments({ event, projects }: { event: EventDoc; 
               <p className="break-words font-medium">{p.title}</p>
               <p className="text-xs text-muted">{p.category}</p>
             </div>
-            <Button variant="outline" size="sm" disabled={event.resultsPublished} onClick={() => setEditing(p.id)}>Configurar jueces</Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" disabled={event.resultsPublished} onClick={() => setEditing(p.id)}>Configurar jueces</Button>
+              <Button size="sm" disabled={event.resultsPublished || event.accessVersion !== 1 || !judges.length} onClick={() => setScheduling(p.id)}>
+                <CalendarClock className="size-3.5" /> Programar turno
+              </Button>
+            </div>
           </div>
+          <p className="text-xs text-muted wrap-anywhere">{projectScheduleSummary(event, p).label}</p>
           <div className="flex flex-wrap gap-2">
             <Badge tone={p.judging ? "lime" : undefined}>{p.judging ? `${judges.length} de ${p.judging.maxJudges} jueces` : `${judges.length} jueces · Máximo sin definir`}</Badge>
             {!judges.length && <span className="text-xs text-muted">Sin jueces asignados</span>}
@@ -45,6 +55,9 @@ export function ProjectJudgeAssignments({ event, projects }: { event: EventDoc; 
     {event.resultsPublished && <p className="mt-3 text-xs text-muted">Oculta los resultados para modificar las asignaciones.</p>}
     <Modal open={!!project} title="Jueces del proyecto" onClose={() => setEditing(null)}>
       {project && <ProjectJudgesEditor key={project.id} event={event} project={project} onClose={() => setEditing(null)} />}
+    </Modal>
+    <Modal open={!!scheduledProject} title="Turno del proyecto" onClose={() => setScheduling(null)}>
+      {scheduledProject && <ProjectJudgingScheduleEditor key={scheduledProject.id} event={event} project={scheduledProject} onClose={() => setScheduling(null)} />}
     </Modal>
   </Card>;
 }
@@ -80,7 +93,7 @@ function ProjectJudgesEditor({ event, project, onClose }: { event: EventDoc; pro
         onChange={() => { setSelected(prev => prev.includes(email) ? prev.filter(value => value !== email) : [...prev, email]); setMessage(""); }} />)}
     </div>
     {!event.judgeEmails.length && <p className="text-xs text-muted">Agrega jueces al evento para poder seleccionarlos.</p>}
-    <p className="text-xs text-muted">Puedes guardar sin jueces y asignarlos después. Solo los seleccionados podrán calificar este proyecto. Los horarios se programan en «Agenda por juez». Las calificaciones ya guardadas se conservan al cambiar la selección.</p>
+    <p className="text-xs text-muted">Puedes guardar sin jueces y asignarlos después. Solo los seleccionados podrán calificar este proyecto. Después de guardar, usa «Programar turno» para aplicar un horario a todos. Las calificaciones ya guardadas se conservan al cambiar la selección.</p>
     {message && <p role="alert" className="text-sm text-red-700">{message}</p>}
     <div className="flex justify-end gap-2">
       <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>Cancelar</Button>

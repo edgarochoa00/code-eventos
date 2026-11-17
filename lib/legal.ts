@@ -22,6 +22,14 @@ export type Release = { version: string; date: string; title: string; changes: s
 
 /** La primera entrada es la versión actual (debe coincidir con package.json). */
 export const RELEASES: Release[] = [
+  { version: "0.4.16", date: "16 de noviembre de 2026", title: "Mejoras en pantallas estrechas", changes: [
+    "El encabezado y las pestañas principales se adaptan a celulares y tabletas.",
+    "Los horarios y las calificaciones disponen de más espacio para leer y usar sus controles.",
+  ] },
+  { version: "0.4.15", date: "16 de noviembre de 2026", title: "Calificación por turnos", changes: [
+    "Cada juez puede enviar su calificación únicamente durante el turno programado para ese proyecto.",
+    "Registro y recepción de entregas se administran desde Ajustes. Los turnos se programan desde Jueces.",
+  ] },
   { version: "0.4.14", date: "14 de noviembre de 2026", title: "Asignación de stands", changes: [
     "Los organizadores del evento pueden asignar, cambiar o retirar el stand de cada proyecto.",
     "Los alumnos y jueces pueden consultar la ubicación asignada.",

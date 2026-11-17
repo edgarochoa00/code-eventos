@@ -20,8 +20,9 @@ import {
 import { signOut, type User } from "firebase/auth";
 import { auth, db } from "./firebase";
 import { inviteSavedAccounts, sendInvitations } from "./account-invitation-client";
-import { scheduleError } from "./judging-agenda";
+import { scheduleError, scheduleStatus } from "./judging-agenda";
 import { projectJudgesError } from "./project-judges";
+import { projectScheduleAssignments, type JudgingSlot } from "./project-judging-schedule";
 import type { JudgeAssignment } from "./types";
 import { categoryCriteriaError, cleanCriteria, criteriaError, deliverySettingsError, evaluationScoresError, getCategoryCriteria, sameCriteria } from "./event-config";
 import { computeStandings } from "./results";
@@ -144,9 +145,23 @@ export async function saveJudgeAssignment(eventId: string, email: string, assign
   const key = normalizeEmail(email);
   await runTransaction(db, async tx => {
     const snap = await tx.get(eventRef(eventId));
-    if (!snap.exists() || !(snap.data() as EventDoc).judgeEmails.includes(key)) throw new Error("El juez ya no pertenece al evento.");
-    const next = { ...((snap.data() as EventDoc).judgeAssignments ?? {}), [key]: assignment };
+    const event = snap.data() as EventDoc | undefined;
+    if (!event?.judgeEmails.includes(key)) throw new Error("El juez ya no pertenece al evento.");
+    if (event.accessVersion !== 1 || event.resultsPublished) throw new Error("Los horarios no se pueden cambiar en este momento.");
+    const next = { ...event.judgeAssignments, [key]: assignment };
     tx.update(eventRef(eventId), { judgeAssignments: next });
+  });
+}
+
+/** Un turno para todos los jueces actuales del proyecto, sin guardados parciales. */
+export async function saveProjectJudgeSchedule(eventId: string, projectId: string, slot: JudgingSlot | null, expectedJudges: string[]) {
+  await runTransaction(db, async tx => {
+    const [eventSnap, projectSnap] = await Promise.all([tx.get(eventRef(eventId)), tx.get(projectRef(eventId, projectId))]);
+    if (!eventSnap.exists() || !projectSnap.exists()) throw new Error("El evento o proyecto ya no existe.");
+    const event = eventSnap.data() as EventDoc;
+    const project = { ...projectSnap.data(), id: projectId } as ProjectDoc;
+    const judgeAssignments = projectScheduleAssignments(event, project, slot, expectedJudges);
+    tx.update(eventRef(eventId), { judgeAssignments });
   });
 }
 
@@ -281,18 +296,8 @@ export async function createEvent(input: NewEventInput, user: User) {
 
 export async function updateEvent(
   eventId: string,
-  patch: Partial<Omit<EventDoc, "id" | "ownerId" | "ownerEmail" | "createdAt" | "accessVersion" | "judgeEmails" | "organizerEmails">>,
+  patch: Partial<Omit<EventDoc, "id" | "ownerId" | "ownerEmail" | "createdAt" | "accessVersion" | "judgeEmails" | "organizerEmails" | "judgingOpen">>,
 ) {
-  if (typeof patch.judgingOpen === "boolean") {
-    return runTransaction(db, async (transaction) => {
-      const snapshot = await transaction.get(eventRef(eventId));
-      if (!snapshot.exists()) throw new Error("El evento ya no existe.");
-      transaction.update(eventRef(eventId), {
-        ...patch,
-        categoryLocked: Boolean(patch.judgingOpen || snapshot.data().judgingOpen || snapshot.data().categoryLocked),
-      });
-    });
-  }
   return updateDoc(eventRef(eventId), patch);
 }
 
@@ -474,9 +479,14 @@ export async function saveEvaluation(
     if (!eventSnap.exists() || !projectSnap.exists()) throw new Error("El proyecto ya no existe.");
     const current = { ...eventSnap.data(), id: event.id } as EventDoc;
     const currentProject = { ...projectSnap.data(), id: projectId } as ProjectDoc;
-    if (current.accessVersion !== 1 || !current.judgingOpen || current.resultsPublished) throw new Error("La evaluación está cerrada.");
+    if (current.accessVersion !== 1 || current.resultsPublished) throw new Error("La evaluación está cerrada.");
     if (!current.phases[phase] || !isProjectAssignedToJudge(current, currentProject, user.email ?? "")) {
       throw new Error("Este proyecto o etapa no está asignado a tu evaluación.");
+    }
+    const judgeEmail = normalizeEmail(user.email ?? "");
+    const slot = current.judgeAssignments?.[judgeEmail]?.schedule?.[projectId];
+    if (scheduleStatus(slot, Date.now()) !== "due") {
+      throw new Error("La calificación solo se puede enviar durante el turno de este proyecto.");
     }
     const criteria = getCategoryCriteria(current, currentProject.category);
     if (currentProject.category !== project.category || !sameCriteria(criteria, getCategoryCriteria(event, project.category))) {
@@ -492,13 +502,16 @@ export async function saveEvaluation(
       projectId,
       phase,
       judgeId: user.uid,
-      judgeEmail: normalizeEmail(user.email ?? ""),
+      judgeEmail,
       judgeName: user.displayName ?? "",
       scores,
       total: weightedTotal(criteria, scores),
       comment: comment.trim(),
     };
     transaction.set(doc(evaluationsCol(event.id), id), { ...data, updatedAt: serverTimestamp() });
+    if (!current.categoryLocked) {
+      transaction.update(eventRef(event.id), { categoryLocked: true, categoryLockedByEvaluation: id });
+    }
   });
 }
 

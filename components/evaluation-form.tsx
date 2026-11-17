@@ -72,15 +72,15 @@ export function EvaluationForm({
         </p>
       )}
 
-      <div className="sticky top-[calc(4rem+env(safe-area-inset-top)+0.75rem)] z-10 flex items-center justify-between gap-3 rounded-2xl bg-night p-3 pl-4 text-white shadow-xl ring-1 ring-white/5 sm:pl-5">
+      <div className="sticky top-[calc(4rem+env(safe-area-inset-top)+0.75rem)] z-10 grid grid-cols-[minmax(5.75rem,1fr)_minmax(0,1.4fr)] items-center gap-2 rounded-2xl bg-night p-2.5 text-white shadow-xl ring-1 ring-white/5 sm:flex sm:justify-between sm:gap-3 sm:p-3 sm:pl-5 [@media(max-height:420px)]:static">
         <div className="min-w-0">
           <p className="font-mono text-[10px] text-white/75">Total ponderado</p>
-          <p className="font-display text-2xl font-bold tabular-nums">
-            {total.toFixed(1)} <span className="text-sm font-normal text-white/75">/100</span>
+          <p className="font-display text-xl font-bold whitespace-nowrap tabular-nums sm:text-2xl">
+            {total.toFixed(1)} <span className="text-xs font-normal text-white/75 sm:text-sm">/100</span>
           </p>
         </div>
-        <Button type="submit" variant="accent" loading={busy} disabled={locked || busy || confirming}>
-          {initial || submitted ? "Enviada" : "Enviar calificación"}
+        <Button type="submit" variant="accent" size="sm" loading={busy} disabled={locked || busy || confirming}>
+          <span className="min-w-0">{initial || submitted ? "Enviada" : "Enviar calificación"}</span>
         </Button>
       </div>
 
@@ -90,7 +90,7 @@ export function EvaluationForm({
           return (
             <div key={c.id} className="ui-inset rounded-2xl p-4">
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
+                <div className="min-w-0 wrap-anywhere">
                   <label htmlFor={`score-${c.id}`} className="font-medium">
                     {c.name}
                   </label>

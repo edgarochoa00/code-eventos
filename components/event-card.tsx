@@ -1,5 +1,6 @@
 import { ArrowUpRight, CalendarDays } from "lucide-react";
 import Link from "next/link";
+import { scheduleBounds } from "@/lib/judging-agenda";
 import type { EventDoc, EventRole } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { Badge } from "./ui";
@@ -8,9 +9,12 @@ const ROLE_LABEL: Record<EventRole, string> = { organizer: "Organizador", judge:
 
 export function EventStatus({ event }: { event: EventDoc }) {
   if (event.resultsPublished) return <Badge tone="dark">Resultados publicados</Badge>;
-  if (event.judgingOpen) return <Badge tone="lime">En evaluación</Badge>;
   if (event.submissions.prototype || event.submissions.final) return <Badge tone="green">Entregas abiertas</Badge>;
   if (event.registrationOpen) return <Badge tone="green">Registro abierto</Badge>;
+  const hasSchedule = Object.values(event.judgeAssignments ?? {}).some(assignment =>
+    Object.values(assignment.schedule ?? {}).some(scheduleBounds),
+  );
+  if (hasSchedule) return <Badge tone="lime">Turnos de evaluación</Badge>;
   return <Badge>Cerrado</Badge>;
 }
 

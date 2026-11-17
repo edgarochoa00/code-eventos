@@ -6,9 +6,10 @@ import { ArrowLeft, Lock, MessageSquareQuote, Pencil, ScanSearch, Trash2, Trophy
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { useAgendaClock } from "@/components/judging-agenda";
 import { EvaluationForm } from "@/components/evaluation-form";
 import { getCategoryCriteria, getPhaseDetails, getPhaseLabel } from "@/lib/event-config";
-import { scheduleLabel } from "@/lib/judging-agenda";
+import { scheduleLabel, scheduleStatus } from "@/lib/judging-agenda";
 import { MatchList, NotEnoughData, SimilarityBadge, SubmissionBadges } from "@/components/project-bits";
 import { ProjectRegistration } from "@/components/project-registration";
 import { ProjectForm } from "@/components/project-form";
@@ -113,6 +114,9 @@ function ProjectBody({
   // Nadie califica un proyecto del que forma parte
   const isJudge = roles.includes("judge") && !isMember;
   const assigned = isJudge && isProjectAssignedToJudge(event, project, user?.email ?? "");
+  const judgeSchedule = isJudge ? event.judgeAssignments?.[normalizeEmail(user?.email ?? "")]?.schedule : undefined;
+  const slot = judgeSchedule?.[project.id];
+  const now = useAgendaClock(judgeSchedule, isJudge);
   const canParticipate = isMember && roles.includes("student");
   const isLeader = Boolean(user?.uid) && user?.uid === project.leaderId;
   // Quién ve el análisis de originalidad: únicamente organizadores y administradores
@@ -126,6 +130,17 @@ function ProjectBody({
   const [deletingProject, setDeletingProject] = useState(false);
   const [evalToDelete, setEvalToDelete] = useState<EvaluationDoc | null>(null);
   const [deletingEval, setDeletingEval] = useState(false);
+  const turn = now === null ? null : scheduleStatus(slot, now);
+  let evaluationLockReason;
+  if (!assigned) evaluationLockReason = "Este proyecto no está asignado a tu evaluación. Puedes revisarlo.";
+  else if (event.resultsPublished) evaluationLockReason = "Los resultados están publicados. Tus calificaciones ya no se pueden cambiar.";
+  else if (event.accessVersion !== 1) evaluationLockReason = "El superadmin debe actualizar los permisos de este evento antes de habilitar la evaluación.";
+  else if (!event.phases[evalPhase]) evaluationLockReason = "Esta etapa no está habilitada.";
+  else if (turn === null) evaluationLockReason = "Comprobando la hora del turno.";
+  else if (turn === "unscheduled") evaluationLockReason = "El organizador aún no programa tu turno para este proyecto.";
+  else if (turn === "upcoming") evaluationLockReason = "Tu turno todavía no comienza. Podrás enviar la calificación a la hora indicada.";
+  else if (turn === "overdue") evaluationLockReason = "Tu turno terminó. Pide al organizador que programe otro horario.";
+
 
   // El contenido del proyecto es del equipo: el organizador no lo edita, solo puede retirarlo antes de publicar resultados.
   const canEditInfo = canParticipate && !event.resultsPublished && (event.registrationOpen || phases.some((p) => event.submissions[p]));
@@ -164,29 +179,29 @@ function ProjectBody({
 
   return (
     <div className="space-y-6">
-      <Link href={`/eventos/${event.id}`} className="inline-flex items-center gap-1.5 font-mono text-xs text-muted hover:text-ink">
-        <ArrowLeft className="size-3.5" /> {event.name}
+      <Link href={`/eventos/${event.id}`} className="inline-flex max-w-full items-center gap-1.5 font-mono text-xs text-muted wrap-anywhere hover:text-ink">
+        <ArrowLeft className="size-3.5 shrink-0" /> {event.name}
       </Link>
       {isMember && !canParticipate && <p className="rounded-2xl bg-amber-50 p-5 text-sm text-amber-900">Tu correo figura en este equipo y también tiene un rol de administración o juez. Puedes consultar el proyecto, pero ese rol impide editarlo o entregar archivos como integrante. La administración debe corregir la incompatibilidad.</p>}
 
-      <section className="ui-panel rounded-3xl p-6 sm:p-8">
+      <section className="ui-panel min-w-0 rounded-3xl p-4 sm:p-8">
         <ProjectLogo project={project} canEdit={canEditInfo && isLeader && !project.registrationPending} />
         <div className="flex flex-wrap items-center gap-1.5">
           {project.category && <Badge tone="dark">{project.category}</Badge>}
           <SubmissionBadges project={project} event={event} />
           {isOrganizer && seeOriginality && !fingerprints.loading && <SimilarityBadge match={matches[0]} state={state} />}
         </div>
-        <h1 className="mt-4 break-words font-display text-3xl font-bold leading-tight sm:text-4xl">{project.title || "Registro pendiente del líder"}</h1>
-        <p className="mt-2 text-sm font-medium">{project.stand ? `Stand: ${project.stand}` : "Sin stand asignado"}</p>
+        <h1 className="mt-3 font-display text-2xl font-bold leading-tight wrap-anywhere sm:mt-4 sm:text-4xl">{project.title || "Registro pendiente del líder"}</h1>
+        <p className="mt-2 text-sm font-medium wrap-anywhere">{project.stand ? `Stand: ${project.stand}` : "Sin stand asignado"}</p>
         {project.registrationPending && <p className="mt-2 text-sm text-muted">El alumno líder completará los datos del proyecto y registrará a sus integrantes al entrar.</p>}
-        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-ink/75">{project.summary}</p>
+        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-ink/75 wrap-anywhere">{project.summary}</p>
         <ul className="mt-5 flex flex-wrap gap-2">
           {project.members.map((m) => (
-            <li key={m.email} className="flex items-center gap-2 rounded-full bg-paper py-1.5 pl-1.5 pr-3">
-              <span className="grid size-6 place-items-center rounded-full bg-lime">
+            <li key={m.email} className="flex min-w-0 max-w-full items-center gap-2 rounded-2xl bg-paper py-1.5 pl-1.5 pr-3">
+              <span className="grid size-6 shrink-0 place-items-center rounded-full bg-lime">
                 <UserRound className="size-3.5" />
               </span>
-              <span className="text-xs">
+              <span className="min-w-0 text-xs wrap-anywhere">
                 {m.name || displayEmail(m.email)}
                 {m.email === project.leaderEmail && <span className="font-mono text-[10px] text-muted"> · líder</span>}
               </span>
@@ -346,12 +361,12 @@ function ProjectBody({
                   El equipo aún no ha enviado esta entrega: {getPhaseLabel(event, evalPhase)}. Puedes calificar si la presentaron en vivo.
                 </p>
               )}
-              <p className="mb-4 rounded-xl bg-paper p-3 text-sm font-medium">Tu horario: {scheduleLabel(event.judgeAssignments?.[normalizeEmail(user.email ?? "")]?.schedule?.[project.id])}</p>
+              <p className="mb-4 rounded-xl bg-paper p-3 text-sm font-medium">Tu horario: {scheduleLabel(slot)}</p>
               <EvaluationForm
                 key={`${evalPhase}:${project.category}:${evaluations.data.find(e => e.id === evaluationId(user.uid, project.id, evalPhase))?.id ?? "new"}:${JSON.stringify(getCategoryCriteria(event, project.category))}`}
                 criteria={getCategoryCriteria(event, project.category)}
-                locked={!assigned || !event.judgingOpen || event.resultsPublished || event.accessVersion !== 1}
-                lockReason={!assigned ? "Este proyecto no está asignado a tu evaluación. Puedes revisarlo." : event.resultsPublished ? "Los resultados están publicados. Tus calificaciones ya no se pueden cambiar." : event.accessVersion !== 1 ? "El superadmin debe actualizar los permisos de este evento antes de habilitar la evaluación." : undefined}
+                locked={Boolean(evaluationLockReason)}
+                lockReason={evaluationLockReason}
                 initial={evaluations.data.find((e) => e.id === evaluationId(user.uid, project.id, evalPhase)) ?? null}
                 onSave={async (scores, comment) => {
                   try {

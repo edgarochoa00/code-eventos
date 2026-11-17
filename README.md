@@ -68,8 +68,8 @@ Los permisos se guardan en `staff/{correo}` y funcionan aunque la persona todav�
 
 | Rol | Cómo se obtiene | Qué puede hacer |
 | --- | --- | --- |
-| Organizador | Crea el evento, lo agregan en «Jueces → Organizadores» o es admin | Abre y cierra etapas, invita jueces, edita la rúbrica, ve calificaciones y originalidad, publica resultados |
-| Juez | Su correo está en la lista de jueces, sin administrar ni concursar en ese evento | Califica de 0 a 10 por criterio con comentario, únicamente en sus categorías o proyectos asignados y etapas habilitadas |
+| Organizador | Crea el evento, lo agregan en «Jueces → Organizadores» o es admin | Controla registro y entregas desde Ajustes, asigna jueces y programa turnos, edita la rúbrica y publica resultados |
+| Juez | Su correo está en la lista de jueces, sin administrar ni concursar en ese evento | Califica de 0 a 10 por criterio con comentario, en sus proyectos asignados, durante el turno programado y en etapas habilitadas |
 | Alumno | Entra con el código o un compañero lo agrega | Registra su proyecto, presenta las entregas definidas por el organizador mientras estén abiertas y ve su resultado. Solo el líder agrega o quita integrantes |
 
 Conflictos de interés que se bloquean (en la interfaz y en `firestore.rules`):
