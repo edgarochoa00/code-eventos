@@ -165,7 +165,7 @@ export function Dashboard() {
       <SectionTitle title="Para evaluar" subtitle="Eventos donde eres evaluador." />
       <div className={GRID}>
         {judgeEvents.map((e) => (
-          <EventCard key={e.id} event={e} role="judge" tone="dark" />
+          <EventCard key={e.id} event={e} role="judge" />
         ))}
       </div>
     </section>
