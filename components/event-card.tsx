@@ -5,7 +5,7 @@ import type { EventDoc, EventRole } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { Badge } from "./ui";
 
-const ROLE_LABEL: Record<EventRole, string> = { organizer: "Organizador", judge: "Juez", student: "Alumno" };
+const ROLE_LABEL: Record<EventRole, string> = { organizer: "Organizador", judge: "Evaluador", student: "Alumno" };
 
 export function EventStatus({ event }: { event: EventDoc }) {
   if (event.resultsPublished) return <Badge tone="dark">Resultados publicados</Badge>;

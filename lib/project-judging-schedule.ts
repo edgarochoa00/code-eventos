@@ -14,10 +14,10 @@ export function projectScheduleAssignments(event: EventDoc, project: ProjectDoc,
   if (event.accessVersion !== 1 || event.resultsPublished) throw new Error("Los horarios no se pueden cambiar en este momento.");
   if (project.registrationPending) throw new Error("El equipo debe completar su registro antes de programar su turno.");
   const judges = projectJudgeEmails(event, project);
-  if (!judges.length) throw new Error("Asigna jueces al proyecto antes de programar su turno.");
+  if (!judges.length) throw new Error("Asigna evaluadores al proyecto antes de programar su turno.");
   const expected = new Set(expectedJudges.map(normalizeEmail));
   if (judges.length !== expected.size || judges.some(email => !expected.has(email))) {
-    throw new Error("Los jueces asignados cambiaron. Cierra y vuelve a abrir el turno para revisar a quiénes se aplicará.");
+    throw new Error("Los evaluadores asignados cambiaron. Cierra y vuelve a abrir el turno para revisar a quiénes se aplicará.");
   }
   if (slot && !scheduleBounds(slot)) throw new Error("Captura el inicio y el fin del turno. El fin debe ser posterior al inicio.");
   const next = { ...event.judgeAssignments };

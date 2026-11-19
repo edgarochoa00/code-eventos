@@ -158,7 +158,7 @@ export async function sendAccountInvitation(input: AccountInvitation, identity: 
     const assigned = input.role === "judge" ? event.judgeEmails : event.organizerEmails;
     if (!assigned.includes(input.email)) throw new InvitationError(409, "Guarda primero ese rol en este evento.");
     if (input.role === "judge" && (event.organizerEmails.includes(input.email) || input.email === SUPERADMIN_EMAIL || targetRole === "admin")) {
-      throw new InvitationError(409, "Ese correo administra el evento y no puede entrar como juez.");
+      throw new InvitationError(409, "Ese correo administra el evento y no puede entrar como evaluador.");
     }
     if (roster?.members[input.email]) {
       throw new InvitationError(409, "Ese correo pertenece a un equipo y no puede recibir ese rol.");

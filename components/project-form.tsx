@@ -118,7 +118,7 @@ export function ProjectForm({
         </Field>
       </div>
 
-      <Field label="Resumen" htmlFor={`${formId}-summary`} hint="Una o dos frases. Es lo primero que ven los jueces." error={errors.summary}>
+      <Field label="Resumen" htmlFor={`${formId}-summary`} hint="Una o dos frases. Es lo primero que ven los evaluadores." error={errors.summary}>
         <Textarea id={`${formId}-summary`} rows={2} value={summary} onChange={(e) => setSummary(e.target.value)} maxLength={300} />
       </Field>
       <Field label="Problema que resuelve" htmlFor={`${formId}-problem`} error={errors.problem}>
@@ -191,7 +191,7 @@ export function ProjectForm({
         )}
         <p className="font-mono text-[11px] text-muted">
           {canManageMembers
-            ? "Cada integrante verá el proyecto al entrar con ese correo y podrá editar las entregas. Los jueces y organizadores del evento no pueden ser integrantes."
+            ? "Cada integrante verá el proyecto al entrar con ese correo y podrá editar las entregas. Los evaluadores y organizadores del evento no pueden ser integrantes."
             : "Solo el líder del equipo puede agregar o quitar integrantes."}
         </p>
         {errors.members && <p role="alert" className="text-sm text-red-600">{errors.members}</p>}

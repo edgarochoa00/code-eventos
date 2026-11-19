@@ -14,7 +14,7 @@ const montserrat = Montserrat({
 export const metadata: Metadata = {
   title: `${APP_TAGLINE} · Evaluación de proyectos`,
   description:
-    "Plataforma de evaluación de proyectos de Sistemas Computacionales y TICs · TECNM Campus Culiacán: registro de equipos, entregas de prototipo y producto final, evaluación de jueces y resultados.",
+    "Plataforma de evaluación de proyectos de Sistemas Computacionales y TICs · TECNM Campus Culiacán: registro de equipos, entregas de prototipo y producto final, calificaciones y resultados.",
   appleWebApp: { capable: true, title: APP_NAME, statusBarStyle: "default" },
 };
 

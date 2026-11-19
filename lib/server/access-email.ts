@@ -11,7 +11,7 @@ export class AccessEmailError extends Error {
 
 export type AccessEmailContext = { role: InvitationScope["role"]; eventName: string | null; projectPath?: string };
 export type BrevoAccessConfig = { apiKey: string; from: string };
-const ROLE_LABEL = { judge: "juez", organizer: "organizador", admin: "administrador", leader: "alumno líder", member: "integrante del equipo" };
+const ROLE_LABEL = { judge: "evaluador", organizer: "organizador", admin: "administrador", leader: "alumno líder", member: "integrante del equipo" };
 let template: Promise<string> | undefined;
 
 export function accessEmailConfig(env: Readonly<Record<string, string | undefined>> = process.env): BrevoAccessConfig | null {

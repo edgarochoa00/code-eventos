@@ -45,8 +45,8 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocument> = {
         id: "servicio",
         title: "Uso de Feria 2026",
         paragraphs: [
-          "Feria 2026 permite crear eventos de proyectos, registrar equipos, recibir entregas de prototipo y producto final, calificar con una rúbrica y publicar resultados. Las calificaciones y decisiones de cada evento son responsabilidad de sus organizadores y jueces; Feria 2026 no las emite ni las valida.",
-          "El servicio se dirige a estudiantes, docentes, jueces y organizadores de eventos académicos en México. Si un evento registra a menores de edad, la institución u organización que lo organiza es responsable de contar con las autorizaciones que correspondan.",
+          "Feria 2026 permite crear eventos de proyectos, registrar equipos, recibir entregas de prototipo y producto final, calificar con una rúbrica y publicar resultados. Las calificaciones y decisiones de cada evento son responsabilidad de sus organizadores y evaluadores; Feria 2026 no las emite ni las valida.",
+          "El servicio se dirige a estudiantes, docentes, evaluadores y organizadores de eventos académicos en México. Si un evento registra a menores de edad, la institución u organización que lo organiza es responsable de contar con las autorizaciones que correspondan.",
         ],
       },
       {
@@ -54,7 +54,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocument> = {
         title: "Cuentas, permisos y acceso",
         paragraphs: [
           "Puedes entrar con Google o con correo y contraseña. Los permisos dependen de un correo verificado: utiliza tu propia cuenta, protege tu acceso y cierra sesión al terminar en dispositivos compartidos.",
-          "El superadministrador asigna los permisos de la plataforma (administrador, organizador o cuenta suspendida) y cada organizador decide quién es juez u organizador de su evento. Iniciar sesión no te hace parte de un evento ni te da acceso a sus proyectos: para participar necesitas el código del evento, que un organizador te agregue o que tu equipo te registre como integrante.",
+          "El superadministrador asigna los permisos de la plataforma (administrador, organizador o cuenta suspendida) y cada organizador decide quién es evaluador u organizador de su evento. Iniciar sesión no te hace parte de un evento ni te da acceso a sus proyectos: para participar necesitas el código del evento, que un organizador te agregue o que tu equipo te registre como integrante.",
           "Se puede suspender una cuenta que ponga en riesgo la seguridad del servicio, se haga pasar por otra persona o incumpla estas condiciones. La suspensión impide usar la app, pero no borra por sí sola la información guardada.",
         ],
       },
@@ -71,7 +71,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocument> = {
         id: "evaluacion",
         title: "Evaluación, resultados y originalidad",
         paragraphs: [
-          "Los jueces califican de 0 a 10 por criterio y el total ponderado se calcula automáticamente. El organizador decide cuándo publicar resultados; al hacerlo, cada equipo ve su lugar, su puntaje por criterio y los comentarios de los jueces, sin el nombre de quien los escribió.",
+          "Los evaluadores califican de 0 a 10 por criterio y el total ponderado se calcula automáticamente. El organizador decide cuándo publicar resultados; al hacerlo, cada equipo ve su lugar, su puntaje por criterio y los comentarios de los evaluadores, sin el nombre de quien los escribió.",
           "Para apoyar a organizadores y administradores, el servicio compara cada proyecto con los registrados antes y muestra coincidencias de texto, enlaces o archivos. Es una señal para revisar, no una conclusión: una coincidencia no implica por sí misma una copia, y las decisiones las toman las personas responsables del evento.",
         ],
       },
@@ -112,8 +112,8 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocument> = {
         title: "Información que utiliza el servicio",
         paragraphs: [
           "La cuenta utiliza identificador de usuario, correo, nombre, estado de verificación y, si entras con Google, la imagen de perfil cuando está disponible. Firebase Authentication gestiona las contraseñas: Feria 2026 no recibe tu contraseña de Google ni pide permisos para leer Gmail, Drive o Calendar. También se registra la fecha de tu último acceso y, si te lo asignan, tu permiso en la plataforma.",
-          "De cada evento se guardan nombre, descripción, institución, fechas, código, rúbrica, etapas, resultados publicados y los correos de sus organizadores y jueces. De cada proyecto se guardan título, resumen, problema, solución, tecnologías, categoría, nombre y correo de sus integrantes y las entregas: descripción, enlaces, archivos y el correo de quien entregó.",
-          "Los archivos de las entregas se suben a un almacenamiento privado de Supabase. Se guardan su nombre, tamaño, tipo, ruta y huella SHA-256. Las entregas nuevas admiten hasta 30 MB por archivo y no aceptan enlaces externos. De las evaluaciones se guardan el nombre y correo del juez, las calificaciones por criterio, el total y el comentario.",
+          "De cada evento se guardan nombre, descripción, institución, fechas, código, rúbrica, etapas, resultados publicados y los correos de sus organizadores y evaluadores. De cada proyecto se guardan título, resumen, problema, solución, tecnologías, categoría, nombre y correo de sus integrantes y las entregas: descripción, enlaces, archivos y el correo de quien entregó.",
+          "Los archivos de las entregas se suben a un almacenamiento privado de Supabase. Se guardan su nombre, tamaño, tipo, ruta y huella SHA-256. Las entregas nuevas admiten hasta 30 MB por archivo y no aceptan enlaces externos. De las evaluaciones se guardan el nombre y correo del evaluador, las calificaciones por criterio, el total y el comentario.",
           "Para la revisión de originalidad se calcula una huella de cada proyecto: valores numéricos derivados del texto, enlaces y archivos convertidos en códigos, junto con el título, el evento y el año. La huella no permite leer el texto ni los enlaces originales. El alojamiento y los proveedores pueden procesar dirección IP, datos del navegador, fechas y registros técnicos para prestar y proteger el servicio.",
         ],
       },
@@ -121,7 +121,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocument> = {
         id: "finalidades",
         title: "Para qué se usa",
         paragraphs: [
-          "Los datos permiten autenticarte, aplicar permisos, organizar eventos, registrar equipos y entregas, que los jueces califiquen, publicar resultados y apoyar la revisión de originalidad de los proyectos. El correo te identifica en los eventos y recibe los mensajes de la cuenta: verificación, establecimiento y recuperación de contraseña. Al asignarte un rol de juez, organizador o administrador se crea tu cuenta si hace falta y Firebase envía un enlace para elegir tu contraseña; los responsables también pueden reenviar ese acceso. Para evitar envíos duplicados o abusivos se guarda un registro técnico de intentos, fechas y límites de envío.",
+          "Los datos permiten autenticarte, aplicar permisos, organizar eventos, registrar equipos y entregas, que los evaluadores califiquen, publicar resultados y apoyar la revisión de originalidad de los proyectos. El correo te identifica en los eventos y recibe los mensajes de la cuenta: verificación, establecimiento y recuperación de contraseña. Al asignarte un rol de evaluador, organizador o administrador se crea tu cuenta si hace falta y Firebase envía un enlace para elegir tu contraseña; los responsables también pueden reenviar ese acceso. Para evitar envíos duplicados o abusivos se guarda un registro técnico de intentos, fechas y límites de envío.",
           "Esta versión no integra publicidad ni medición de visitas. No se usan tus datos para publicidad, venta de perfiles, envíos comerciales ni entrenamiento de modelos.",
         ],
       },
@@ -129,8 +129,8 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocument> = {
         id: "accesos",
         title: "Quién puede consultar información",
         paragraphs: [
-          "Un proyecto lo ven sus integrantes, los organizadores y jueces de su evento y los administradores de la plataforma. Cada juez ve sus propias calificaciones; los organizadores ven todas las del evento con el nombre del juez. Cuando el organizador publica resultados, cada equipo ve sus puntajes y comentarios sin el nombre del juez.",
-          "Los datos generales de cada evento —nombre, descripción, institución, fechas, código, rúbrica, resultados publicados y correos de organizadores y jueces— los pueden consultar las cuentas con sesión iniciada, porque permiten encontrar el evento con su código. La clasificación publicada muestra títulos de proyectos y puntajes.",
+          "Un proyecto lo ven sus integrantes, los organizadores y evaluadores de su evento y los administradores de la plataforma. Cada evaluador ve sus propias calificaciones; los organizadores ven todas las del evento con el nombre del evaluador. Cuando el organizador publica resultados, cada equipo ve sus puntajes y comentarios sin el nombre del evaluador.",
+          "Los datos generales de cada evento —nombre, descripción, institución, fechas, código, rúbrica, resultados publicados y correos de organizadores y evaluadores— los pueden consultar las cuentas con sesión iniciada, porque permiten encontrar el evento con su código. La clasificación publicada muestra títulos de proyectos y puntajes.",
           "Las huellas de originalidad, con título, evento y año del proyecto, las pueden consultar las cuentas verificadas para hacer la comparación. Los administradores y el superadministrador pueden consultar la lista de usuarios, sus permisos y todos los eventos y proyectos para administrar la plataforma.",
         ],
       },
@@ -138,7 +138,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocument> = {
         id: "proveedores",
         title: "Proveedores y tratamiento fuera de México",
         paragraphs: [
-          "Google Firebase Authentication gestiona cuentas, sesiones y los correos de verificación y recuperación; Brevo envía las invitaciones de acceso para jueces, organizadores y administradores con el enlace seguro generado por Firebase (recibiendo únicamente correo destinatario, rol asignado y nombre del evento, sin seguimiento de apertura ni listas comerciales); Cloud Firestore almacena los datos. Supabase Storage almacena los archivos de las entregas en un bucket privado; Feria 2026 comprueba los permisos y proporciona accesos temporales para subirlos y descargarlos. Los archivos de versiones anteriores pueden permanecer en Firebase Storage. Firebase App Hosting y Vercel alojan la app y procesan solicitudes y registros técnicos. El acceso con Google utiliza el flujo y las políticas de Google.",
+          "Google Firebase Authentication gestiona cuentas, sesiones y los correos de verificación y recuperación; Brevo envía las invitaciones de acceso para evaluadores, organizadores y administradores con el enlace seguro generado por Firebase (recibiendo únicamente correo destinatario, rol asignado y nombre del evento, sin seguimiento de apertura ni listas comerciales); Cloud Firestore almacena los datos. Supabase Storage almacena los archivos de las entregas en un bucket privado; Feria 2026 comprueba los permisos y proporciona accesos temporales para subirlos y descargarlos. Los archivos de versiones anteriores pueden permanecer en Firebase Storage. Firebase App Hosting y Vercel alojan la app y procesan solicitudes y registros técnicos. El acceso con Google utiliza el flujo y las políticas de Google.",
           "El servicio se dirige a México, pero estos proveedores pueden procesar información en otros países. No se garantiza almacenamiento exclusivo en México; sus condiciones y prácticas de conservación también se aplican al tratamiento que realizan.",
           "No se comercializan datos ni se transfieren para publicidad. Las comunicaciones necesarias a proveedores por cuenta del responsable, a las personas del evento según sus permisos y a autoridades cuando exista una obligación válida se limitan a su finalidad. Si se incorpora una transferencia que requiera consentimiento adicional, se informará y recabará antes de efectuarla.",
         ],

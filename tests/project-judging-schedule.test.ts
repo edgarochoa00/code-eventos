@@ -76,7 +76,7 @@ test("rechaza jueces retirados, agregados o cambios en la selección mientras se
 });
 
 test("bloquea proyectos sin jueces, registros pendientes, eventos antiguos y resultados publicados", () => {
-  assert.throws(() => projectScheduleAssignments(event, { ...project, judging: { maxJudges: 3, judgeEmails: [] } }, slot, []), /Asigna jueces/);
+  assert.throws(() => projectScheduleAssignments(event, { ...project, judging: { maxJudges: 3, judgeEmails: [] } }, slot, []), /Asigna evaluadores/);
   assert.throws(() => projectScheduleAssignments(event, { ...project, registrationPending: true }, slot, judges), /completar su registro/);
   for (const current of [{ ...event, resultsPublished: true }, { ...event, accessVersion: undefined }]) {
     for (const value of [slot, null]) assert.throws(() => projectScheduleAssignments(current, project, value, judges), /no se pueden cambiar/);

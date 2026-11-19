@@ -31,7 +31,7 @@ export function Leaderboard({
             <span className="min-w-0 flex-1">
               <span className="block font-medium wrap-anywhere">{r.title}</span>
               <span className="font-mono text-[10px] text-muted">
-                {r.judges} {r.judges === 1 ? "juez" : "jueces"}
+                {r.judges} {r.judges === 1 ? "evaluador" : "evaluadores"}
               </span>
             </span>
             <span className="shrink-0 font-display text-lg font-bold tabular-nums sm:text-xl">{r.score.toFixed(1)}</span>

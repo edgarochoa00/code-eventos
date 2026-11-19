@@ -1,6 +1,6 @@
 "use client";
 
-import { FolderKanban, Gavel, Plus, ShieldCheck, Ticket } from "lucide-react";
+import { ClipboardCheck, FolderKanban, Plus, ShieldCheck, Ticket } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
@@ -92,8 +92,8 @@ export function Dashboard() {
   const discover = open.data.filter((e) => !mine.has(e.id) && !projectEvents.has(e.id));
 
   let intro = "Registra tu proyecto con el código que te dio tu organizador y presenta las entregas que definió para tu evento.";
-  if (access.isAdmin) intro = "Administras la plataforma: crea eventos, revisa todos en Administración y asigna jueces y permisos.";
-  else if (isStaff) intro = "Crea tus eventos, invita jueces y sigue el avance de los equipos.";
+  if (access.isAdmin) intro = "Administras la plataforma: crea eventos, revisa todos en Administración y asigna evaluadores y permisos.";
+  else if (isStaff) intro = "Crea tus eventos, invita evaluadores y sigue el avance de los equipos.";
   else if (organizesSomething) intro = "Administras los eventos donde te agregaron como organizador.";
   else if (isJudge)
     intro = `Tienes ${judgeEvents.length} evento${judgeEvents.length === 1 ? "" : "s"} para evaluar. Entra para calificar los proyectos.`;
@@ -162,7 +162,7 @@ export function Dashboard() {
 
   const judgingSection = isJudge && (
     <section>
-      <SectionTitle title="Para evaluar" subtitle="Eventos donde eres juez." />
+      <SectionTitle title="Para evaluar" subtitle="Eventos donde eres evaluador." />
       <div className={GRID}>
         {judgeEvents.map((e) => (
           <EventCard key={e.id} event={e} role="judge" tone="dark" />
@@ -189,9 +189,9 @@ export function Dashboard() {
         </div>
       ) : (
         <EmptyState
-          icon={<Gavel className="size-5" />}
+          icon={<ClipboardCheck className="size-5" />}
           title="No organizas eventos"
-          text="Crea uno para invitar jueces y abrir el registro de proyectos."
+          text="Crea uno para invitar evaluadores y abrir el registro de proyectos."
           action={
             <ButtonLink href="/eventos/nuevo" variant="dark" size="sm">
               <Plus className="size-4" /> Crear evento

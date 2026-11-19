@@ -77,7 +77,7 @@ export function ProjectView() {
         title="No disponible"
         text={
           project.error === "permission-denied"
-            ? "Solo los integrantes, jueces y organizadores pueden ver este proyecto."
+            ? "Solo los integrantes, evaluadores y organizadores pueden ver este proyecto."
             : "Este proyecto no existe."
         }
         action={
@@ -182,7 +182,7 @@ function ProjectBody({
       <Link href={`/eventos/${event.id}`} className="inline-flex max-w-full items-center gap-1.5 font-mono text-xs text-muted wrap-anywhere hover:text-ink">
         <ArrowLeft className="size-3.5 shrink-0" /> {event.name}
       </Link>
-      {isMember && !canParticipate && <p className="rounded-2xl bg-amber-50 p-5 text-sm text-amber-900">Tu correo figura en este equipo y también tiene un rol de administración o juez. Puedes consultar el proyecto, pero ese rol impide editarlo o entregar archivos como integrante. La administración debe corregir la incompatibilidad.</p>}
+      {isMember && !canParticipate && <p className="rounded-2xl bg-amber-50 p-5 text-sm text-amber-900">Tu correo figura en este equipo y también tiene un rol de administración o evaluador. Puedes consultar el proyecto, pero ese rol impide editarlo o entregar archivos como integrante. La administración debe corregir la incompatibilidad.</p>}
 
       <section className="ui-panel min-w-0 rounded-3xl p-4 sm:p-8">
         <ProjectLogo project={project} canEdit={canEditInfo && isLeader && !project.registrationPending} />
@@ -218,7 +218,7 @@ function ProjectBody({
 
       {canEditInfo && (!project.summary || !project.problem || !project.solution) && (
         <div className="rounded-2xl bg-lime p-4 text-sm">
-          Tu equipo ya está registrado. Completa la información del proyecto para que los jueces puedan conocerlo.
+          Tu equipo ya está registrado. Completa la información del proyecto para que los evaluadores puedan conocerlo.
           <Button variant="outline" size="sm" className="mt-3" onClick={() => { setTab("info"); setEditingInfo(true); }}>Completar información</Button>
         </div>
       )}
@@ -411,7 +411,7 @@ function ProjectBody({
       {tab === "scores" && isOrganizer && (
         <Card>
           <SectionTitle
-            title="Calificaciones de jueces"
+            title="Calificaciones de evaluadores"
             subtitle={
               event.resultsPublished
                 ? "Los resultados ya se publicaron: las calificaciones no se pueden descartar."
@@ -456,7 +456,7 @@ function ProjectBody({
               })}
             </div>
           ) : (
-            <p className="font-mono text-xs text-muted">Ningún juez ha calificado este proyecto.</p>
+            <p className="font-mono text-xs text-muted">Ningún evaluador ha calificado este proyecto.</p>
           )}
         </Card>
       )}
@@ -494,7 +494,7 @@ function ProjectBody({
           <>
             <p className="font-mono text-xs leading-relaxed text-muted">
               Se eliminará la calificación de {evalToDelete.judgeName || displayEmail(evalToDelete.judgeEmail)} en{" "}
-              {getPhaseLabel(event, evalToDelete.phase)}. El juez podrá volver a calificar si la evaluación sigue abierta.
+              {getPhaseLabel(event, evalToDelete.phase)}. El evaluador podrá volver a calificar si la evaluación sigue abierta.
             </p>
             <div className="mt-6 flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setEvalToDelete(null)}>
@@ -559,7 +559,7 @@ function ProjectBody({
                   {fb.comments.length > 0 && (
                     <div className="mt-6 space-y-2">
                       <p className="flex items-center gap-1.5 font-mono text-[11px] text-muted">
-                        <MessageSquareQuote className="size-3.5" /> Comentarios de los jueces
+                        <MessageSquareQuote className="size-3.5" /> Comentarios de los evaluadores
                       </p>
                       {fb.comments.map((c, i) => (
                         <p key={i} className="rounded-2xl bg-paper p-3 text-sm leading-relaxed">

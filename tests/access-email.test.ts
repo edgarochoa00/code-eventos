@@ -27,7 +27,10 @@ test("el mensaje usa el logo y la acción segura, escapa contenido y ofrece text
   assert.match(message.html, /logo\.png/);
   assert.match(message.html, /Configurar mi acceso/);
   assert.match(message.html, /Feria de Ingeniería 2026/);
+  assert.match(message.html, /Ya tienes acceso como evaluador\./);
+  assert.match(message.html, /Te han dado acceso como <strong[^>]*>evaluador<\/strong>/);
   assert.match(message.html, /oobCode=fake&amp;lang=es/);
+  assert.match(message.text, /Te han dado acceso como evaluador en Feria de Ingeniería 2026\./);
   assert.ok(message.text.includes(link));
   assert.doesNotMatch(message.html, /\{\{[A-Z_]+\}\}/);
   const escaped = await renderAccessEmail("juez@example.com", { ...context, eventName: '</strong><script>alert("x")</script>' }, link);

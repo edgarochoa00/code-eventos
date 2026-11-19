@@ -128,7 +128,7 @@ export async function saveEventEmails(event: EventDoc, list: "judgeEmails" | "or
     const next = Array.from(new Set([...current[list].filter((email) => !removed.includes(email)), ...added]));
     const other = list === "judgeEmails" ? current.organizerEmails : current.judgeEmails;
     const overlap = next.find((email) => other.includes(email));
-    if (overlap) throw new Error(`${overlap} ya es ${list === "judgeEmails" ? "organizador" : "juez"}. Quita ese rol antes de asignarle otro.`);
+    if (overlap) throw new Error(`${overlap} ya es ${list === "judgeEmails" ? "organizador" : "evaluador"}. Quita ese rol antes de asignarle otro.`);
     const members = (rosterSnap.data() as ParticipantRoster).members;
     const contestant = next.find((email) => members[email]);
     if (contestant) throw new Error(`${contestant} participa en un equipo y no puede administrar ni calificar este evento.`);
@@ -146,7 +146,7 @@ export async function saveJudgeAssignment(eventId: string, email: string, assign
   await runTransaction(db, async tx => {
     const snap = await tx.get(eventRef(eventId));
     const event = snap.data() as EventDoc | undefined;
-    if (!event?.judgeEmails.includes(key)) throw new Error("El juez ya no pertenece al evento.");
+    if (!event?.judgeEmails.includes(key)) throw new Error("El evaluador ya no pertenece al evento.");
     if (event.accessVersion !== 1 || event.resultsPublished) throw new Error("Los horarios no se pueden cambiar en este momento.");
     const next = { ...event.judgeAssignments, [key]: assignment };
     tx.update(eventRef(eventId), { judgeAssignments: next });
@@ -215,7 +215,7 @@ function assertNotEventStaff(event: EventDoc, memberEmails: string[]) {
   const staff = new Set([...event.organizerEmails, ...event.judgeEmails].map(normalizeEmail));
   const conflict = memberEmails.find((e) => staff.has(normalizeEmail(e)));
   if (conflict) {
-    const role = event.judgeEmails.map(normalizeEmail).includes(conflict) ? "juez" : "organizador";
+    const role = event.judgeEmails.map(normalizeEmail).includes(conflict) ? "evaluador" : "organizador";
     throw new Error(`${conflict} es ${role} de este evento y no puede formar parte de un equipo.`);
   }
 }

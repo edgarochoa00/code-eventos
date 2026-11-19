@@ -3,9 +3,9 @@
 import {
   ArrowUpRight,
   CalendarDays,
+  ClipboardCheck,
   Crown,
   FolderKanban,
-  Gavel,
   Lock,
   Search,
   Trash2,
@@ -80,7 +80,7 @@ type Person = {
 };
 
 const ROLE_HELP: Record<StaffRole | "user", string> = {
-  user: "Puede registrar proyectos y evaluar si un organizador lo agrega como juez.",
+  user: "Puede registrar proyectos y calificarlos si un organizador le asigna el rol de evaluador.",
   organizer: "Además puede crear sus propios eventos.",
   admin: "Administra todos los eventos y ve a todos los usuarios. No puede concursar ni calificar mientras tenga este permiso.",
   blocked: "No puede usar la app hasta que le quites la suspensión.",
@@ -229,15 +229,15 @@ export function AdminView() {
           <h1 className="font-display text-3xl font-bold sm:text-4xl">Administración</h1>
           <p className="mt-2 max-w-md font-mono text-[11px] leading-relaxed text-white/75">
             {access.isSuperadmin
-              ? "Controlas quién es admin u organizador, suspendes o eliminas cuentas y asignas jueces en cualquier evento."
-              : "Administras todos los eventos y sus jueces. Solo el superadmin cambia permisos de la plataforma."}
+              ? "Controlas quién es admin u organizador, suspendes o eliminas cuentas y asignas evaluadores en cualquier evento."
+              : "Administras todos los eventos y sus evaluadores. Solo el superadmin cambia permisos de la plataforma."}
           </p>
         </div>
         <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3">
           <Stat icon={<Users className="size-4" />} label="Usuarios registrados" value={users.data.length} />
           <Stat icon={<CalendarDays className="size-4" />} label="Eventos" value={events.data.length} />
           <Stat icon={<FolderKanban className="size-4" />} label="Proyectos" value={projects.data.length} />
-          <Stat icon={<Gavel className="size-4" />} label="Jueces" value={judgeCount} />
+          <Stat icon={<ClipboardCheck className="size-4" />} label="Evaluadores" value={judgeCount} />
         </div>
       </section>
 
@@ -366,7 +366,7 @@ function PeopleTab({
           { id: "all", label: "Todos", count: counts.all },
           { id: "admins", label: "Admins", count: counts.admins },
           { id: "organizers", label: "Organizadores", count: counts.organizers },
-          { id: "judges", label: "Jueces", count: counts.judges },
+          { id: "judges", label: "Evaluadores", count: counts.judges },
           { id: "blocked", label: "Suspendidos", count: counts.blocked },
           { id: "pending", label: "Sin registrarse", count: counts.pending },
         ]}
@@ -423,7 +423,7 @@ function PeopleTab({
                       </Badge>
                       {p.judgeIn.length > 0 && (
                         <Badge>
-                          <Gavel className="size-3" /> Juez · {p.judgeIn.length}
+                          <ClipboardCheck className="size-3" /> Evaluador · {p.judgeIn.length}
                         </Badge>
                       )}
                       {p.organizerIn.length > 0 && <Badge>Organiza · {p.organizerIn.length}</Badge>}
@@ -631,18 +631,18 @@ function PersonPanel({
           </section>
 
           <section>
-            <p className="text-sm font-medium">Juez en eventos</p>
+            <p className="text-sm font-medium">Evaluador en eventos</p>
             <p className="font-mono text-[11px] text-muted">Activa los eventos donde esta persona calificará. Admins, superadmin y organizadores del evento no califican.</p>
             <div className="mt-2 divide-y divide-line rounded-2xl bg-paper px-4">
               {sortedEvents.map((e) => (
                 <Toggle
                   key={e.id}
                   label={e.name}
-                  description={person.role === "admin" || isSuper ? "Administra la plataforma; no puede calificar." : e.organizerEmails.includes(person.email) ? "Ya organiza este evento; debe dejar ese rol antes de ser juez." : e.institution || undefined}
+                  description={person.role === "admin" || isSuper ? "Administra la plataforma; no puede calificar." : e.organizerEmails.includes(person.email) ? "Ya organiza este evento; debe dejar ese rol antes de ser evaluador." : e.institution || undefined}
                   checked={e.judgeEmails.includes(person.email)}
                   disabled={!!busy || (!e.judgeEmails.includes(person.email) && (person.role === "admin" || isSuper || e.organizerEmails.includes(person.email)))}
                   onChange={(v) =>
-                    run(`j:${e.id}`, () => setEventMembership(e, person.email, "judgeEmails", v), v ? "Agregado como juez." : "Quitado de jueces.")
+                    run(`j:${e.id}`, () => setEventMembership(e, person.email, "judgeEmails", v), v ? "Agregado como evaluador." : "Retirado de la lista de evaluadores.")
                   }
                 />
               ))}
@@ -713,7 +713,7 @@ function EventsTab({ events, projects }: { events: EventDoc[]; projects: Project
 
   return (
     <div className="space-y-4">
-      <SectionTitle title="Eventos" subtitle="Consulta los proyectos de cada evento y gestiona a sus jueces y organizadores." />
+      <SectionTitle title="Eventos" subtitle="Consulta los proyectos de cada evento y gestiona a sus evaluadores y organizadores." />
       <ul className="grid grid-cols-[minmax(0,1fr)] gap-3 md:grid-cols-[repeat(2,minmax(0,1fr))]">
         {sorted.map((e) => {
           const count = projects.filter((p) => p.eventId === e.id).length;
@@ -728,13 +728,13 @@ function EventsTab({ events, projects }: { events: EventDoc[]; projects: Project
               </div>
               <div className="grid grid-cols-[repeat(3,minmax(0,1fr))] gap-2 text-center">
                 <MiniStat label="Proyectos" value={count} />
-                <MiniStat label="Jueces" value={e.judgeEmails.length} />
+                <MiniStat label="Evaluadores" value={e.judgeEmails.length} />
                 <MiniStat label="Organiz." value={e.organizerEmails.length} />
               </div>
               <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4">
                 <div className="flex min-w-0 flex-wrap gap-2">
                   <Button variant="outline" size="sm" onClick={() => setTeam(e.id)}>
-                    <Gavel className="size-3.5" /> Jueces y organizadores
+                    <ClipboardCheck className="size-3.5" /> Evaluadores y organizadores
                   </Button>
                   <Link
                     href={`/eventos/${e.id}`}
@@ -764,7 +764,7 @@ function EventsTab({ events, projects }: { events: EventDoc[]; projects: Project
         {current && (
           <div className="space-y-4 [&>div]:p-0">
             <EmailListEditor
-              title="Jueces"
+              title="Evaluadores"
               subtitle="Califican sus proyectos asignados. No pueden organizar ni concursar en este evento."
               emails={current.judgeEmails}
               invitation={{ kind: "event", eventId: current.id, role: "judge" }}

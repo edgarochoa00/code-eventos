@@ -68,7 +68,7 @@ export function scheduleError(schedule: JudgeAssignment["schedule"]) {
   if (bounds.some(slot => slot === null)) return "Captura el inicio y el fin de cada turno. El fin debe ser posterior al inicio.";
   const ordered = bounds.filter(slot => slot !== null).sort((a, b) => a.start - b.start);
   if (ordered.some((slot, index) => index > 0 && slot.start < ordered[index - 1].end)) {
-    return "Hay horarios que se cruzan para este juez. Ajusta los turnos.";
+    return "Hay horarios que se cruzan para este evaluador. Ajusta los turnos.";
   }
   return null;
 }

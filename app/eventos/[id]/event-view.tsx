@@ -54,7 +54,7 @@ export function EventView() {
         </Link>
       </div>
       <EventHeader event={event} role={role} viaAdmin={viaAdmin} />
-      {conflictingTeam && <p className="rounded-2xl bg-amber-50 p-5 text-sm text-amber-900">Tu correo aparece en un equipo y en la lista de jueces. Pide al organizador que retire el permiso de juez para poder seguir trabajando con tu equipo. Mientras tanto puedes consultar tu proyecto.</p>}
+      {conflictingTeam && <p className="rounded-2xl bg-amber-50 p-5 text-sm text-amber-900">Tu correo aparece en un equipo y en la lista de evaluadores. Pide al organizador que retire el permiso de evaluador para poder seguir trabajando con tu equipo. Mientras tanto puedes consultar tu proyecto.</p>}
       {event.accessVersion !== 1 && <EventAccessNotice eventId={event.id} />}
       {role === "organizer" && <OrganizerView event={event} />}
       {role === "judge" && event.accessVersion === 1 && <JudgeView event={event} />}
@@ -70,7 +70,7 @@ function EventAccessNotice({ eventId }: { eventId: string }) {
   return (
     <div className="space-y-3 rounded-2xl bg-amber-50 p-5 text-amber-900">
       <p className="text-sm">
-        Este evento necesita una actualización de permisos por el superadmin para registrar equipos, cambiar integrantes o roles y habilitar a los jueces.
+        Este evento necesita una actualización de permisos por el superadmin para registrar equipos, cambiar integrantes o roles y habilitar a los evaluadores.
         Los proyectos, entregas y calificaciones existentes se conservan.
       </p>
       {access.isSuperadmin && (
@@ -111,7 +111,7 @@ function EventHeader({ event, role, viaAdmin }: { event: EventDoc; role: EventRo
         <div className="flex flex-wrap gap-1.5">
           <EventStatus event={event} />
           <Badge tone={role === "organizer" ? "dark" : role === "judge" ? "lime" : "neutral"}>
-            {role === "organizer" ? (viaAdmin ? "Admin" : "Organizas") : role === "judge" ? "Eres juez" : "Participante"}
+            {role === "organizer" ? (viaAdmin ? "Admin" : "Organizas") : role === "judge" ? "Eres evaluador" : "Participante"}
           </Badge>
         </div>
         <h1 className="mt-3 font-display text-2xl font-bold leading-tight wrap-anywhere sm:mt-4 sm:text-4xl">{event.name}</h1>

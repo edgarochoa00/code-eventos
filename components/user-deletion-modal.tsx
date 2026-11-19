@@ -241,7 +241,7 @@ function UserDeletionBody({
 
                     {inspection.links.evaluationsByEvent.length > 0 && (
                       <LinkBlock
-                        title="Evaluaciones registradas como juez"
+                        title="Evaluaciones registradas como evaluador"
                         consequence="Se eliminarán todas sus calificaciones y comentarios. Si el evento tiene resultados publicados, se recalcularán sin sus votos."
                       >
                         {inspection.links.evaluationsByEvent.map((ev) => (
@@ -271,8 +271,8 @@ function UserDeletionBody({
 
                     {inspection.links.judgeEvents.length > 0 && (
                       <LinkBlock
-                        title={`Juez en ${inspection.links.judgeEvents.length} evento(s)`}
-                        consequence="Se quitará de jueces y se eliminarán sus asignaciones en esos eventos."
+                        title={`Evaluador en ${inspection.links.judgeEvents.length} evento(s)`}
+                        consequence="Se retirará de la lista de evaluadores y se eliminarán sus asignaciones en esos eventos."
                       >
                         {inspection.links.judgeEvents.map((ev) => (
                           <li key={ev.eventId}>

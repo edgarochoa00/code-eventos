@@ -4,9 +4,9 @@ import {
   AlertTriangle,
   ArrowUpRight,
   CalendarClock,
+  ClipboardCheck,
   Download,
   EyeOff,
-  Gavel,
   MapPin,
   Megaphone,
   RefreshCw,
@@ -116,7 +116,7 @@ export function OrganizerView({ event }: { event: EventDoc }) {
         tabs={[
           { id: "summary", label: "Resumen" },
           { id: "projects", label: "Proyectos", count: projects.data.length },
-          { id: "judges", label: "Jueces", count: event.judgeEmails.length },
+          { id: "judges", label: "Evaluadores", count: event.judgeEmails.length },
           { id: "statistics", label: "Estadísticas" },
           { id: "rubric", label: "Rúbrica" },
           { id: "results", label: "Resultados" },
@@ -188,7 +188,7 @@ function Summary({
       {!event.judgeEmails.length && (
         <button onClick={() => onGo("judges")} className="flex w-full items-center gap-4 rounded-3xl bg-lime p-5 text-left">
           <UserPlus className="size-5" />
-          <span className="flex-1 font-mono text-xs">Invita a tus jueces para que puedan calificar</span>
+          <span className="flex-1 font-mono text-xs">Invita a tus evaluadores para que puedan calificar</span>
           <ArrowUpRight className="size-5" />
         </button>
       )}
@@ -279,7 +279,7 @@ function OriginalitySettingsCard() {
         subtitle="Solo los organizadores y administradores ven el análisis de originalidad."
       />
       <p className="font-mono text-[11px] leading-relaxed text-muted">
-        El análisis de similitud contra el historial de proyectos es de uso interno para organización y administración; no se muestra a jueces ni a participantes.
+        El análisis de similitud contra el historial de proyectos es de uso interno para organización y administración; no se muestra a evaluadores ni a participantes.
       </p>
     </Card>
   );
@@ -551,7 +551,7 @@ function JudgesTab({ event, projects }: { event: EventDoc; projects: ProjectDoc[
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[repeat(2,minmax(0,1fr))]">
       <EmailListEditor
-        title="Jueces"
+        title="Evaluadores"
         subtitle="Califican sus proyectos asignados. No pueden organizar ni formar parte de un equipo de este evento."
         emails={event.judgeEmails}
         invitation={{ kind: "event", eventId: event.id, role: "judge" }}
@@ -571,8 +571,8 @@ function JudgesTab({ event, projects }: { event: EventDoc; projects: ProjectDoc[
       {event.judgeEmails.length > 0 && (
         <Card className="lg:col-span-2">
           <SectionTitle
-            title="Horarios de los jueces"
-            subtitle="Ajusta aquí las excepciones de un juez. Para dar el mismo horario a todos los jueces de un proyecto, usa «Programar turno» en «Asignación por proyecto»."
+            title="Horarios de los evaluadores"
+            subtitle="Ajusta aquí las excepciones de un evaluador. Para dar el mismo horario a todos los evaluadores de un proyecto, usa «Programar turno» en «Asignación por proyecto»."
           />
           {event.resultsPublished && <p className="mb-4 text-sm text-muted">Oculta los resultados para cambiar los horarios.</p>}
           <ul className="divide-y divide-line">
@@ -605,10 +605,10 @@ function JudgesTab({ event, projects }: { event: EventDoc; projects: ProjectDoc[
       )}
 
       <div className="flex items-start gap-3 rounded-3xl bg-lime p-5 lg:col-span-2">
-        <Gavel className="mt-0.5 size-5 shrink-0" />
+        <ClipboardCheck className="mt-0.5 size-5 shrink-0" />
         <p className="font-mono text-[11px] leading-relaxed">
-          Los jueces no necesitan código: al iniciar sesión con el correo que agregaste, el evento aparece en su panel en
-          «Para evaluar». Cada juez solo ve sus propias calificaciones.
+          Los evaluadores no necesitan código: al iniciar sesión con el correo que agregaste, el evento aparece en su panel en
+          «Para evaluar». Cada evaluador solo ve sus propias calificaciones.
         </p>
       </div>
 
@@ -717,14 +717,14 @@ function JudgeScheduleModal({
           <p className="mt-1 text-sm text-muted">
             {assigned.length
               ? "Horas de Culiacán. Los proyectos sin turno quedan pendientes."
-              : "Este juez no tiene proyectos asignados. Asígnalos primero en «Asignación por proyecto»."}
+              : "Este evaluador no tiene proyectos asignados. Asígnalos primero en «Asignación por proyecto»."}
           </p>
         </div>
 
         {hasLegacy && !clearLegacy && (
           <div className="space-y-2 rounded-2xl bg-amber-50 p-4 text-amber-900">
             <p className="text-xs leading-relaxed">
-              Este juez tiene una asignación anterior
+              Este evaluador tiene una asignación anterior
               {legacyCats.length > 0 && <> por categoría (<strong>{legacyCats.join(", ")}</strong>)</>}
               {legacyCats.length > 0 && legacyProjs.length > 0 && " y"}
               {legacyProjs.length > 0 && <> de {legacyProjs.length} proyecto(s) individual(es)</>}
@@ -735,7 +735,7 @@ function JudgeScheduleModal({
         )}
         {clearLegacy && (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-paper p-4 text-xs">
-            <span>Al guardar, el juez solo conservará los proyectos elegidos en «Asignación por proyecto».</span>
+            <span>Al guardar, el evaluador solo conservará los proyectos elegidos en «Asignación por proyecto».</span>
             <button type="button" className="font-mono underline" onClick={() => setClearLegacy(false)}>Deshacer</button>
           </div>
         )}
@@ -778,11 +778,11 @@ function RubricTab({ event, projects, hasEvaluations }: { event: EventDoc; proje
   return (
     <Card>
       <SectionTitle title="Rúbricas por categoría"
-        subtitle="Selecciona la categoría y guarda sus propios criterios. El juez recibirá automáticamente la rúbrica de la categoría del proyecto; cada total se normaliza a 100." />
+        subtitle="Selecciona la categoría y guarda sus propios criterios. El evaluador recibirá automáticamente la rúbrica de la categoría del proyecto; cada total se normaliza a 100." />
       {hasEvaluations && (
         <p className="mb-4 rounded-xl bg-amber-50 px-3 py-2.5 font-mono text-[11px] text-amber-800">
           Ya hay evaluaciones. Cambiar pesos o quitar criterios recalcula los promedios de esa categoría. Si agregas criterios,
-          avisa a sus jueces para que completen la evaluación.
+          avisa a sus evaluadores para que completen la evaluación.
         </p>
       )}
       {event.resultsPublished && <p className="mb-4 font-mono text-xs text-muted">Oculta los resultados antes de cambiar una rúbrica.</p>}
@@ -832,7 +832,7 @@ function ResultsTab({ event, projects, evaluations }: { event: EventDoc; project
       "Categoría",
       "Integrantes",
       "Correos",
-      "Jueces que evaluaron",
+      "Número de evaluadores",
       ...criterionHeaders,
       "Puntaje final (0-100)",
       "Comentarios",
@@ -871,7 +871,7 @@ function ResultsTab({ event, projects, evaluations }: { event: EventDoc; project
             {event.resultsPublished ? "Resultados publicados" : "Vista previa en vivo"}
           </h2>
           <p className="mt-1 max-w-lg font-mono text-[11px] text-muted">
-            Promedio de los jueces por etapa. Al publicar, se cierra la evaluación y cada equipo ve su lugar, puntaje y
+            Promedio de los evaluadores por etapa. Al publicar, se cierra la evaluación y cada equipo ve su lugar, puntaje y
             comentarios (anónimos).
           </p>
         </div>
@@ -934,8 +934,8 @@ function ResultsTab({ event, projects, evaluations }: { event: EventDoc; project
 
       <Modal open={confirm} onClose={() => setConfirm(false)} title="¿Publicar resultados?">
         <p className="font-mono text-xs leading-relaxed text-muted">
-          Se cerrará la evaluación de jueces y todos los participantes verán el ranking. Cada equipo verá su puntaje por
-          criterio y los comentarios de los jueces sin sus nombres. Puedes ocultarlos después.
+          Se cerrará la evaluación y todos los participantes verán el ranking. Cada equipo verá su puntaje por
+          criterio y los comentarios de los evaluadores sin sus nombres. Puedes ocultarlos después.
         </p>
         <div className="mt-6 flex justify-end gap-2">
           <Button variant="ghost" onClick={() => setConfirm(false)}>

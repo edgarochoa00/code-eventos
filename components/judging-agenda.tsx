@@ -34,14 +34,14 @@ export function JudgingControl({ event, projects, evaluations }: { event: EventD
   const rows = event.judgeEmails.map(email => judgeProgress(event, projects, evaluations, email, now));
   const done = rows.reduce((sum, row) => sum + row.done, 0), total = rows.reduce((sum, row) => sum + row.total, 0);
   return <Card className="lg:col-span-2">
-    <SectionTitle title="Estadísticas de jueces" subtitle="Despliega un juez para ver qué proyectos tiene asignados, cuáles calificó y cuáles siguen pendientes. Horarios de Culiacán." />
+    <SectionTitle title="Estadísticas de evaluadores" subtitle="Despliega un evaluador para ver qué proyectos tiene asignados, cuáles calificó y cuáles siguen pendientes. Horarios de Culiacán." />
     <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
       {[['Calificadas', done], ['Pendientes', total - done], ['En turno', rows.reduce((s,r)=>s+r.due,0)], ['Atrasadas', rows.reduce((s,r)=>s+r.overdue,0)]].map(([label,value]) =>
         <div key={label} className="rounded-xl bg-paper p-3"><p className="text-xs text-muted">{label}</p><p className="text-2xl font-bold">{value}</p></div>)}
     </div>
     <Tabs value={filter} onChange={setFilter} tabs={[{id:'all',label:'Todos'},{id:'pending',label:'Con pendientes'},{id:'done',label:'Completaron'},{id:'overdue',label:'Atrasados'}]} />
-    <p className="my-3 text-sm text-muted">{rows.filter(r=>r.total>0 && !r.pending).length} de {rows.length} jueces completaron su evaluación.</p>
-    {!rows.length && <p className="py-4 text-sm text-muted">Agrega jueces en la pestaña Jueces para ver sus estadísticas.</p>}
+    <p className="my-3 text-sm text-muted">{rows.filter(r=>r.total>0 && !r.pending).length} de {rows.length} evaluadores completaron su evaluación.</p>
+    {!rows.length && <p className="py-4 text-sm text-muted">Agrega evaluadores en la pestaña Evaluadores para ver sus estadísticas.</p>}
     <div className="space-y-3">{rows.filter(r => filter === 'all' || (filter === 'pending' ? r.pending > 0 : filter === 'done' ? r.total > 0 && !r.pending : r.overdue > 0)).map(row =>
       <details key={row.email} className="rounded-2xl border border-line p-4">
         <summary className="cursor-pointer text-sm font-medium wrap-anywhere">{row.email}

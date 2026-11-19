@@ -27,26 +27,26 @@ export const RELEASES: Release[] = [
     "Los horarios y las calificaciones disponen de más espacio para leer y usar sus controles.",
   ] },
   { version: "0.4.15", date: "16 de noviembre de 2026", title: "Calificación por turnos", changes: [
-    "Cada juez puede enviar su calificación únicamente durante el turno programado para ese proyecto.",
-    "Registro y recepción de entregas se administran desde Ajustes. Los turnos se programan desde Jueces.",
+    "Cada evaluador puede enviar su calificación únicamente durante el turno programado para ese proyecto.",
+    "Registro y recepción de entregas se administran desde Ajustes. Los turnos se programan desde Evaluadores.",
   ] },
   { version: "0.4.14", date: "14 de noviembre de 2026", title: "Asignación de stands", changes: [
     "Los organizadores del evento pueden asignar, cambiar o retirar el stand de cada proyecto.",
-    "Los alumnos y jueces pueden consultar la ubicación asignada.",
+    "Los alumnos y evaluadores pueden consultar la ubicación asignada.",
   ] },
-  { version: "0.4.13", date: "13 de noviembre de 2026", title: "Comentario obligatorio, horarios de jueces y baja completa desde Administración", changes: [
-    "El juez debe escribir un comentario para el equipo antes de enviar su calificación.",
-    "«Horarios de los jueces» solo programa el horario de los proyectos que cada juez ya tiene asignados. La asignación se hace en «Asignación por proyecto».",
+  { version: "0.4.13", date: "13 de noviembre de 2026", title: "Comentario obligatorio, horarios de evaluadores y baja completa desde Administración", changes: [
+    "El evaluador debe escribir un comentario para el equipo antes de enviar su calificación.",
+    "«Horarios de los evaluadores» solo programa el horario de los proyectos que cada evaluador ya tiene asignados. La asignación se hace en «Asignación por proyecto».",
     "El superadministrador puede revisar los vínculos de cualquier cuenta en Firebase y Authentication y eliminarla por completo desde Administración.",
   ] },
   { version: "0.4.12", date: "13 de noviembre de 2026", title: "Bajas de alumnos y evaluaciones definitivas", changes: [
     "Al retirar un proyecto se elimina el perfil y el acceso de los alumnos que no participan ni tienen permisos en otros eventos, para permitir un nuevo registro.",
-    "Los jueces empiezan sin proyectos asignados y la organización puede filtrar por categoría al asignarlos.",
+    "Los evaluadores empiezan sin proyectos asignados y la organización puede filtrar por categoría al asignarlos.",
     "Las calificaciones comienzan en cero y requieren confirmar un único envío por proyecto y etapa. Una evaluación enviada no se puede modificar.",
   ] },
   { version: "0.4.11", date: "10 de noviembre de 2026", title: "Originalidad exclusiva para organización y administración", changes: [
     "El análisis de originalidad y las coincidencias solo se muestran a organizadores y administradores.",
-    "Corrección al actualizar o guardar calificaciones de jueces cuando cambian el orden de campos en la rúbrica.",
+    "Corrección al actualizar o guardar calificaciones de evaluadores cuando cambian el orden de campos en la rúbrica.",
   ] },
   { version: "0.4.10", date: "10 de noviembre de 2026", title: "Invitaciones por correo para alumnos", changes: [
     "El líder recibe un enlace para configurar su cuenta y completar el formulario del proyecto.",
@@ -65,28 +65,28 @@ export const RELEASES: Release[] = [
   ] },
   { version: "0.4.6", date: "6 de noviembre de 2026", title: "Estabilidad de Administración y agenda unificada", changes: [
     "El formulario de alta de alumnos conserva sus datos y muestra un aviso si desaparece el evento seleccionado.",
-    "Sesión estable de autenticación, avance de jueces calculado una sola vez y eliminación de controles vacíos.",
+    "Sesión estable de autenticación, avance de evaluadores calculado una sola vez y eliminación de controles vacíos.",
     "Edición y visualización de turnos usan la misma zona horaria de Culiacán.",
   ] },
-  { version: "0.4.5", date: "6 de noviembre de 2026", title: "Jueces elegidos por proyecto", changes: [
-    "El organizador define el máximo de jueces de cada proyecto y elige quiénes lo califican.",
+  { version: "0.4.5", date: "6 de noviembre de 2026", title: "Evaluadores elegidos por proyecto", changes: [
+    "El organizador define el máximo de evaluadores de cada proyecto y elige quiénes lo califican.",
     "La selección por proyecto se refleja en la agenda y las estadísticas y se comprueba al guardar calificaciones.",
   ] },
   { version: "0.4.4", date: "6 de noviembre de 2026", title: "Estadísticas en su propia sección", changes: [
-    "Estadísticas de jueces en una pestaña independiente: proyectos asignados, calificados y pendientes.",
-    "La gestión de jueces, accesos y horarios queda separada del seguimiento de evaluaciones.",
+    "Estadísticas de evaluadores en una pestaña independiente: proyectos asignados, calificados y pendientes.",
+    "La gestión de evaluadores, accesos y horarios queda separada del seguimiento de evaluaciones.",
   ] },
-  { version: "0.4.3", date: "5 de noviembre de 2026", title: "Agenda y control de jueces", changes: [
-    "Horarios por juez y proyecto con fecha, inicio y fin en hora de Culiacán.",
+  { version: "0.4.3", date: "5 de noviembre de 2026", title: "Agenda y control de evaluadores", changes: [
+    "Horarios por evaluador y proyecto con fecha, inicio y fin en hora de Culiacán.",
     "Control en tiempo real de evaluaciones completadas, pendientes, en turno y atrasadas.",
     "Las presentaciones en vivo sin archivos también cuentan como tareas de evaluación.",
   ] },
   {
     version: "0.4.2",
     date: "5 de noviembre de 2026",
-    title: "Acceso por correo para jueces y organizadores",
+    title: "Acceso por correo para evaluadores y organizadores",
     changes: [
-      "Asignar un rol de juez, organizador o administrador envía un correo para establecer la contraseña y crea la cuenta si hace falta.",
+      "Asignar un rol de evaluador, organizador o administrador envía un correo para establecer la contraseña y crea la cuenta si hace falta.",
       "Las cuentas existentes conservan sus datos y su contraseña hasta que la persona decide cambiarla.",
       "Botón para reenviar el acceso y mensajes que distinguen el permiso guardado de un fallo del correo.",
     ],
@@ -106,7 +106,7 @@ export const RELEASES: Release[] = [
     title: "Roles separados por evento",
     changes: [
       "Administradores y organizadores no califican ni compiten en los eventos que administran.",
-      "Las asignaciones de jueces y los conflictos con integrantes se comprueban también en las reglas de seguridad.",
+      "Las asignaciones de evaluadores y los conflictos con integrantes se comprueban también en las reglas de seguridad.",
       "Publicar resultados bloquea cambios en calificaciones, proyectos y entregas.",
       "Actualización de permisos para eventos existentes que conserva sus proyectos y calificaciones.",
     ],
@@ -140,10 +140,10 @@ export const RELEASES: Release[] = [
       "Eventos con prototipo, producto final o ambos, y registro de equipos con un código de 6 letras.",
       "Entregas con descripción y enlaces; de los archivos se guarda su huella digital.",
       "Rúbrica con pesos y calificación de 0 a 10 por criterio desde el celular, con total ponderado automático.",
-      "Publicación de resultados con lugar, puntaje por criterio y comentarios sin el nombre del juez.",
-      "Panel distinto para alumnos, jueces, organizadores y administradores; el código del evento solo lo ven los organizadores.",
-      "Administración de permisos y cuentas suspendidas, y asignación de jueces y organizadores en cualquier evento.",
-      "Revisión de originalidad: el organizador decide cuándo la ven jueces y equipos.",
+      "Publicación de resultados con lugar, puntaje por criterio y comentarios sin el nombre del evaluador.",
+      "Panel distinto para alumnos, evaluadores, organizadores y administradores; el código del evento solo lo ven los organizadores.",
+      "Administración de permisos y cuentas suspendidas, y asignación de evaluadores y organizadores en cualquier evento.",
+      "Revisión de originalidad: el organizador decide cuándo la ven evaluadores y equipos.",
       "Modo claro y oscuro que recuerda tu elección.",
     ],
   },

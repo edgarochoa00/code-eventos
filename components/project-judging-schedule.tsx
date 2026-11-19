@@ -15,7 +15,7 @@ export function projectScheduleSummary(event: EventDoc, project: ProjectDoc) {
   const shared = first && scheduleBounds(first) && slots.every(slot =>
     slot && Date.parse(slot.startsAt) === Date.parse(first.startsAt) && Date.parse(slot.endsAt) === Date.parse(first.endsAt));
   return { judges, shared: shared ? first : undefined,
-    label: shared ? scheduleLabel(first) : slots.some(slot => scheduleBounds(slot)) ? "Horarios distintos o pendientes por juez" : "Sin horario asignado" };
+    label: shared ? scheduleLabel(first) : slots.some(slot => scheduleBounds(slot)) ? "Horarios distintos o pendientes por evaluador" : "Sin horario asignado" };
 }
 
 export function ProjectJudgingScheduleEditor({ event, project, onClose }: { event: EventDoc; project: ProjectDoc; onClose: () => void }) {
@@ -35,7 +35,7 @@ export function ProjectJudgingScheduleEditor({ event, project, onClose }: { even
       projectScheduleAssignments(event, project, slot, judges);
       setBusy(true);
       await saveProjectJudgeSchedule(event.id, project.id, slot, judges);
-      toast(remove ? `Turno retirado de ${judges.length} jueces.` : `Turno guardado para ${judges.length} jueces.`);
+      toast(remove ? `Turno retirado de ${judges.length} evaluadores.` : `Turno guardado para ${judges.length} evaluadores.`);
       onClose();
     } catch (err) { setMessage(firestoreErrorMessage(err)); }
     finally { setBusy(false); }
@@ -43,7 +43,7 @@ export function ProjectJudgingScheduleEditor({ event, project, onClose }: { even
 
   return <form className="space-y-5" onSubmit={e => { e.preventDefault(); void save(); }}>
     <p className="font-medium wrap-anywhere">{project.title}</p>
-    <p className="text-sm text-muted">Captura una sola vez el turno en hora de Culiacán. Se aplicará a los {judges.length} jueces asignados a este proyecto y reemplazará sus horarios anteriores para este proyecto.</p>
+    <p className="text-sm text-muted">Captura una sola vez el turno en hora de Culiacán. Se aplicará a los {judges.length} evaluadores asignados a este proyecto y reemplazará sus horarios anteriores para este proyecto.</p>
     <fieldset disabled={busy || event.resultsPublished} className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
       <Field label="Inicio" htmlFor="project-turn-start">
         <Input id="project-turn-start" type="datetime-local" required value={start} onChange={e => { setStart(e.target.value); setMessage(""); }} />
@@ -53,7 +53,7 @@ export function ProjectJudgingScheduleEditor({ event, project, onClose }: { even
       </Field>
     </fieldset>
     <div className="rounded-2xl bg-paper p-3">
-      <p className="mb-2 text-sm font-medium">Jueces que recibirán este turno</p>
+      <p className="mb-2 text-sm font-medium">Evaluadores que recibirán este turno</p>
       <ul className="space-y-3">
         {judges.map(email => <li key={email} className="min-w-0">
           <p className="text-xs font-medium wrap-anywhere">{displayEmail(email)}</p>
@@ -61,14 +61,14 @@ export function ProjectJudgingScheduleEditor({ event, project, onClose }: { even
         </li>)}
       </ul>
     </div>
-    <p className="text-xs text-muted">Cada juez podrá enviar su calificación durante el turno. Para una excepción, ajusta su horario en «Horarios de los jueces». Si agregas jueces después, vuelve a aplicar el turno para incluirlos.</p>
+    <p className="text-xs text-muted">Cada evaluador podrá enviar su calificación durante el turno. Para una excepción, ajusta su horario en «Horarios de los evaluadores». Si agregas evaluadores después, vuelve a aplicar el turno para incluirlos.</p>
     {message && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{message}</p>}
     <div className="flex flex-wrap justify-end gap-2">
       <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>Cancelar</Button>
-      <Button type="submit" loading={busy} disabled={event.resultsPublished || event.accessVersion !== 1 || !judges.length}>Aplicar a todos los jueces</Button>
+      <Button type="submit" loading={busy} disabled={event.resultsPublished || event.accessVersion !== 1 || !judges.length}>Aplicar a todos los evaluadores</Button>
     </div>
     {judges.some(email => event.judgeAssignments?.[email]?.schedule?.[project.id]) && <div className="space-y-2 border-t border-line pt-3">
-      <p className="text-xs text-muted">Si retiras el turno, estos jueces no podrán enviar calificaciones hasta que programes otro.</p>
+      <p className="text-xs text-muted">Si retiras el turno, estos evaluadores no podrán enviar calificaciones hasta que programes otro.</p>
       <Button type="button" variant="outline" size="sm" disabled={busy || event.resultsPublished || event.accessVersion !== 1} onClick={() => void save(true)}>Quitar turno a todos</Button>
     </div>}
   </form>;
