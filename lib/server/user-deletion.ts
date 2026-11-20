@@ -4,17 +4,13 @@ import { createHash } from "node:crypto";
 import type { Auth, DecodedIdToken, UserRecord } from "firebase-admin/auth";
 import { FieldValue, type DocumentReference, type Firestore } from "firebase-admin/firestore";
 import { isProjectLogoPath } from "../project-logo";
-import { computeStandings } from "../results";
 import {
   PHASES,
   SUPERADMIN_EMAIL,
   type EvaluationDoc,
   type EventDoc,
   type ParticipantRoster,
-  type Phase,
-  type PhaseFeedback,
   type ProjectDoc,
-  type ResultRow,
   type StaffDoc,
   type StaffRole,
   type UserDoc,
@@ -145,57 +141,6 @@ function collectProjectStoragePaths(eventId: string, projectId: string, project:
     }
   }
   return { supabasePaths, firebaseStoragePaths };
-}
-
-function buildResultsUpdate(
-  event: EventDoc,
-  remainingProjects: Array<{ ref: DocumentReference; data: ProjectDoc }>,
-  remainingEvaluations: EvaluationDoc[],
-): { results: Record<Phase, ResultRow[]>; projectUpdates: BatchOp[] } {
-  const standings = computeStandings(
-    { ...event, criteria: Array.isArray(event.criteria) ? event.criteria : [] },
-    remainingProjects.map((entry) => entry.data),
-    remainingEvaluations,
-  );
-  const results: Record<Phase, ResultRow[]> = {
-    prototype: standings.prototype.map(({ projectId, title, category, score, judges }) => ({
-      projectId,
-      title,
-      ...(category ? { category } : {}),
-      score,
-      judges,
-    })),
-    final: standings.final.map(({ projectId, title, category, score, judges }) => ({
-      projectId,
-      title,
-      ...(category ? { category } : {}),
-      score,
-      judges,
-    })),
-  };
-  const projectUpdates: BatchOp[] = [];
-  for (const entry of remainingProjects) {
-    const feedback: Partial<Record<Phase, PhaseFeedback>> = {};
-    for (const phase of PHASES) {
-      const idx = standings[phase].findIndex((item) => item.projectId === entry.data.id);
-      if (idx === -1) continue;
-      const standing = standings[phase][idx];
-      feedback[phase] = {
-        score: standing.score,
-        judges: standing.judges,
-        rank: idx + 1,
-        of: standings[phase].length,
-        comments: standing.comments,
-        criteria: standing.criteria,
-      };
-    }
-    if (Object.keys(feedback).length > 0) {
-      projectUpdates.push({ type: "update", ref: entry.ref, data: { feedback } });
-    } else if (entry.data.feedback && Object.keys(entry.data.feedback).length > 0) {
-      projectUpdates.push({ type: "update", ref: entry.ref, data: { feedback: FieldValue.delete() } });
-    }
-  }
-  return { results, projectUpdates };
 }
 
 async function resolveIdentity(
@@ -516,7 +461,6 @@ async function buildDeletionPlan(
     const deletedProjectIds = new Set<string>();
     const rosterKeysToDelete = new Set<string>();
     const projectTitlesById = new Map<string, string>();
-    const remainingProjects: Array<{ ref: DocumentReference; data: ProjectDoc }> = [];
     const evalsByProjectId = new Map<string, number>();
 
     for (const evalDoc of evaluationsSnap.docs) {
@@ -608,7 +552,6 @@ async function buildDeletionPlan(
       if (Object.keys(projectPatch).length > 0) {
         batchOps.push({ type: "update", ref: projectDoc.ref, data: projectPatch });
       }
-      remainingProjects.push({ ref: projectDoc.ref, data: updatedProject });
     }
 
     // Scan evaluations in this event (user's own evaluations OR evaluations belonging to a deleted led project)
@@ -616,7 +559,6 @@ async function buildDeletionPlan(
     const userEvalProjectTitles = new Set<string>();
     let userEvalCount = 0;
     let deletedAnyEvalInEvent = false;
-    const remainingEvaluations: EvaluationDoc[] = [];
 
     for (const evalDoc of evaluationsSnap.docs) {
       const evalData = { ...evalDoc.data(), id: evalDoc.id } as EvaluationDoc;
@@ -634,8 +576,6 @@ async function buildDeletionPlan(
       if (authoredByUser || forDeletedProject) {
         deletedAnyEvalInEvent = true;
         batchOps.push({ type: "delete", ref: evalDoc.ref });
-      } else {
-        remainingEvaluations.push(evalData);
       }
     }
 
@@ -683,11 +623,16 @@ async function buildDeletionPlan(
       }
     }
 
-    // Keep published standings & feedback consistent if any project or evaluation was removed
-    if (eventData?.resultsPublished && (deletedAnyEvalInEvent || deletedProjectIds.size > 0)) {
-      const { results, projectUpdates } = buildResultsUpdate(eventData, remainingProjects, remainingEvaluations);
-      batchOps.push({ type: "update", ref: eventRef, data: { results } });
-      batchOps.push(...projectUpdates);
+    // Retira las copias antiguas cuando cambian los datos de una evaluación.
+    if (deletedAnyEvalInEvent || deletedProjectIds.size > 0) {
+      if (eventData?.results != null) {
+        batchOps.push({ type: "update", ref: eventRef, data: { results: FieldValue.delete() } });
+      }
+      for (const projectDoc of projectsSnap.docs) {
+        if (!deletedProjectIds.has(projectDoc.id) && projectDoc.get("feedback") != null) {
+          batchOps.push({ type: "update", ref: projectDoc.ref, data: { feedback: FieldValue.delete() } });
+        }
+      }
     }
   }
 

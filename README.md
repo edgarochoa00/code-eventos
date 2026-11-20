@@ -12,7 +12,7 @@ El líder también puede agregar un **logo opcional de su marca** después de co
 
 ## Alta de líderes y equipos
 
-El administrador y el organizador dan de alta únicamente el correo del alumno desde **Dar de alta alumno líder**. Se crea la cuenta si falta y se conserva el acceso si ya existe. Al entrar, el líder completa el formulario: su nombre, datos del proyecto, categoría e integrantes. Hasta completarlo, el registro queda pendiente y no recibe entregas ni calificaciones. El líder administra después a sus integrantes desde **Información → Editar**. [Guía de altas y permisos](docs/ALTAS_EQUIPOS.md).
+El administrador y el organizador dan de alta únicamente el correo del alumno desde **Dar de alta alumno líder**. Se crea la cuenta si falta y se conserva el acceso si ya existe. Al entrar, el líder completa el formulario: su nombre, datos del proyecto, categoría, integrantes y asesores opcionales. Hasta completarlo, el registro queda pendiente y no recibe entregas ni calificaciones. El líder administra su equipo desde **Información → Editar**. El organizador puede actualizar integrantes y asesores de proyectos registrados desde **Información → Editar equipo**. [Guía de altas y permisos](docs/ALTAS_EQUIPOS.md).
 
 ## Arranque
 
@@ -70,15 +70,16 @@ Los permisos se guardan en `staff/{correo}` y funcionan aunque la persona todav�
 | --- | --- | --- |
 | Organizador | Crea el evento, lo agregan en «Jueces → Organizadores» o es admin | Controla registro y entregas desde Ajustes, asigna jueces y programa turnos, edita la rúbrica y publica resultados |
 | Juez | Su correo está en la lista de jueces, sin administrar ni concursar en ese evento | Califica de 0 a 10 por criterio con comentario, en sus proyectos asignados, durante el turno programado y en etapas habilitadas |
-| Alumno | Entra con el código o un compañero lo agrega | Registra su proyecto, presenta las entregas definidas por el organizador mientras estén abiertas y ve su resultado. Solo el líder agrega o quita integrantes |
+| Alumno | Entra con el código o un compañero lo agrega | Registra su proyecto, presenta las entregas definidas por el organizador mientras estén abiertas y ve su resultado. El líder administra a los integrantes de su equipo |
 
 Conflictos de interés que se bloquean (en la interfaz y en `firestore.rules`):
 
 - Quien concursa en un evento no puede ser juez ni organizador de ese evento, y viceversa.
 - Un juez nunca califica un proyecto del que forma parte.
-- El organizador no edita el contenido ni las entregas de los equipos; solo escribe la retroalimentación al publicar resultados.
+- El organizador puede corregir la categoría desde **Información → Cambiar categoría** antes de que comience la evaluación. El equipo edita el contenido y las entregas de su proyecto.
 - Organizador y juez son incompatibles en el mismo evento. Los admins y el superadmin siempre actúan como administración, aunque aparezcan en una lista antigua de jueces o integrantes.
-- Con resultados publicados no se pueden cambiar calificaciones, información ni entregas, ni descartar calificaciones o borrar proyectos. Para corregirlos, primero hay que ocultar los resultados.
+- Los puntajes y comentarios se consultan desde el panel de organización. Publicar los resultados cierra la evaluación y bloquea los cambios en calificaciones, información y entregas.
+- Esta versión deja de guardar copias de resultados en los documentos de eventos y proyectos. Al actualizar, carga primero las reglas nuevas de Firestore y después retira las copias que ya existían. Ejecuta `node scripts/remove-legacy-results.mjs <proyecto-firebase>` para contar los registros, y agrega `--apply` para retirar esas copias. Las evaluaciones originales se conservan.
 - Las asignaciones de jueces también se comprueban en Firestore. Los proyectos no asignados se pueden consultar, pero no calificar. Se mantiene la evaluación de presentaciones en vivo aunque no haya archivo entregado.
 
 Los eventos nuevos crean automáticamente un registro privado en `events/{id}/access/participants`. Los eventos existentes muestran al superadmin el botón **Actualizar permisos del evento**. La actualización conserva proyectos, roles y calificaciones; prepara el registro para comprobar conflictos también al asignar un rol. Hasta actualizarlo se bloquean altas/bajas de proyectos, cambios de integrantes o roles y evaluación de jueces. Las entregas existentes siguen disponibles. Consulta [la política y puesta en marcha](docs/PERMISOS.md).

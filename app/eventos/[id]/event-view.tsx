@@ -109,7 +109,7 @@ function EventHeader({ event, role, viaAdmin }: { event: EventDoc; role: EventRo
     <section className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[1.6fr_1fr]">
       <div className="min-w-0 ui-panel rounded-3xl p-4 sm:p-8">
         <div className="flex flex-wrap gap-1.5">
-          <EventStatus event={event} />
+          <EventStatus event={event} role={role} />
           <Badge tone={role === "organizer" ? "dark" : role === "judge" ? "lime" : "neutral"}>
             {role === "organizer" ? (viaAdmin ? "Admin" : "Organizas") : role === "judge" ? "Eres evaluador" : "Participante"}
           </Badge>
@@ -178,7 +178,6 @@ function StatusCard({ event, role }: { event: EventDoc; role: EventRole }) {
               off: "Cerrada",
             };
           }),
-          { label: "Resultados", open: event.resultsPublished, on: "Publicados", off: "Pendientes" },
         ];
 
   return (

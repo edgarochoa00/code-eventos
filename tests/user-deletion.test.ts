@@ -467,15 +467,13 @@ test("inspecciona vínculos completos, detecta cambios (409) y al confirmar limp
     { uid: "stay", email: "stay@example.com" },
   ]);
 
-  // Evento compartido se conserva pero desvincula al usuario y recalcula resultados publicados.
+  // Evento compartido se conserva, desvincula al usuario y retira las copias antiguas de resultados.
   const sharedAfter = (await db.doc(`events/${sharedEventId}`).get()).data();
   assert.ok(sharedAfter);
   assert.deepEqual(sharedAfter.organizerEmails, [otherOrgEmail]);
   assert.deepEqual(sharedAfter.judgeEmails, [secondJudgeEmail]);
   assert.deepEqual(sharedAfter.judgeAssignments, { [secondJudgeEmail]: { projectIds: [memberProjectId] } });
-  assert.deepEqual(sharedAfter.results.prototype, [
-    { projectId: memberProjectId, title: "Proyecto Equipo", category: "Software", score: 80, judges: 1 },
-  ]);
+  assert.equal(sharedAfter.results, undefined);
 
   // Proyecto liderado fue eliminado con su fingerprint y evaluaciones; compañero liberado en roster.
   assert.equal((await db.doc(`events/${sharedEventId}/projects/${ledProjectId}`).get()).exists, false);
@@ -488,21 +486,14 @@ test("inspecciona vínculos completos, detecta cambios (409) y al confirmar limp
   assert.deepEqual(sharedRoster?.members, { [otherLeaderEmail]: true });
   assert.equal(sharedRoster?.projectId, "");
 
-  // Proyecto donde solo era integrante conserva al resto del equipo y recalcula su retroalimentación sin el juez borrado.
+  // Proyecto donde solo era integrante conserva al resto del equipo y retira la copia de retroalimentación.
   const memberProjAfter = (await db.doc(`events/${sharedEventId}/projects/${memberProjectId}`).get()).data();
   assert.deepEqual(memberProjAfter?.memberEmails, [otherLeaderEmail]);
   assert.deepEqual(memberProjAfter?.members, [{ email: otherLeaderEmail }]);
   assert.equal(memberProjAfter?.prototype?.submittedBy, "");
   assert.equal(memberProjAfter?.final?.submittedBy, "");
   assert.deepEqual(memberProjAfter?.judging?.judgeEmails, [secondJudgeEmail]);
-  assert.deepEqual(memberProjAfter?.feedback?.prototype, {
-    score: 80,
-    judges: 1,
-    rank: 1,
-    of: 1,
-    criteria: { r1: 8 },
-    comments: ["Comentario conservado"],
-  });
+  assert.equal(memberProjAfter?.feedback, undefined);
 
   // Padrón huérfano limpio para el usuario, conservando a otros.
   assert.deepEqual((await db.doc(`events/${orphanEventId}/access/participants`).get()).data()?.members, {

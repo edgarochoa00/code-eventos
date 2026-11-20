@@ -140,7 +140,7 @@ export async function sendAccountInvitation(input: AccountInvitation, identity: 
       const projectSnap = await tx.get(eventSnap.ref.collection("projects").doc(input.projectId));
       const project = projectSnap.data() as ProjectDoc | undefined;
       const isLeader = project?.leaderId === identity.uid && project.leaderEmail === actor;
-      if (input.role === "leader" ? !manages : !isLeader) {
+      if (input.role === "leader" ? !manages : !(isLeader || (manages && project?.registrationPending !== true))) {
         throw new InvitationError(403, "Solo quien administra el alta puede enviar este acceso.");
       }
       if (!project || !project.memberEmails.includes(input.email) || roster?.members[input.email] !== true ||

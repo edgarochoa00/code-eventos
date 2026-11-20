@@ -25,7 +25,6 @@ import { projectJudgesError } from "./project-judges";
 import { projectScheduleAssignments, type JudgingSlot } from "./project-judging-schedule";
 import type { JudgeAssignment } from "./types";
 import { categoryCriteriaError, cleanCriteria, criteriaError, deliverySettingsError, evaluationScoresError, getCategoryCriteria, sameCriteria } from "./event-config";
-import { computeStandings } from "./results";
 import { validateSubmissionFiles } from "./submission-files";
 import { removeSubmissionFile, verifySubmissionFiles } from "./submission-storage";
 import { projectLogoRequest } from "./project-logo-storage";
@@ -35,17 +34,18 @@ import type {
   EvaluationDoc,
   EventDoc,
   FingerprintDoc,
+  Member,
   Phase,
   PhaseDetails,
-  PhaseFeedback,
   ParticipantRoster,
   ProjectDoc,
-  ResultRow,
   StaffRole,
   Submission,
 } from "./types";
 import { DEFAULT_ORIGINALITY, SUPERADMIN_EMAIL } from "./types";
 import {
+  categoryChangeLockReason,
+  eventCategories,
   weightedTotal,
   isProjectAssignedToJudge,
   normalizeEmail,
@@ -169,6 +169,26 @@ export function saveProjectStand(eventId: string, projectId: string, value: stri
   const stand = value.trim();
   if (stand.length > 80 || /[\r\n]/.test(stand)) throw new Error("Escribe la ubicación en una línea de hasta 80 caracteres.");
   return updateDoc(projectRef(eventId, projectId), { stand: stand || deleteField() });
+}
+
+export async function saveProjectCategory(eventId: string, projectId: string, category: string) {
+  await runTransaction(db, async (transaction) => {
+    const project = projectRef(eventId, projectId);
+    const [eventSnap, projectSnap] = await Promise.all([
+      transaction.get(eventRef(eventId)),
+      transaction.get(project),
+    ]);
+    if (!eventSnap.exists() || !projectSnap.exists()) throw new Error("El evento o el proyecto ya no existe.");
+
+    const event = eventSnap.data() as EventDoc;
+    const currentProject = projectSnap.data() as ProjectDoc;
+    const lockReason = categoryChangeLockReason(event, currentProject);
+    if (lockReason) throw new Error(lockReason);
+    if (!eventCategories(event).includes(category)) throw new Error("Selecciona una categoría del evento.");
+    if (currentProject.category === category) return;
+
+    transaction.update(project, { category, updatedAt: serverTimestamp() });
+  });
 }
 
 export async function saveProjectJudges(eventId: string, projectId: string, judging: NonNullable<ProjectDoc["judging"]>) {
@@ -345,8 +365,45 @@ export async function saveCategoryCriteria(eventId: string, category: string, cr
 
 export type ProjectInfoInput = Pick<
   ProjectDoc,
-  "title" | "summary" | "problem" | "solution" | "technologies" | "category" | "members"
+  "title" | "summary" | "problem" | "solution" | "technologies" | "category" | "members" | "advisors"
 >;
+
+function assertTeamUnchanged(current: ProjectDoc, previous: ProjectDoc) {
+  if (current.members.length !== previous.members.length ||
+    current.members.some((member, index) => member.email !== previous.members[index].email || member.name !== previous.members[index].name) ||
+    (current.advisors ?? "") !== (previous.advisors ?? "")) {
+    throw new Error("El equipo cambió mientras editabas. Cierra el formulario y vuelve a abrirlo.");
+  }
+}
+
+export async function saveProjectTeam(eventId: string, project: ProjectDoc, input: { members: Member[]; advisors: string }) {
+  const added = await runTransaction(db, async (tx) => {
+    const ref = projectRef(eventId, project.id);
+    const [projectSnap, eventSnap] = await Promise.all([tx.get(ref), tx.get(eventRef(eventId))]);
+    if (!projectSnap.exists() || !eventSnap.exists()) throw new Error("El evento o el proyecto ya no existe.");
+    const current = projectSnap.data() as ProjectDoc;
+    const event = eventSnap.data() as EventDoc;
+    if (event.accessVersion !== 1) throw new Error("El superadmin debe actualizar los permisos de este evento.");
+    if (event.resultsPublished || current.registrationPending) throw new Error("El equipo no se puede editar en este momento.");
+    assertTeamUnchanged(current, project);
+
+    const members = dedupeMembers(input.members);
+    const memberEmails = members.map((member) => member.email);
+    const advisors = input.advisors.trim();
+    if (!memberEmails.includes(current.leaderEmail)) throw new Error("Conserva al líder del proyecto en el equipo.");
+    if (members.length > event.maxTeamSize) throw new Error(`El evento admite hasta ${event.maxTeamSize} integrantes.`);
+    assertNotEventStaff(event, memberEmails);
+    const removed = current.memberEmails.some((email) => !memberEmails.includes(email));
+    const added = memberEmails.filter((email) => !current.memberEmails.includes(email));
+    if (members.length === current.members.length &&
+      members.every((member, index) => member.email === current.members[index].email && member.name === current.members[index].name) &&
+      advisors === (current.advisors ?? "") && !removed && !added.length) return [];
+    tx.update(ref, { members, memberEmails, advisors, updatedAt: serverTimestamp() });
+    if (removed || added.length) syncParticipants(tx, eventId, project.id, current.memberEmails, memberEmails);
+    return added;
+  });
+  return sendInvitations({ kind: "team", role: "member", eventId, projectId: project.id }, added);
+}
 
 async function writeFingerprint(project: ProjectDoc, event: EventDoc) {
   const fp = await buildFingerprint(project, event.name);
@@ -395,6 +452,7 @@ export async function updateProjectInfo(event: EventDoc, project: ProjectDoc, in
     const current = { ...projectSnap.data(), id: project.id } as ProjectDoc;
     const isLeader = user.uid === current.leaderId;
     if (current.registrationPending && !isLeader) throw new Error("Solo el líder puede completar el registro del proyecto.");
+    if (isLeader) assertTeamUnchanged(current, project);
     // Solo el líder administra a los integrantes; los demás conservan la lista actual.
     const members = isLeader ? dedupeMembers(input.members) : [...current.members];
     if (!members.some((m) => m.email === current.leaderEmail)) {
@@ -405,7 +463,10 @@ export async function updateProjectInfo(event: EventDoc, project: ProjectDoc, in
     const changedMembers = memberEmails.length !== current.memberEmails.length || memberEmails.some((email, index) => current.memberEmails[index] !== email);
     if (changedMembers && eventSnap.data().accessVersion !== 1) throw new Error("El superadmin debe actualizar los permisos de este evento antes de cambiar integrantes.");
     const completion = current.registrationPending ? { registrationPending: false } : {};
-    const patch = isLeader ? { ...input, ...completion, members, memberEmails } : { ...input, members: current.members };
+    const { advisors, ...info } = input;
+    const patch = isLeader
+      ? { ...info, ...completion, members, memberEmails, ...(advisors !== undefined && { advisors: advisors.trim() }) }
+      : { ...info, members: current.members };
     tx.update(projectRef(event.id, project.id), { ...patch, updatedAt: serverTimestamp() });
     if (changedMembers) syncParticipants(tx, event.id, project.id, current.memberEmails, memberEmails);
     const added = memberEmails.filter((email) => email !== current.leaderEmail && !current.memberEmails.includes(email));
@@ -521,45 +582,12 @@ export function deleteEvaluation(eventId: string, evalId: string) {
 
 /* ---------- Resultados ---------- */
 
-export async function publishResults(event: EventDoc, projects: ProjectDoc[], evaluations: EvaluationDoc[]) {
-  const standings = computeStandings(event, projects, evaluations);
-  const batch = writeBatch(db);
-  const results: Record<Phase, ResultRow[]> = {
-    prototype: standings.prototype.map(({ projectId, title, category, score, judges }) => ({
-      projectId,
-      title,
-      ...(category ? { category } : {}),
-      score,
-      judges,
-    })),
-    final: standings.final.map(({ projectId, title, category, score, judges }) => ({
-      projectId,
-      title,
-      ...(category ? { category } : {}),
-      score,
-      judges,
-    })),
-  };
-  batch.update(eventRef(event.id), { results, resultsPublished: true, judgingOpen: false, categoryLocked: true });
-
-  for (const p of projects) {
-    const feedback: Partial<Record<Phase, PhaseFeedback>> = {};
-    for (const phase of ["prototype", "final"] as Phase[]) {
-      const idx = standings[phase].findIndex((s) => s.projectId === p.id);
-      if (idx === -1) continue;
-      const s = standings[phase][idx];
-      feedback[phase] = {
-        score: s.score,
-        judges: s.judges,
-        rank: idx + 1,
-        of: standings[phase].length,
-        comments: s.comments,
-        criteria: s.criteria,
-      };
-    }
-    batch.update(projectRef(event.id, p.id), { feedback });
-  }
-  await batch.commit();
+export function publishResults(eventId: string) {
+  return updateDoc(eventRef(eventId), {
+    resultsPublished: true,
+    judgingOpen: false,
+    categoryLocked: true,
+  });
 }
 
 export function unpublishResults(eventId: string) {

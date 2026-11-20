@@ -2,7 +2,7 @@
 
 import { AccountInvitationButton } from "@/components/account-invitation-button";
 
-import { ArrowLeft, Lock, MessageSquareQuote, Pencil, ScanSearch, Trash2, Trophy, UserRound } from "lucide-react";
+import { ArrowLeft, Lock, Pencil, ScanSearch, Trash2, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -13,6 +13,7 @@ import { scheduleLabel, scheduleStatus } from "@/lib/judging-agenda";
 import { MatchList, NotEnoughData, SimilarityBadge, SubmissionBadges } from "@/components/project-bits";
 import { ProjectRegistration } from "@/components/project-registration";
 import { ProjectForm } from "@/components/project-form";
+import { ProjectTeamEditor } from "@/components/project-team-editor";
 import { ProjectLogo } from "@/components/project-logo";
 import { SubmissionEditor, SubmissionView } from "@/components/submission";
 import {
@@ -20,8 +21,10 @@ import {
   Button,
   Card,
   EmptyState,
+  Field,
   Modal,
   SectionTitle,
+  Select,
   Spinner,
   Tabs,
   firestoreErrorMessage,
@@ -37,6 +40,7 @@ import {
   eventRef,
   projectRef,
   saveEvaluation,
+  saveProjectCategory,
   saveSubmission,
   updateProjectInfo,
 } from "@/lib/data";
@@ -52,6 +56,7 @@ import {
   type ProjectDoc,
 } from "@/lib/types";
 import {
+  categoryChangeLockReason,
   displayEmail,
   effectiveEvaluationTotal,
   eventCategories,
@@ -60,7 +65,7 @@ import {
   rolesInEvent,
 } from "@/lib/utils";
 
-type Tab = "info" | Phase | "evaluate" | "originality" | "scores" | "feedback";
+type Tab = "info" | Phase | "evaluate" | "originality" | "scores";
 
 export function ProjectView() {
   const { id, pid } = useParams<{ id: string; pid: string }>();
@@ -124,6 +129,8 @@ function ProjectBody({
   const firstPhase = phases.find((p) => project[p]) ?? phases[0];
   const [tab, setTab] = useState<Tab>(isJudge ? "evaluate" : isMember && !isOrganizer ? (firstPhase ?? "info") : "info");
   const [editingInfo, setEditingInfo] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(false);
+  const [editingTeam, setEditingTeam] = useState(false);
   const [editingPhase, setEditingPhase] = useState<Phase | null>(null);
   const [evalPhase, setEvalPhase] = useState<Phase>(firstPhase ?? "prototype");
   const [confirmDeleteProject, setConfirmDeleteProject] = useState(false);
@@ -142,7 +149,9 @@ function ProjectBody({
   else if (turn === "overdue") evaluationLockReason = "Tu turno terminó. Pide al organizador que programe otro horario.";
 
 
-  // El contenido del proyecto es del equipo: el organizador no lo edita, solo puede retirarlo antes de publicar resultados.
+  const categoryLockReason = categoryChangeLockReason(event, project);
+  const canChangeCategory = isOrganizer && !categoryLockReason;
+  const canEditTeam = isOrganizer && event.accessVersion === 1 && !event.resultsPublished && !project.registrationPending;
   const canEditInfo = canParticipate && !event.resultsPublished && (event.registrationOpen || phases.some((p) => event.submissions[p]));
   const canDeleteProject = event.accessVersion === 1 && !event.resultsPublished && (isOrganizer || (canParticipate && isLeader && event.registrationOpen));
 
@@ -162,7 +171,6 @@ function ProjectBody({
   }, [fingerprints.data, project.id]);
 
   const leader = project.members.find((m) => m.email === project.leaderEmail) ?? { name: "", email: project.leaderEmail };
-  const hasFeedback = event.resultsPublished && project.feedback && Object.keys(project.feedback).length > 0;
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "info", label: "Información" },
@@ -170,7 +178,6 @@ function ProjectBody({
     ...(isJudge ? [{ id: "evaluate" as Tab, label: "Evaluar" }] : []),
     ...(seeOriginality ? [{ id: "originality" as Tab, label: "Originalidad" }] : []),
     ...(isOrganizer ? [{ id: "scores" as Tab, label: "Calificaciones" }] : []),
-    ...(isMember && hasFeedback ? [{ id: "feedback" as Tab, label: "Resultados" }] : []),
   ];
 
   if (project.registrationPending && canParticipate && isLeader) {
@@ -208,7 +215,7 @@ function ProjectBody({
               {isOrganizer && project.registrationPending && m.email === project.leaderEmail && (
                 <AccountInvitationButton scope={{ kind: "team", role: "leader", eventId: event.id, projectId: project.id }} email={m.email} />
               )}
-              {canParticipate && isLeader && m.email !== project.leaderEmail && (
+              {((canParticipate && isLeader) || canEditTeam) && m.email !== project.leaderEmail && (
                 <AccountInvitationButton scope={{ kind: "team", role: "member", eventId: event.id, projectId: project.id }} email={m.email} />
               )}
             </li>
@@ -236,10 +243,10 @@ function ProjectBody({
               submitLabel="Guardar"
               canManageMembers={isLeader && event.accessVersion === 1}
               onCancel={() => setEditingInfo(false)}
-              onSubmit={async (input) => {
+              onSubmit={async (input, original) => {
                 if (!user) return;
                 try {
-                  const failedInvitations = await updateProjectInfo(event, project, input, user);
+                  const failedInvitations = await updateProjectInfo(event, original ?? project, input, user);
                   if (failedInvitations.length) toast(`Proyecto actualizado. Reintenta enviar acceso a ${failedInvitations.join(", ")} desde el proyecto.`, "error");
                   else toast("Proyecto actualizado.");
                   setEditingInfo(false);
@@ -253,11 +260,21 @@ function ProjectBody({
               <SectionTitle
                 title="Información"
                 action={
-                  (canEditInfo || canDeleteProject) && (
+                  (canEditInfo || canChangeCategory || canEditTeam || canDeleteProject) && (
                     <div className="flex flex-wrap items-center gap-2">
                       {canEditInfo && (
                         <Button variant="outline" size="sm" onClick={() => setEditingInfo(true)}>
                           <Pencil className="size-3.5" /> Editar
+                        </Button>
+                      )}
+                      {canEditTeam && (
+                        <Button variant="outline" size="sm" onClick={() => setEditingTeam(true)}>
+                          <UserRound className="size-3.5" /> Editar equipo
+                        </Button>
+                      )}
+                      {canChangeCategory && (
+                        <Button variant="outline" size="sm" onClick={() => setEditingCategory(true)}>
+                          <Pencil className="size-3.5" /> Cambiar categoría
                         </Button>
                       )}
                       {canDeleteProject && (
@@ -270,8 +287,15 @@ function ProjectBody({
                 }
               />
               <dl className="space-y-5">
+                {isOrganizer && (
+                  <div>
+                    <InfoBlock label="Categoría" text={project.category || "Pendiente de registro"} />
+                    {categoryLockReason && <p className="mt-1 text-xs text-muted">{categoryLockReason}</p>}
+                  </div>
+                )}
                 <InfoBlock label="Problema" text={project.problem} />
                 <InfoBlock label="Solución" text={project.solution} />
+                {(project.advisors || isOrganizer) && <InfoBlock label="Asesores" text={project.advisors || "Sin asesores registrados"} />}
                 {project.technologies.length > 0 && (
                   <div>
                     <dt className="font-mono text-[11px] text-muted">Tecnologías</dt>
@@ -461,6 +485,14 @@ function ProjectBody({
         </Card>
       )}
 
+      <Modal open={editingTeam} onClose={() => setEditingTeam(false)} title="Editar equipo">
+        {editingTeam && <ProjectTeamEditor event={event} project={project} onClose={() => setEditingTeam(false)} />}
+      </Modal>
+
+      <Modal open={editingCategory} onClose={() => setEditingCategory(false)} title="Cambiar categoría">
+        {editingCategory && <CategoryEditor event={event} project={project} onClose={() => setEditingCategory(false)} />}
+      </Modal>
+
       <Modal open={confirmDeleteProject} onClose={() => setConfirmDeleteProject(false)} title="¿Eliminar proyecto?">
         <p className="font-mono text-xs leading-relaxed text-muted">
           Se eliminará el proyecto «{project.title}» y sus entregas. También se eliminarán el perfil y la cuenta de acceso de los alumnos que no participen ni tengan permisos en otros eventos. Para volver deberán registrarse de nuevo. Esta acción no se puede deshacer.
@@ -522,58 +554,48 @@ function ProjectBody({
           </>
         )}
       </Modal>
-
-      {tab === "feedback" && hasFeedback && (
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[repeat(2,minmax(0,1fr))]">
-          {phases
-            .filter((p) => project.feedback?.[p])
-            .map((p) => {
-              const fb = project.feedback![p]!;
-              return (
-                <Card key={p}>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-mono text-[11px] text-muted">{getPhaseLabel(event, p)}</p>
-                      <p className="mt-1 font-display text-4xl font-bold tabular-nums">
-                        {fb.score.toFixed(1)}
-                        <span className="text-base font-normal text-muted">/100</span>
-                      </p>
-                    </div>
-                    <span className="flex items-center gap-1.5 rounded-2xl bg-lime px-3 py-2 font-mono text-xs font-bold">
-                      <Trophy className="size-4" /> {fb.rank}° de {fb.of}
-                    </span>
-                  </div>
-                  <div className="mt-5 space-y-2.5">
-                    {getCategoryCriteria(event, project.category).map((c) => (
-                      <div key={c.id}>
-                        <div className="flex justify-between font-mono text-[11px]">
-                          <span>{c.name}</span>
-                          <span>{fb.criteria[c.id] ?? "—"}</span>
-                        </div>
-                        <div className="mt-1 h-2 rounded-full bg-ink/5">
-                          <div className="h-full rounded-full bg-ink" style={{ width: `${(fb.criteria[c.id] ?? 0) * 10}%` }} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  {fb.comments.length > 0 && (
-                    <div className="mt-6 space-y-2">
-                      <p className="flex items-center gap-1.5 font-mono text-[11px] text-muted">
-                        <MessageSquareQuote className="size-3.5" /> Comentarios de los evaluadores
-                      </p>
-                      {fb.comments.map((c, i) => (
-                        <p key={i} className="rounded-2xl bg-paper p-3 text-sm leading-relaxed">
-                          {c}
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                </Card>
-              );
-            })}
-        </div>
-      )}
     </div>
+  );
+}
+
+function CategoryEditor({ event, project, onClose }: { event: EventDoc; project: ProjectDoc; onClose: () => void }) {
+  const toast = useToast();
+  const categories = eventCategories(event);
+  const [category, setCategory] = useState(() => categories.includes(project.category) ? project.category : "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const canSave = !saving && categories.includes(category) && category !== project.category;
+
+  return (
+    <form noValidate className="space-y-4" onSubmit={async (e) => {
+      e.preventDefault();
+      if (!canSave) return;
+      setSaving(true);
+      setError("");
+      try {
+        await saveProjectCategory(event.id, project.id, category);
+        toast("Categoría actualizada.");
+        onClose();
+      } catch (err) {
+        setError(firestoreErrorMessage(err));
+      } finally {
+        setSaving(false);
+      }
+    }}>
+      <Field label="Categoría del proyecto" htmlFor="project-category" hint="La categoría determina la rúbrica y puede afectar la asignación de evaluadores.">
+        <Select id="project-category" value={category} onChange={(e) => { setCategory(e.target.value); setError(""); }} disabled={saving}>
+          <option value="" disabled>Selecciona una categoría</option>
+          {categories.map((option) => (
+            <option key={option} value={option}>{option}{option === project.category ? " (actual)" : ""}</option>
+          ))}
+        </Select>
+      </Field>
+      {error && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{error}</p>}
+      <div className="flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-end">
+        <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>Cancelar</Button>
+        <Button type="submit" loading={saving} disabled={!canSave}>Guardar categoría</Button>
+      </div>
+    </form>
   );
 }
 

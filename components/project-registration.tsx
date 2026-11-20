@@ -24,12 +24,12 @@ export function ProjectRegistration({ event, project }: { event: EventDoc; proje
         </p>
       ) : (
         <ProjectForm initial={project} leader={leader} maxTeamSize={event.maxTeamSize} categories={eventCategories(event)}
-          submitLabel="Completar registro" onSubmit={async (input) => {
+          submitLabel="Completar registro" onSubmit={async (input, original) => {
             if (!user || user.uid !== project.leaderId) return;
             try {
               const name = input.members.find((member) => member.email === project.leaderEmail)?.name ?? "";
               if (name && name !== user.displayName) await updateName(name);
-              const failedInvitations = await updateProjectInfo(event, project, input, user);
+              const failedInvitations = await updateProjectInfo(event, original ?? project, input, user);
               if (failedInvitations.length) toast(`Proyecto registrado. Reintenta enviar acceso a ${failedInvitations.join(", ")} desde el proyecto.`, "error");
               else toast("Proyecto registrado. Ya puedes consultar las entregas de tu evento.");
             } catch (error) { toast(firestoreErrorMessage(error), "error"); }

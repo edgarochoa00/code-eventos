@@ -22,6 +22,17 @@ export type Release = { version: string; date: string; title: string; changes: s
 
 /** La primera entrada es la versión actual (debe coincidir con package.json). */
 export const RELEASES: Release[] = [
+  { version: "0.4.19", date: "20 de noviembre de 2026", title: "Asesores y edición de equipos", changes: [
+    "El líder puede incluir asesores al registrar el proyecto.",
+    "El organizador puede editar los integrantes y asesores de proyectos existentes.",
+    "Los alumnos consultan su proyecto y sus entregas. Los resultados se consultan en el panel de organización.",
+  ] },
+  { version: "0.4.18", date: "19 de noviembre de 2026", title: "Ajuste del selector de categoría", changes: [
+    "El diálogo abre con la categoría actual seleccionada y acomoda los botones en pantallas estrechas.",
+  ] },
+  { version: "0.4.17", date: "19 de noviembre de 2026", title: "Corrección de categorías de proyectos", changes: [
+    "Los organizadores pueden corregir la categoría de un proyecto cuyo registro esté completo desde Información, antes de iniciar la evaluación.",
+  ] },
   { version: "0.4.16", date: "16 de noviembre de 2026", title: "Mejoras en pantallas estrechas", changes: [
     "El encabezado y las pestañas principales se adaptan a celulares y tabletas.",
     "Los horarios y las calificaciones disponen de más espacio para leer y usar sus controles.",

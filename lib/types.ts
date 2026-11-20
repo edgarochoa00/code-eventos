@@ -136,6 +136,8 @@ export type ProjectDoc = {
   leaderEmail: string;
   members: Member[];
   memberEmails: string[];
+  /** Nombres de asesores, uno por línea. */
+  advisors?: string;
   prototype: Submission | null;
   final: Submission | null;
   feedback?: Partial<Record<Phase, PhaseFeedback>>;

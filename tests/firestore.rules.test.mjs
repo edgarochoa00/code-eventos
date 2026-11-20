@@ -14,6 +14,7 @@ import {
   getDoc,
   getDocs,
   query,
+  serverTimestamp,
   setDoc,
   updateDoc,
   where,
@@ -232,6 +233,76 @@ describe("cuenta suspendida", () => {
 });
 
 describe("proyectos", () => {
+  test("el organizador edita integrantes y asesores con el índice de participantes sincronizado", async () => {
+    const eid = "edicion-de-equipo";
+    const pid = "proyecto";
+    const eventRef = doc(org, `events/${eid}`);
+    const path = `events/${eid}/projects/${pid}`;
+    const ref = doc(org, path);
+    const before = project.memberEmails;
+    const teamMembers = (emails) => emails.map((email, index) => ({ email, name: `Integrante ${index + 1}` }));
+    const initial = { ...project, eventId: eid, members: teamMembers(before), advisors: "Asesora Uno" };
+    await assertSucceeds(createEvent(org, eid, { ...eventFor("org", "org@tec.mx"), maxTeamSize: 15 }));
+    await assertFails(syncTeam(stu, pid, { ...initial, advisors: ["Inválido"] }, [], eid));
+    await assertSucceeds(syncTeam(stu, pid, initial, [], eid));
+    await assertSucceeds(updateDoc(doc(stu, path), { advisors: "Asesora Dos" }));
+    await assertFails(updateDoc(doc(mate, path), { advisors: "Intento de editar" }));
+    await assertSucceeds(updateDoc(eventRef, {
+      registrationOpen: false, submissions: { prototype: false, final: false }, judgeEmails: ["judge@tec.mx"],
+    }));
+    await assertFails(updateDoc(doc(outsider, path), { advisors: "Persona ajena" }));
+    await assertSucceeds(updateDoc(ref, { advisors: "Asesor corregido" }));
+    const after = ["stu@tec.mx", "out@tec.mx"];
+    const changes = { members: teamMembers(after), memberEmails: after, updatedAt: serverTimestamp() };
+    await assertFails(updateDoc(ref, changes));
+    await assertFails(syncTeam(org, pid, { ...changes, members: teamMembers(before) }, before, eid));
+    const conflict = ["stu@tec.mx", "judge@tec.mx"];
+    await assertFails(syncTeam(org, pid, { members: teamMembers(conflict), memberEmails: conflict }, before, eid));
+    await assertFails(syncTeam(org, pid, { ...changes, leaderEmail: after[1] }, before, eid));
+    await assertSucceeds(syncTeam(org, pid, changes, before, eid));
+    await assertFails(getDoc(doc(mate, path)));
+    await assertSucceeds(getDoc(doc(outsider, path)));
+    assert.deepEqual((await getDoc(doc(org, `events/${eid}/access/participants`))).data().members, {
+      "stu@tec.mx": true, "out@tec.mx": true,
+    });
+    const full = [after[0], ...Array.from({ length: 14 }, (_, i) => `equipo-${i}@tec.mx`)];
+    await assertSucceeds(syncTeam(org, pid, { members: teamMembers(full), memberEmails: full }, after, eid));
+    await assertSucceeds(updateDoc(eventRef, { resultsPublished: true }));
+    await assertFails(updateDoc(ref, { advisors: "Después de publicar" }));
+  });
+
+  test("los organizadores corrigen solo la categoría elegida antes de la evaluación", async () => {
+    const eid = "correccion-categoria";
+    const path = `events/${eid}/projects/p1`;
+    const eventRef = doc(org, `events/${eid}`);
+    const ref = doc(org, path);
+    await assertSucceeds(createEvent(org, eid, {
+      ...eventFor("org", "org@tec.mx"), categories: ["Software", "Carteles"],
+      registrationOpen: false, submissions: { prototype: false, final: false },
+    }));
+    await assertSucceeds(updateDoc(eventRef, {
+      judgeEmails: ["judge@tec.mx"], organizerEmails: ["org@tec.mx", "coorganizador@tec.mx"],
+    }));
+    await env.withSecurityRulesDisabled(c => setDoc(doc(c.firestore(), path), { ...project, eventId: eid }));
+
+    for (const actor of [stu, judge, outsider]) {
+      await assertFails(updateDoc(doc(actor, path), { category: "Carteles" }));
+    }
+    await assertFails(updateDoc(ref, { category: "Fuera del evento" }));
+    await assertFails(updateDoc(ref, { category: "Carteles", title: "Título cambiado" }));
+    await assertSucceeds(updateDoc(ref, { category: "Carteles", updatedAt: serverTimestamp() }));
+    const changed = (await getDoc(ref)).data();
+    assert.equal(changed.category, "Carteles");
+    assert.equal(changed.title, project.title);
+    assert.deepEqual(changed.memberEmails, project.memberEmails);
+
+    const coorganizer = ctx("coorganizador", "coorganizador@tec.mx");
+    await assertSucceeds(updateDoc(doc(coorganizer, path), { category: "Software" }));
+    await assertSucceeds(updateDoc(eventRef, { resultsPublished: true }));
+    await assertFails(updateDoc(ref, { category: "Carteles" }));
+    await assertSucceeds(updateDoc(eventRef, { resultsPublished: false, categoryLocked: true }));
+    await assertFails(updateDoc(ref, { category: "Carteles" }));
+  });
   test("alumno registra su proyecto", async () => {
     await assertFails(setDoc(doc(stu, "events/e1/projects/p1"), project));
     await assertFails(syncTeam(stu, "p1", { ...project, stand: "A-12" }));
@@ -678,8 +749,13 @@ describe("evaluaciones", () => {
     await assertFails(getDocs(collection(stu, "events/e1/evaluations")));
   });
 
-  test("organizador publica resultados en el proyecto", async () => {
-    await assertSucceeds(updateDoc(doc(org, "events/e1/projects/p1"), { feedback: { prototype: { score: 80 } } }));
+  test("las calificaciones quedan privadas al cerrar resultados", async () => {
+    await assertFails(updateDoc(doc(org, "events/e1"), { results: { prototype: [{ score: 80 }] } }));
+    await assertFails(updateDoc(doc(org, "events/e1/projects/p1"), { feedback: { prototype: { score: 80 } } }));
+    await assertSucceeds(updateDoc(doc(org, "events/e1"), { resultsPublished: true }));
+    await assertFails(getDocs(collection(stu, "events/e1/evaluations")));
+    await assertSucceeds(getDocs(collection(org, "events/e1/evaluations")));
+    await assertSucceeds(updateDoc(doc(org, "events/e1"), { resultsPublished: false }));
   });
 
   test("el juez no califica un proyecto del que es integrante", async () => {

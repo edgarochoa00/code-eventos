@@ -193,6 +193,7 @@ service cloud.firestore {
         && request.resource.data.maxTeamSize >= 1
         && request.resource.data.maxTeamSize <= 15
         && request.resource.data.resultsPublished == false
+        && request.resource.data.get('results', null) == null
         && validCriteria(request.resource.data.criteria)
         && validCategoryRubrics(request.resource.data);
 
@@ -209,6 +210,7 @@ service cloud.firestore {
           && !get(rosterPath(eid)).data.members.keys().hasAny(request.resource.data.organizerEmails)
           && !get(rosterPath(eid)).data.members.keys().hasAny(request.resource.data.judgeEmails)
         ))
+        && (!changed(['results']) || request.resource.data.get('results', null) == null)
         && (!changed(['criteria', 'categoryCriteria', 'judgeAssignments']) || resource.data.resultsPublished != true)
         && (!changed(['categoryLocked']) || resource.data.get('categoryLocked', false) != true)
         && (!changed(['judgingOpen']) || (!resource.data.judgingOpen && !request.resource.data.judgingOpen) || request.resource.data.get('categoryLocked', false) == true)
@@ -310,6 +312,37 @@ service cloud.firestore {
             && next.members.keys().toSet() == roster.difference(before.toSet()).union(after.toSet());
         }
 
+        function validAdvisors(data) {
+          let advisors = data.get('advisors', '');
+          return advisors is string && advisors.size() <= 3000;
+        }
+
+        function validMemberAt(members, emails, count, index) {
+          return index >= count || (members[index].email == emails[index] && members[index].name is string);
+        }
+
+        function validTeamMembers(data) {
+          let members = data.members;
+          let emails = data.memberEmails;
+          let count = emails.size();
+          return members is list && members.size() == count && count <= 15
+            && validMemberAt(members, emails, count, 0)
+            && validMemberAt(members, emails, count, 1)
+            && validMemberAt(members, emails, count, 2)
+            && validMemberAt(members, emails, count, 3)
+            && validMemberAt(members, emails, count, 4)
+            && validMemberAt(members, emails, count, 5)
+            && validMemberAt(members, emails, count, 6)
+            && validMemberAt(members, emails, count, 7)
+            && validMemberAt(members, emails, count, 8)
+            && validMemberAt(members, emails, count, 9)
+            && validMemberAt(members, emails, count, 10)
+            && validMemberAt(members, emails, count, 11)
+            && validMemberAt(members, emails, count, 12)
+            && validMemberAt(members, emails, count, 13)
+            && validMemberAt(members, emails, count, 14);
+        }
+
         function validProjectCategory(data) {
           let categories = ev().get('categories', []);
           return data.category is string && data.category.size() > 0
@@ -371,7 +404,8 @@ service cloud.firestore {
               && event.judgingOpen != true && event.get('categoryLocked', false) != true))
             && (!keys.hasAny(['prototype']) || (event.phases.prototype == true && event.submissions.prototype == true))
             && (!keys.hasAny(['final']) || (event.phases.final == true && event.submissions.final == true))
-            && (!keys.hasAny(['members', 'memberEmails']) || previous.leaderId == request.auth.uid)
+            && (!keys.hasAny(['members', 'memberEmails', 'advisors']) || previous.leaderId == request.auth.uid)
+            && (!keys.hasAny(['advisors']) || validAdvisors(data))
             && (!keys.hasAny(['memberEmails']) || (noStaffInTeam(data) && syncedTeam(previous.memberEmails, data.memberEmails)));
         }
 
@@ -393,6 +427,7 @@ service cloud.firestore {
           && request.resource.data.leaderEmail == myEmail()
           && request.resource.data.get('registrationPending', false) == false
           && validTeam(request.resource.data)
+          && validAdvisors(request.resource.data)
           && noStaffInTeam(request.resource.data)
           && syncedTeam([], request.resource.data.memberEmails)
           && validInfo(request.resource.data)
@@ -423,10 +458,36 @@ service cloud.firestore {
             && stand is string && stand.size() <= 80 && stand.matches('.*');
         }
 
-        // El organizador gestiona retroalimentación, jueces y stands.
+        function canChangeCategory() {
+          let fields = request.resource.data.diff(resource.data).affectedKeys();
+          let event = ev();
+          return fields.hasAll(['category']) && fields.hasOnly(['category', 'updatedAt'])
+            && isOrganizer(eid) && event.resultsPublished != true
+            && event.get('judgingOpen', false) != true && event.get('categoryLocked', false) != true
+            && resource.data.get('registrationPending', false) != true
+            && validProjectCategory(request.resource.data)
+            && (!fields.hasAny(['updatedAt']) || request.resource.data.updatedAt == request.time);
+        }
+
+        function organizerTeamUpdate() {
+          let data = request.resource.data;
+          let previous = resource.data;
+          let keys = data.diff(previous).affectedKeys();
+          return keys.hasOnly(['members', 'memberEmails', 'advisors', 'updatedAt'])
+            && keys.hasAny(['members', 'memberEmails', 'advisors'])
+            && isOrganizer(eid) && ev().get('accessVersion', 0) == 1
+            && ev().resultsPublished != true && previous.get('registrationPending', false) != true
+            && validAdvisors(data) && validTeam(data) && validTeamMembers(data)
+            && (!keys.hasAny(['updatedAt']) || data.updatedAt == request.time)
+            && (data.memberEmails.toSet() == previous.memberEmails.toSet()
+              || (noStaffInTeam(data) && syncedTeam(previous.memberEmails, data.memberEmails)));
+        }
+
+        // El organizador gestiona equipos, categoría, jueces y stands.
         allow update: if canSetStand();
+        allow update: if canChangeCategory();
+        allow update: if organizerTeamUpdate();
         allow update: if participantUpdate()
-          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['feedback']) && isOrganizer(eid))
           || (isOrganizer(eid) && ev().resultsPublished != true
             && resource.data.get('registrationPending', false) != true
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['judging']) && validJudging());

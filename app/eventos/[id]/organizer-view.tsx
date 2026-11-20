@@ -871,8 +871,8 @@ function ResultsTab({ event, projects, evaluations }: { event: EventDoc; project
             {event.resultsPublished ? "Resultados publicados" : "Vista previa en vivo"}
           </h2>
           <p className="mt-1 max-w-lg font-mono text-[11px] text-muted">
-            Promedio de los evaluadores por etapa. Al publicar, se cierra la evaluación y cada equipo ve su lugar, puntaje y
-            comentarios (anónimos).
+            Promedio de los evaluadores por etapa. Al publicar, se cierra la evaluación.
+            Los resultados se consultan desde el panel de organización.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -882,19 +882,14 @@ function ResultsTab({ event, projects, evaluations }: { event: EventDoc; project
             </Button>
           )}
           {event.resultsPublished ? (
-            <>
-              <Button variant="outline" onClick={() => setConfirm(true)}>
-                <RefreshCw className="size-4" /> Actualizar
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={async () => {
-                  await unpublishResults(event.id).catch((e) => toast(firestoreErrorMessage(e), "error"));
-                }}
-              >
-                <EyeOff className="size-4" /> Ocultar
-              </Button>
-            </>
+            <Button
+              variant="ghost"
+              onClick={async () => {
+                await unpublishResults(event.id).catch((e) => toast(firestoreErrorMessage(e), "error"));
+              }}
+            >
+              <EyeOff className="size-4" /> Desbloquear resultados
+            </Button>
           ) : (
             <Button variant="dark" onClick={() => setConfirm(true)} disabled={!evaluations.length}>
               <Megaphone className="size-4" /> Publicar resultados
@@ -934,8 +929,7 @@ function ResultsTab({ event, projects, evaluations }: { event: EventDoc; project
 
       <Modal open={confirm} onClose={() => setConfirm(false)} title="¿Publicar resultados?">
         <p className="font-mono text-xs leading-relaxed text-muted">
-          Se cerrará la evaluación y todos los participantes verán el ranking. Cada equipo verá su puntaje por
-          criterio y los comentarios de los evaluadores sin sus nombres. Puedes ocultarlos después.
+          Se cerrará la evaluación y se bloquearán las calificaciones. Los puntajes y comentarios quedan disponibles para el organizador.
         </p>
         <div className="mt-6 flex justify-end gap-2">
           <Button variant="ghost" onClick={() => setConfirm(false)}>
@@ -947,7 +941,7 @@ function ResultsTab({ event, projects, evaluations }: { event: EventDoc; project
             onClick={async () => {
               setBusy(true);
               try {
-                await publishResults(event, projects, evaluations);
+                await publishResults(event.id);
                 toast("Resultados publicados.");
                 setConfirm(false);
               } catch (err) {

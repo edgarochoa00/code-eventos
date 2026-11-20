@@ -191,7 +191,7 @@ export function Field({
 }
 
 const inputBase =
-  "w-full min-w-0 rounded-2xl border-2 border-control bg-field px-4 py-3 font-sans text-base font-medium text-ink placeholder:text-muted outline-none transition focus:border-ink focus:bg-surface disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm";
+  "w-full min-w-0 rounded-2xl border-2 border-control bg-field px-4 font-sans text-base font-medium text-ink placeholder:text-muted outline-none transition focus:border-ink focus:bg-surface disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm";
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input(
   { className, ...props },
@@ -216,7 +216,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSel
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(
   function Textarea({ className, rows = 4, ...props }, ref) {
-    return <textarea ref={ref} rows={rows} className={cn(inputBase, "resize-y leading-relaxed", className)} {...props} />;
+    return <textarea ref={ref} rows={rows} className={cn(inputBase, "resize-y py-3 leading-relaxed", className)} {...props} />;
   },
 );
 

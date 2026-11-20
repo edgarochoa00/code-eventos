@@ -143,6 +143,13 @@ export function eventCategories(event?: Pick<EventDoc, "categories"> | null): st
   return event?.categories?.length ? event.categories : DEFAULT_CATEGORIES;
 }
 
+export function categoryChangeLockReason(event: EventDoc, project: ProjectDoc): string | null {
+  if (project.registrationPending) return "El líder debe completar el registro del proyecto.";
+  if (event.resultsPublished) return "Los resultados del evento están publicados.";
+  if (event.judgingOpen || event.categoryLocked) return "La categoría queda fija una vez iniciada la evaluación del evento.";
+  return null;
+}
+
 export function hasJudgeAssignment(event: EventDoc, judgeEmail: string): boolean {
   const a = event.judgeAssignments?.[normalizeEmail(judgeEmail)];
   return Boolean((a?.categories && a.categories.length > 0) || (a?.projectIds && a.projectIds.length > 0));

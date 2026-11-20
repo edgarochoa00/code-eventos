@@ -5,10 +5,10 @@ El administrador y el superadmin usan **Administración → Dar de alta alumno l
 1. Seleccionar el evento y escribir únicamente el correo del alumno líder.
 2. Pulsar **Dar de alta líder**. Feria guarda el lugar del alumno y envía un correo para configurar el acceso. Una cuenta existente conserva su contraseña hasta que la persona decida cambiarla.
 3. El alumno abre **Configurar mi acceso** en su correo, escribe su nombre completo y elige su contraseña. El botón **Ir a mi proyecto** lleva al formulario pendiente.
-4. El líder escribe el nombre del proyecto, categoría, resumen, problema, solución y tecnologías, y agrega a sus integrantes. Cada integrante agregado recibe su propio correo para configurar el acceso y abrir el proyecto.
-5. Si un correo falla o caduca, **Enviar acceso** permite volver a enviarlo desde el proyecto. El organizador puede reenviar el acceso del líder pendiente y el líder puede reenviar el de sus integrantes.
+4. El líder escribe el nombre del proyecto, categoría, resumen, problema, solución y tecnologías, y agrega a sus integrantes y, de forma opcional, los nombres de sus asesores. Cada integrante agregado recibe su propio correo para configurar el acceso y abrir el proyecto.
+5. Si un correo falla o caduca, **Enviar acceso** permite volver a enviarlo desde el proyecto. El organizador puede reenviar el acceso del líder pendiente. El líder y el organizador pueden reenviar los accesos de los integrantes registrados.
 
-El organizador y el administrador no necesitan conocer los datos del proyecto ni registrar a los integrantes. El líder administra a sus integrantes desde **Información → Editar**. El organizador conserva sus controles del evento y la posibilidad de retirar un registro antes de publicar resultados.
+El organizador y el administrador no necesitan conocer los datos del proyecto ni registrar a los integrantes. El líder administra a sus integrantes desde **Información → Editar**. En proyectos con registro completo, el organizador puede corregir asesores, nombres y correos de integrantes desde **Información → Editar equipo**, incluso con el registro cerrado. El nombre del líder se puede corregir y su cuenta identifica a la persona responsable. El evento admite estos cambios hasta la publicación de resultados.
 
 ## Registro pendiente y permisos
 

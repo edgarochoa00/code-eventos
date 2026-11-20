@@ -7,8 +7,10 @@ import { Badge } from "./ui";
 
 const ROLE_LABEL: Record<EventRole, string> = { organizer: "Organizador", judge: "Evaluador", student: "Alumno" };
 
-export function EventStatus({ event }: { event: EventDoc }) {
-  if (event.resultsPublished) return <Badge tone="dark">Resultados publicados</Badge>;
+export function EventStatus({ event, role }: { event: EventDoc; role?: EventRole }) {
+  if (event.resultsPublished) {
+    return role === "student" ? <Badge>Cerrado</Badge> : <Badge tone="dark">Resultados publicados</Badge>;
+  }
   if (event.submissions.prototype || event.submissions.final) return <Badge tone="green">Entregas abiertas</Badge>;
   if (event.registrationOpen) return <Badge tone="green">Registro abierto</Badge>;
   const hasSchedule = Object.values(event.judgeAssignments ?? {}).some(assignment =>
@@ -27,7 +29,7 @@ export function EventCard({ event, role }: { event: EventDoc; role?: EventRole }
       <div>
         <div className="flex items-start justify-between gap-3">
           <div className="flex flex-wrap gap-1.5">
-            <EventStatus event={event} />
+            <EventStatus event={event} role={role ?? "student"} />
             {role && <Badge>{ROLE_LABEL[role]}</Badge>}
           </div>
           <ArrowUpRight className="size-5 shrink-0 opacity-40 transition group-hover:opacity-100" />
