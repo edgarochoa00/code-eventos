@@ -3,6 +3,7 @@ import { after, before, mock, test } from "node:test";
 import { deleteApp, initializeApp } from "firebase/app";
 import { confirmPasswordReset, connectAuthEmulator, getAuth, verifyPasswordResetCode } from "firebase/auth";
 import { POST } from "../app/api/account-invitations/route";
+import { GET as judgeRegistration } from "../app/api/judge-registration/route";
 import { feriaAccessLink } from "../lib/server/access-link";
 import { adminServices } from "../lib/server/firebase-admin";
 import { invitationDeliveryId } from "../lib/server/account-invitations";
@@ -78,6 +79,37 @@ after(async () => {
     await receipt(user.email!).delete();
     await auth.deleteUser(user.uid);
   }
+});
+
+test("solo la administración ve cuáles evaluadores del evento ya verificaron su correo", async () => {
+  const registered = await target();
+  const pending = await target();
+  const withoutAccount = await target();
+  const outsider = await account("registration-outsider");
+  await auth.createUser({ email: registered.email, password, emailVerified: true });
+  await auth.createUser({ email: pending.email, password, emailVerified: false });
+  const judgeToken = await login(registered.email);
+  const url = `http://localhost/api/judge-registration?eventId=${eventId}&email=${outsider.user.email}`;
+  const read = (token?: string) => judgeRegistration(new Request(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  }));
+
+  assert.equal((await read()).status, 401);
+  assert.equal((await read(judgeToken)).status, 403);
+  assert.equal((await read(outsider.token)).status, 403);
+  const response = await read(orgToken);
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("cache-control")!, /no-store/);
+  assert.deepEqual(await response.json(), { statuses: {
+    [registered.email]: true,
+    [pending.email]: false,
+    [withoutAccount.email]: false,
+  } });
+
+  const user = await auth.getUserByEmail(pending.email);
+  await auth.updateUser(user.uid, { emailVerified: true });
+  const refreshed = await (await read(adminToken)).json();
+  assert.equal(refreshed.statuses[pending.email], true);
 });
 
 test("sin sesión, con token inválido o sin correo verificado no crea cuentas ni envía correos", async () => {
