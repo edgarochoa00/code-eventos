@@ -9,7 +9,7 @@ import { authErrorMessage, useAuth } from "@/lib/auth";
 import { auth } from "@/lib/firebase";
 
 type AccessState =
-  | { status: "checking" | "invalid" }
+  | { status: "checking" | "incomplete" | "invalid" }
   | { status: "saved"; signedIn: boolean; namePending: boolean; projectPath: string | null }
   | { status: "retry"; message: string }
   | { status: "ready"; email: string; code: string; projectPath: string | null };
@@ -19,8 +19,16 @@ function isInvalidLink(error: unknown) {
     .includes((error as { code?: string })?.code ?? "");
 }
 
+function readAccessLink(url: URL) {
+  const fragment = new URLSearchParams(url.hash.slice(1));
+  return {
+    code: fragment.get("oobCode"),
+    projectPath: invitationProjectPath(url.searchParams.get("next")) ?? invitationProjectPath(fragment.get("next")),
+  };
+}
+
 function accessCode() {
-  return new URLSearchParams(window.location.hash.slice(1)).get("oobCode");
+  return readAccessLink(new URL(window.location.href)).code;
 }
 
 export function AccessForm() {
@@ -33,6 +41,7 @@ export function AccessForm() {
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [pastedAccess, setPastedAccess] = useState("");
 
   useEffect(() => {
     function onNewLink() {
@@ -44,6 +53,7 @@ export function AccessForm() {
       setVisible(false);
       setError("");
       setBusy(false);
+      setPastedAccess("");
     }
     window.addEventListener("hashchange", onNewLink);
     return () => window.removeEventListener("hashchange", onNewLink);
@@ -52,12 +62,11 @@ export function AccessForm() {
   useEffect(() => {
     let cancelled = false;
     async function checkLink() {
-      const params = new URLSearchParams(window.location.hash.slice(1));
-      const code = params.get("oobCode");
-      if (!code) return { status: "invalid" } as const;
+      const { code, projectPath } = readAccessLink(new URL(window.location.href));
+      if (!code) return { status: "incomplete" } as const;
       try {
         const email = await verifyPasswordResetCode(auth, code);
-        return { status: "ready", email, code, projectPath: invitationProjectPath(params.get("next")) } as const;
+        return { status: "ready", email, code, projectPath } as const;
       } catch (err) {
         if (isInvalidLink(err)) return { status: "invalid" } as const;
         return { status: "retry", message: authErrorMessage(err) } as const;
@@ -66,6 +75,29 @@ export function AccessForm() {
     void checkLink().then((result) => { if (!cancelled) setState(result); });
     return () => { cancelled = true; };
   }, [attempt]);
+
+  function verifyPastedAccess(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const current = new URL(window.location.href);
+    const entry = pastedAccess.trim();
+    let link: URL | undefined;
+    try { link = new URL(entry); } catch { /* Un código se puede pegar sin URL. */ }
+    const fromLink = link && (link.origin === current.origin || link.origin === "https://feria2026.web.app")
+      && link.pathname === "/acceso" ? readAccessLink(link) : null;
+    const code = link ? fromLink?.code : entry;
+    if (!code || code.length > 512 || !/^[\w-]+$/.test(code)) {
+      setError("Pega el código de acceso o el enlace completo del correo de Feria 2026.");
+      return;
+    }
+    const projectPath = fromLink?.projectPath ?? readAccessLink(current).projectPath;
+    const fragment = new URLSearchParams({ oobCode: code });
+    if (projectPath) fragment.set("next", projectPath);
+    window.history.replaceState(window.history.state, "", current.pathname + "#" + fragment.toString());
+    setError("");
+    setPastedAccess("");
+    setState({ status: "checking" });
+    setAttempt((value) => value + 1);
+  }
 
   async function savePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -112,7 +144,8 @@ export function AccessForm() {
   }
 
   const title = state.status === "saved" ? "Contraseña guardada"
-    : state.status === "invalid" ? "Enlace no disponible" : "Configura tu acceso";
+    : state.status === "incomplete" ? "Enlace incompleto"
+      : state.status === "invalid" ? "Enlace no disponible" : "Configura tu acceso";
   const projectPath = state.status === "saved" && !state.namePending ? state.projectPath : null;
 
   return (
@@ -141,12 +174,22 @@ export function AccessForm() {
           </ButtonLink>
         </div>
       )}
-      {state.status === "invalid" && (
+      {(state.status === "incomplete" || state.status === "invalid") && (
         <div className="mt-3 space-y-5">
           <p role="status" className="text-sm leading-relaxed text-muted">
-            El enlace está incompleto, caducó o ya se utilizó. Si ya tienes contraseña, puedes iniciar sesión. Si necesitas un enlace nuevo, pídelo a quien te invitó.
+            {state.status === "incomplete"
+              ? "El enlace llegó sin el código. Pega el código de acceso o el enlace completo del mensaje original."
+              : "El código ya no es válido. Si caducó o ya se usó, pide al organizador que te envíe otro. Si ya tienes contraseña, puedes iniciar sesión."}
           </p>
-          <ButtonLink className="w-full" size="lg" href="/login">Ir a iniciar sesión <ArrowUpRight className="size-4" aria-hidden /></ButtonLink>
+          <form onSubmit={verifyPastedAccess} className="space-y-3">
+            <Field label="Código o enlace del correo" htmlFor="access-code">
+              <Input id="access-code" value={pastedAccess} maxLength={2048} autoComplete="off" autoCapitalize="none"
+                spellCheck={false} onChange={(event) => setPastedAccess(event.target.value)} required />
+            </Field>
+            {error && <p role="alert" className="text-xs text-red-700">{error}</p>}
+            <Button className="w-full" type="submit">Verificar acceso</Button>
+          </form>
+          <ButtonLink className="w-full" variant="outline" href="/login">Ir a iniciar sesión <ArrowUpRight className="size-4" aria-hidden /></ButtonLink>
         </div>
       )}
       {state.status === "ready" && (

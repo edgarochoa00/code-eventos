@@ -10,7 +10,7 @@ export function feriaAccessLink(firebaseLink: string, projectPath?: string) {
   const link = new URL("https://feria2026.web.app/acceso");
   // El fragmento solo llega al navegador, así el código no aparece en los registros de Hosting.
   const fragment = new URLSearchParams({ oobCode: code });
-  if (projectPath) fragment.set("next", projectPath);
+  if (projectPath) link.searchParams.set("next", projectPath);
   link.hash = fragment.toString();
   return link.href;
 }

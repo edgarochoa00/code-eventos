@@ -34,7 +34,8 @@ function escapeHtml(value: string) {
 
 export async function renderAccessEmail(email: string, context: AccessEmailContext, actionUrl: string) {
   const url = new URL(actionUrl);
-  if (url.protocol !== "https:") throw new AccessEmailError(503, "No se pudo preparar el enlace seguro de acceso.");
+  const code = new URLSearchParams(url.hash.slice(1)).get("oobCode") ?? url.searchParams.get("oobCode");
+  if (url.protocol !== "https:" || !code) throw new AccessEmailError(503, "No se pudo preparar el enlace seguro de acceso.");
   template ??= readFile(path.join(process.cwd(), "emails/acceso.html"), "utf8");
   const role = ROLE_LABEL[context.role];
   const eventName = context.eventName ?? "la plataforma Feria 2026";
@@ -43,11 +44,11 @@ export async function renderAccessEmail(email: string, context: AccessEmailConte
       : "Después podrás ver las opciones de tu rol.";
   const instructions = `Escribe tu nombre completo y elige tu contraseña. ${afterSetup}`;
   const values: Record<string, string> = { ROLE_LABEL: role, EVENT_NAME: eventName,
-    RECIPIENT_EMAIL: email, ACTION_URL: url.href, ACCESS_INSTRUCTIONS: instructions };
-  const html = (await template).replace(/\{\{(ROLE_LABEL|EVENT_NAME|RECIPIENT_EMAIL|ACTION_URL|ACCESS_INSTRUCTIONS)\}\}/g,
+    RECIPIENT_EMAIL: email, ACTION_URL: url.href, ACCESS_CODE: code, ACCESS_INSTRUCTIONS: instructions };
+  const html = (await template).replace(/\{\{(ROLE_LABEL|EVENT_NAME|RECIPIENT_EMAIL|ACTION_URL|ACCESS_CODE|ACCESS_INSTRUCTIONS)\}\}/g,
     (_, key: string) => escapeHtml(values[key]));
   return { subject: "Tu acceso a Feria 2026", html,
-    text: `Feria 2026 · TecNM Culiacán\n\nHola,\nTe han dado acceso como ${role} en ${eventName}.\nCuenta: ${email}\n\n${instructions}\nEnlace personal: ${url.href}\n\nSi ya tienes cuenta, puedes seguir entrando con tu contraseña habitual. Solo cambiará si completas este enlace.\nNo compartas el enlace. Si caduca, solicita uno nuevo a quien te invitó. Si no esperabas esta invitación, puedes ignorarla.\n\nEquipo Feria 2026\nhttps://feria2026.web.app` };
+    text: `Feria 2026 · TecNM Culiacán\n\nHola,\nTe han dado acceso como ${role} en ${eventName}.\nCuenta: ${email}\n\n${instructions}\nEnlace personal: ${url.href}\n\nSi la página dice «Enlace incompleto», pega este código de acceso: ${code}\n\nSi ya tienes cuenta, puedes seguir entrando con tu contraseña habitual. Solo cambiará si completas este enlace.\nNo compartas el enlace ni el código. Si caduca, solicita uno nuevo a quien te invitó. Si no esperabas esta invitación, puedes ignorarla.\n\nEquipo Feria 2026\nhttps://feria2026.web.app` };
 }
 
 export async function sendBrevoAccessEmail(config: BrevoAccessConfig, email: string, context: AccessEmailContext, actionUrl: string) {

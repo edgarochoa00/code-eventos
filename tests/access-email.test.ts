@@ -30,8 +30,10 @@ test("el mensaje usa el logo y la acción segura, escapa contenido y ofrece text
   assert.match(message.html, /Ya tienes acceso como evaluador\./);
   assert.match(message.html, /Te han dado acceso como <strong[^>]*>evaluador<\/strong>/);
   assert.match(message.html, /oobCode=fake&amp;lang=es/);
+  assert.match(message.html, /Código de acceso<\/strong><br><span[^>]*>fake<\/span>/);
   assert.match(message.text, /Te han dado acceso como evaluador en Feria de Ingeniería 2026\./);
   assert.ok(message.text.includes(link));
+  assert.match(message.text, /pega este código de acceso: fake/);
   assert.doesNotMatch(message.html, /\{\{[A-Z_]+\}\}/);
   const escaped = await renderAccessEmail("juez@example.com", { ...context, eventName: '</strong><script>alert("x")</script>' }, link);
   assert.doesNotMatch(escaped.html, /<script>/);
@@ -39,12 +41,15 @@ test("el mensaje usa el logo y la acción segura, escapa contenido y ofrece text
   const staff = await renderAccessEmail("admin@example.com", { role: "admin", eventName: null }, link);
   assert.match(staff.text, /administrador en la plataforma Feria 2026/);
   await assert.rejects(renderAccessEmail("juez@example.com", context, "javascript:alert(1)"), AccessEmailError);
+  await assert.rejects(renderAccessEmail("juez@example.com", context, "https://feria2026.web.app/acceso"), AccessEmailError);
   const projectPath = "/eventos/evento/proyectos/proyecto";
   const leaderLink = new URL(feriaAccessLink(link, projectPath));
-  assert.equal(invitationProjectPath(new URLSearchParams(leaderLink.hash.slice(1)).get("next")), projectPath);
+  assert.equal(invitationProjectPath(leaderLink.searchParams.get("next")), projectPath);
+  assert.equal(leaderLink.searchParams.has("oobCode"), false);
   assert.equal(invitationProjectPath("//example.com/eventos/e/proyectos/p"), null);
   const leader = await renderAccessEmail("lider@example.com", { role: "leader", eventName: "Prueba", projectPath }, leaderLink.href);
   assert.match(leader.html, /nombre completo.*formulario de tu proyecto/);
+  assert.match(leader.html, /Código de acceso<\/strong><br><span[^>]*>fake<\/span>/);
 });
 
 test("envía a un único destinatario sin listas de marketing y devuelve solo confirmación del proveedor", async () => {
