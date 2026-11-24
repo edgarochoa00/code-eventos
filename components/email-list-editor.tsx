@@ -9,11 +9,12 @@ import { AccountInvitationButton } from "./account-invitation-button";
 import { Badge, Button, Card, SectionTitle, Select, Textarea, firestoreErrorMessage, useToast } from "./ui";
 
 type StatusFilter = "all" | "registered" | "pending";
+type JudgeRegistration = { statuses: Record<string, boolean>; names: Record<string, string> };
 
 function useJudgeRegistration(eventId: string | undefined, emails: string[]) {
   const { user } = useAuth();
   const [revision, setRevision] = useState(0);
-  const [response, setResponse] = useState<{ key: string; statuses: Record<string, boolean> | null }>();
+  const [response, setResponse] = useState<{ key: string; data: JudgeRegistration | null }>();
   const key = eventId && user && emails.length
     ? JSON.stringify([eventId, user.uid, emails, revision])
     : null;
@@ -30,10 +31,10 @@ function useJudgeRegistration(eventId: string | undefined, emails: string[]) {
           signal: controller.signal,
         });
         if (!result.ok) throw new Error("No se pudo consultar el registro.");
-        const { statuses } = await result.json() as { statuses: Record<string, boolean> };
-        if (!controller.signal.aborted) setResponse({ key, statuses });
+        const data = await result.json() as JudgeRegistration;
+        if (!controller.signal.aborted) setResponse({ key, data });
       } catch {
-        if (!controller.signal.aborted) setResponse({ key, statuses: null });
+        if (!controller.signal.aborted) setResponse({ key, data: null });
       }
     };
     void load();
@@ -42,9 +43,10 @@ function useJudgeRegistration(eventId: string | undefined, emails: string[]) {
 
   const current = key === response?.key ? response : undefined;
   return {
-    statuses: current?.statuses,
+    statuses: current?.data?.statuses,
+    names: current?.data?.names,
     loading: Boolean(key && !current),
-    failed: current?.statuses === null,
+    failed: current?.data === null,
     refresh: () => setRevision((value) => value + 1),
   };
 }
@@ -74,7 +76,7 @@ export function EmailListEditor({
   const filterId = useId();
   const judgeList = invitation?.kind === "event" && invitation.role === "judge";
   const [filter, setFilter] = useState<StatusFilter>("all");
-  const { statuses, loading, failed, refresh } = useJudgeRegistration(judgeList ? invitation.eventId : undefined, emails);
+  const { statuses, names, loading, failed, refresh } = useJudgeRegistration(judgeList ? invitation.eventId : undefined, emails);
   const matches = statuses && filter !== "all"
     ? emails.filter((email) => statuses[normalizeEmail(email)] === (filter === "registered"))
     : emails;
@@ -100,25 +102,36 @@ export function EmailListEditor({
   }
 
   const list = (
-    <ul className="divide-y divide-line">
+    <ul className="@container divide-y divide-line">
       {matches.map((email) => {
-        const registered = statuses?.[normalizeEmail(email)];
+        const address = normalizeEmail(email);
+        const registered = statuses?.[address];
+        const name = names?.[address];
+        const showName = name && normalizeEmail(name) !== address;
         return (
-          <li key={email} className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 py-3">
-            <div className="min-w-0 flex-1 basis-36">
-              <p className="text-sm wrap-anywhere">{displayEmail(email)}</p>
+          <li key={email} className={cn("py-3", onViewProjects
+            ? "grid min-w-0 gap-2 @min-[25rem]:grid-cols-[minmax(0,1fr)_auto] @min-[25rem]:items-center"
+            : "flex flex-wrap items-center justify-between gap-x-2 gap-y-1")}>
+            <div className={cn("min-w-0", !onViewProjects && "flex-1 basis-36")}>
+              {showName && <p className="font-semibold text-sm wrap-anywhere">{name}</p>}
+              <p className={cn("wrap-anywhere", showName ? "mt-0.5 text-xs text-muted" : "text-sm")}>{displayEmail(email)}</p>
               {judgeList && registered !== undefined && (
                 <Badge className="mt-1" tone={registered ? "green" : "amber"}>{registered ? "Registrado" : "Pendiente"}</Badge>
               )}
             </div>
-            <div className={cn("flex items-center gap-1", onViewProjects ? "ml-auto max-w-full flex-wrap justify-end" : "shrink-0")}>
+            <div className={cn("items-center gap-1", onViewProjects
+              ? "grid grid-cols-[minmax(0,1fr)_auto_auto] @min-[25rem]:grid-cols-[auto_auto_auto]"
+              : "flex shrink-0")}>
               {onViewProjects && (
                 <Button type="button" variant="outline" size="sm" aria-haspopup="dialog"
+                  className="min-w-0 px-2.5!"
                   aria-label={`Ver proyectos de ${displayEmail(email)}`} onClick={() => onViewProjects(email)}>
-                  <FolderOpen className="size-4" aria-hidden /> Ver proyectos
+                  <FolderOpen className="size-4 @max-[16rem]:hidden" aria-hidden /> Ver proyectos
                 </Button>
               )}
-              {invitation && !locked.includes(email) && <AccountInvitationButton scope={invitation} email={email} disabled={busy} />}
+              {invitation && !locked.includes(email) && (
+                <AccountInvitationButton scope={invitation} email={email} disabled={busy} iconOnly={Boolean(onViewProjects)} />
+              )}
               {locked.includes(email) ? (
                 <Badge>Creador</Badge>
               ) : (
@@ -127,9 +140,11 @@ export function EmailListEditor({
                   size="sm"
                   disabled={busy}
                   aria-label={`Quitar ${displayEmail(email)}`}
+                  title={onViewProjects ? "Quitar evaluador" : undefined}
+                  className={onViewProjects ? "w-11 px-0!" : undefined}
                   onClick={() => save(emails.filter((e) => e !== email))}
                 >
-                  <Trash2 className="size-4" />
+                  <Trash2 className="size-4" aria-hidden />
                 </Button>
               )}
             </div>

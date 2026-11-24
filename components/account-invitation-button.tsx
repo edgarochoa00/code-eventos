@@ -6,13 +6,15 @@ import type { InvitationScope } from "@/lib/account-invitations";
 import { sendAccountInvitation } from "@/lib/account-invitation-client";
 import { Button, useToast } from "./ui";
 
-export function AccountInvitationButton({ scope, email, disabled = false }: {
-  scope: InvitationScope; email: string; disabled?: boolean;
+export function AccountInvitationButton({ scope, email, disabled = false, iconOnly = false }: {
+  scope: InvitationScope; email: string; disabled?: boolean; iconOnly?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const toast = useToast();
   return <Button variant="ghost" size="sm" loading={busy} disabled={disabled}
     aria-label={`Enviar acceso a ${email}`}
+    title={iconOnly ? "Enviar acceso" : undefined}
+    className={iconOnly ? "w-11 px-0!" : undefined}
     onClick={async () => {
       setBusy(true);
       try {
@@ -24,6 +26,7 @@ export function AccountInvitationButton({ scope, email, disabled = false }: {
         toast(error instanceof Error ? error.message : "No se pudo enviar el acceso.", "error");
       } finally { setBusy(false); }
     }}>
-    <Mail className="size-4" /><span className="hidden sm:inline">Enviar acceso</span>
+    {(!iconOnly || !busy) && <Mail className="size-4" aria-hidden />}
+    {!iconOnly && <span className="hidden sm:inline">Enviar acceso</span>}
   </Button>;
 }

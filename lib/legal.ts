@@ -22,6 +22,10 @@ export type Release = { version: string; date: string; title: string; changes: s
 
 /** La primera entrada es la versión actual (debe coincidir con package.json). */
 export const RELEASES: Release[] = [
+  { version: "0.4.23", date: "24 de noviembre de 2026", title: "Nombres en la lista de evaluadores", changes: [
+    "La lista muestra el nombre registrado de cada evaluador y conserva el correo para identificarlo.",
+    "Las acciones de cada fila se acomodan al ancho de la lista en PC y celular.",
+  ] },
   { version: "0.4.22", date: "24 de noviembre de 2026", title: "Croquis de stands y proyectos por evaluador", changes: [
     "El croquis de stands se puede consultar y ampliar desde la portada y el evento.",
     "El organizador puede consultar los proyectos asignados a cada evaluador desde su lista.",

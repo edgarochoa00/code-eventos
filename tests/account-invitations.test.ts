@@ -81,12 +81,12 @@ after(async () => {
   }
 });
 
-test("solo la administración ve cuáles evaluadores del evento ya verificaron su correo", async () => {
+test("solo la administración ve nombres y estados de registro de los evaluadores del evento", async () => {
   const registered = await target();
   const pending = await target();
   const withoutAccount = await target();
   const outsider = await account("registration-outsider");
-  await auth.createUser({ email: registered.email, password, emailVerified: true });
+  await auth.createUser({ email: registered.email, password, emailVerified: true, displayName: "  María López  " });
   await auth.createUser({ email: pending.email, password, emailVerified: false });
   const judgeToken = await login(registered.email);
   const url = `http://localhost/api/judge-registration?eventId=${eventId}&email=${outsider.user.email}`;
@@ -100,16 +100,16 @@ test("solo la administración ve cuáles evaluadores del evento ya verificaron s
   const response = await read(orgToken);
   assert.equal(response.status, 200);
   assert.match(response.headers.get("cache-control")!, /no-store/);
-  assert.deepEqual(await response.json(), { statuses: {
-    [registered.email]: true,
-    [pending.email]: false,
-    [withoutAccount.email]: false,
-  } });
+  assert.deepEqual(await response.json(), {
+    statuses: { [registered.email]: true, [pending.email]: false, [withoutAccount.email]: false },
+    names: { [registered.email]: "María López" },
+  });
 
   const user = await auth.getUserByEmail(pending.email);
-  await auth.updateUser(user.uid, { emailVerified: true });
+  await auth.updateUser(user.uid, { emailVerified: true, displayName: "Daniel Cruz" });
   const refreshed = await (await read(adminToken)).json();
   assert.equal(refreshed.statuses[pending.email], true);
+  assert.equal(refreshed.names[pending.email], "Daniel Cruz");
 });
 
 test("sin sesión, con token inválido o sin correo verificado no crea cuentas ni envía correos", async () => {

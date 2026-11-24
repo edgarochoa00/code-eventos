@@ -35,14 +35,19 @@ export async function GET(request: Request) {
     // Una invitación crea una cuenta sin verificar. El registro se completa al verificar el correo.
     const emails = Array.from(new Set(event.judgeEmails.map(normalizeEmail)));
     const registered = new Set<string>();
+    const names: Record<string, string> = {};
     for (let start = 0; start < emails.length; start += 100) {
       const batch = emails.slice(start, start + 100).map((email) => ({ email }));
       const { users } = await auth.getUsers(batch);
       for (const user of users) {
-        if (user.email && user.emailVerified) registered.add(normalizeEmail(user.email));
+        if (!user.email) continue;
+        const address = normalizeEmail(user.email);
+        const name = user.displayName?.trim();
+        if (user.emailVerified) registered.add(address);
+        if (name) names[address] = name;
       }
     }
-    return reply({ statuses: Object.fromEntries(emails.map((email) => [email, registered.has(email)])) });
+    return reply({ statuses: Object.fromEntries(emails.map((email) => [email, registered.has(email)])), names });
   } catch {
     return reply({ error: "No se pudo consultar el estado de los evaluadores." }, 503);
   }
