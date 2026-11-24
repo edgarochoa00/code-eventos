@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, CalendarDays, Check, Share2 } from "lucide-react";
+import { ArrowLeft, CalendarDays, Check, Map, Share2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
@@ -16,6 +16,8 @@ import { formatDate, normalizeEmail, rolesInEvent } from "@/lib/utils";
 import { JudgeView } from "./judge-view";
 import { OrganizerView } from "./organizer-view";
 import { StudentView } from "./student-view";
+
+const FAIR_2026_EVENT_ID = "vluciw18Te2lBJiUeUHJ";
 
 export function EventView() {
   const { id } = useParams<{ id: string }>();
@@ -52,6 +54,11 @@ export function EventView() {
         <Link href="/panel" className="inline-flex items-center gap-1.5 font-mono text-xs text-muted hover:text-ink">
           <ArrowLeft className="size-3.5" /> Panel
         </Link>
+        {event.id === FAIR_2026_EVENT_ID && (
+          <Link href="/croquis" className="inline-flex min-h-11 items-center gap-2 rounded-full border border-control bg-surface px-4 text-xs font-semibold hover:bg-field">
+            <Map className="size-4" aria-hidden /> Croquis de stands
+          </Link>
+        )}
       </div>
       <EventHeader event={event} role={role} viaAdmin={viaAdmin} />
       {conflictingTeam && <p className="rounded-2xl bg-amber-50 p-5 text-sm text-amber-900">Tu correo aparece en un equipo y en la lista de evaluadores. Pide al organizador que retire el permiso de evaluador para poder seguir trabajando con tu equipo. Mientras tanto puedes consultar tu proyecto.</p>}

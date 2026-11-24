@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Map } from "lucide-react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { AuthCard } from "@/components/auth-card";
@@ -123,6 +124,11 @@ export function LoginForm() {
           Olvidé mi contraseña
         </button>
       )}
+      <div className="mt-5 border-t border-line pt-2">
+        <Link href="/croquis" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold hover:underline">
+          <Map className="size-4" aria-hidden /> Croquis de stands
+        </Link>
+      </div>
     </AuthCard>
   );
 }

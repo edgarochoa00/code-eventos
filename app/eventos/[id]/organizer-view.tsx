@@ -547,6 +547,8 @@ function JudgesTab({ event, projects }: { event: EventDoc; projects: ProjectDoc[
   const toast = useToast();
   const ownerEmail = event.ownerEmail;
   const [editingJudge, setEditingJudge] = useState<string | null>(null);
+  const [viewingJudge, setViewingJudge] = useState<string | null>(null);
+  const assignedProjects = viewingJudge ? projects.filter((project) => isProjectAssignedToJudge(event, project, viewingJudge)) : [];
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[repeat(2,minmax(0,1fr))]">
@@ -556,6 +558,7 @@ function JudgesTab({ event, projects }: { event: EventDoc; projects: ProjectDoc[
         emails={event.judgeEmails}
         invitation={{ kind: "event", eventId: event.id, role: "judge" }}
         onSave={(judgeEmails) => saveEventEmails(event, "judgeEmails", judgeEmails)}
+        onViewProjects={setViewingJudge}
       />
       <EmailListEditor
         title="Organizadores"
@@ -567,6 +570,36 @@ function JudgesTab({ event, projects }: { event: EventDoc; projects: ProjectDoc[
       />
 
       <ProjectJudgeAssignments event={event} projects={projects} />
+
+      <Modal open={viewingJudge !== null} title="Proyectos asignados" onClose={() => setViewingJudge(null)}>
+        {viewingJudge && (
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-semibold">{displayEmail(viewingJudge)}</p>
+              <p className="mt-1 text-xs text-muted">
+                {assignedProjects.length === 1 ? "1 proyecto asignado" : `${assignedProjects.length} proyectos asignados`}
+              </p>
+            </div>
+            {!!assignedProjects.length && (
+              <ul className="divide-y divide-line">
+                {assignedProjects.map((project) => (
+                  <li key={project.id}>
+                    <Link href={`/eventos/${event.id}/proyectos/${project.id}`}
+                      className="flex min-h-11 items-center justify-between gap-3 rounded-xl px-2 py-3 hover:bg-field focus-visible:outline-2 focus-visible:outline-ink"
+                      onClick={() => setViewingJudge(null)}>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold wrap-anywhere">{project.title}</p>
+                        {project.category && <p className="text-xs text-muted wrap-anywhere">{project.category}</p>}
+                      </div>
+                      <ArrowUpRight className="size-4 shrink-0 text-muted" aria-hidden />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </Modal>
 
       {event.judgeEmails.length > 0 && (
         <Card className="lg:col-span-2">

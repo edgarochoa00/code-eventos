@@ -1,10 +1,10 @@
 "use client";
 
-import { ChevronDown, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { ChevronDown, FolderOpen, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { SavedInvitationError, type InvitationScope } from "@/lib/account-invitations";
 import { useAuth } from "@/lib/auth";
-import { displayEmail, normalizeEmail, parseEmails } from "@/lib/utils";
+import { cn, displayEmail, normalizeEmail, parseEmails } from "@/lib/utils";
 import { AccountInvitationButton } from "./account-invitation-button";
 import { Badge, Button, Card, SectionTitle, Select, Textarea, firestoreErrorMessage, useToast } from "./ui";
 
@@ -57,6 +57,7 @@ export function EmailListEditor({
   locked = [],
   onSave,
   invitation,
+  onViewProjects,
 }: {
   title: string;
   subtitle: string;
@@ -64,6 +65,7 @@ export function EmailListEditor({
   locked?: string[];
   onSave: (emails: string[]) => Promise<void>;
   invitation?: InvitationScope;
+  onViewProjects?: (email: string) => void;
 }) {
   const toast = useToast();
   const [raw, setRaw] = useState("");
@@ -109,7 +111,13 @@ export function EmailListEditor({
                 <Badge className="mt-1" tone={registered ? "green" : "amber"}>{registered ? "Registrado" : "Pendiente"}</Badge>
               )}
             </div>
-            <div className="flex shrink-0 items-center gap-1">
+            <div className={cn("flex items-center gap-1", onViewProjects ? "ml-auto max-w-full flex-wrap justify-end" : "shrink-0")}>
+              {onViewProjects && (
+                <Button type="button" variant="outline" size="sm" aria-haspopup="dialog"
+                  aria-label={`Ver proyectos de ${displayEmail(email)}`} onClick={() => onViewProjects(email)}>
+                  <FolderOpen className="size-4" aria-hidden /> Ver proyectos
+                </Button>
+              )}
               {invitation && !locked.includes(email) && <AccountInvitationButton scope={invitation} email={email} disabled={busy} />}
               {locked.includes(email) ? (
                 <Badge>Creador</Badge>
