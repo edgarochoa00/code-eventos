@@ -1,6 +1,6 @@
 {
   "name": "code-eventos",
-  "version": "0.4.23",
+  "version": "0.4.24",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -11,6 +11,7 @@
     "test:storage": "node --conditions=react-server --import tsx --test tests/submission-storage.test.ts",
     "test:logos": "node --conditions=react-server --import tsx --test tests/project-logo.test.ts",
     "test:use-cases": "node --conditions=react-server --import tsx --test tests/use-cases.test.ts",
+    "test:team-results": "npx -y firebase-tools@15 emulators:exec --project demo-code --only auth,firestore \"node --conditions=react-server --import tsx --test tests/project-results.test.ts\"",
     "test:rules": "npx -y firebase-tools@15 emulators:exec --project demo-code --only firestore \"node --test tests/firestore.rules.test.mjs\"",
     "emulators": "npx -y firebase-tools@15 emulators:start --project demo-code --only auth,firestore",
     "dev:emulators": "NEXT_PUBLIC_USE_EMULATORS=true next dev -p 3100",

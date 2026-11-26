@@ -8,7 +8,7 @@ import { SubmissionBadges } from "@/components/project-bits";
 import { ProjectForm } from "@/components/project-form";
 import { ProjectRegistration } from "@/components/project-registration";
 import { ProjectLogo } from "@/components/project-logo";
-import { Badge, Card, EmptyState, ErrorNote, SectionTitle, Spinner, Tabs, firestoreErrorMessage, useToast } from "@/components/ui";
+import { Badge, ButtonLink, Card, EmptyState, ErrorNote, SectionTitle, Spinner, Tabs, firestoreErrorMessage, useToast } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { createProject, qMyEventProject } from "@/lib/data";
 import { useCollection } from "@/lib/hooks";
@@ -65,6 +65,11 @@ export function StudentView({ event }: { event: EventDoc }) {
               <ArrowUpRight className="size-5" />
             </span>
           </Link>
+          {event.resultsPublished && !project.registrationPending && (
+            <ButtonLink href={`/eventos/${event.id}/proyectos/${project.id}?tab=calificaciones`} variant="outline" className="w-full sm:w-auto">
+              Ver calificaciones
+            </ButtonLink>
+          )}
         </>
       ) : event.registrationOpen && !event.resultsPublished && event.accessVersion === 1 ? (
         <Card className="sm:p-8">

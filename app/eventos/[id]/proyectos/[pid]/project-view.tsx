@@ -4,7 +4,7 @@ import { AccountInvitationButton } from "@/components/account-invitation-button"
 
 import { ArrowLeft, Lock, Pencil, ScanSearch, Trash2, UserRound } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useAgendaClock } from "@/components/judging-agenda";
 import { EvaluationForm } from "@/components/evaluation-form";
@@ -16,6 +16,7 @@ import { ProjectForm } from "@/components/project-form";
 import { ProjectTeamEditor } from "@/components/project-team-editor";
 import { ProjectLogo } from "@/components/project-logo";
 import { SubmissionEditor, SubmissionView } from "@/components/submission";
+import { TeamResults } from "@/components/team-results";
 import {
   Badge,
   Button,
@@ -97,7 +98,7 @@ export function ProjectView() {
   const email = normalizeEmail(user?.email ?? "");
   const roles = rolesInEvent(event.data, email, access.isAdmin);
   const isMember = project.data.memberEmails.includes(email);
-  return <ProjectBody event={event.data} project={project.data} roles={roles} isMember={isMember} />;
+  return <ProjectBody key={`${id}:${pid}:${user?.uid}`} event={event.data} project={project.data} roles={roles} isMember={isMember} />;
 }
 
 function ProjectBody({
@@ -113,6 +114,7 @@ function ProjectBody({
 }) {
   const { user } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const toast = useToast();
   const phases = PHASES.filter((p) => event.phases[p]);
   const isOrganizer = roles.includes("organizer");
@@ -123,11 +125,14 @@ function ProjectBody({
   const slot = judgeSchedule?.[project.id];
   const now = useAgendaClock(judgeSchedule, isJudge);
   const canParticipate = isMember && roles.includes("student");
+  const showTeamResults = canParticipate && event.resultsPublished && !project.registrationPending;
   const isLeader = Boolean(user?.uid) && user?.uid === project.leaderId;
   // Quién ve el análisis de originalidad: únicamente organizadores y administradores
   const seeOriginality = isOrganizer;
   const firstPhase = phases.find((p) => project[p]) ?? phases[0];
-  const [tab, setTab] = useState<Tab>(isJudge ? "evaluate" : isMember && !isOrganizer ? (firstPhase ?? "info") : "info");
+  const defaultTab = isJudge ? "evaluate" : isMember && !isOrganizer ? (firstPhase ?? "info") : "info";
+  const [requestedTab, setTab] = useState<Tab>(canParticipate && searchParams.get("tab") === "calificaciones" ? "scores" : defaultTab);
+  const tab = requestedTab === "scores" && !isOrganizer && !showTeamResults ? defaultTab : requestedTab;
   const [editingInfo, setEditingInfo] = useState(false);
   const [editingCategory, setEditingCategory] = useState(false);
   const [editingTeam, setEditingTeam] = useState(false);
@@ -177,7 +182,7 @@ function ProjectBody({
     ...phases.map((p) => ({ id: p as Tab, label: getPhaseLabel(event, p) })),
     ...(isJudge ? [{ id: "evaluate" as Tab, label: "Evaluar" }] : []),
     ...(seeOriginality ? [{ id: "originality" as Tab, label: "Originalidad" }] : []),
-    ...(isOrganizer ? [{ id: "scores" as Tab, label: "Calificaciones" }] : []),
+    ...(isOrganizer || showTeamResults ? [{ id: "scores" as Tab, label: "Calificaciones" }] : []),
   ];
 
   if (project.registrationPending && canParticipate && isLeader) {
@@ -484,6 +489,8 @@ function ProjectBody({
           )}
         </Card>
       )}
+
+      {tab === "scores" && showTeamResults && user && <TeamResults event={event} projectId={project.id} user={user} />}
 
       <Modal open={editingTeam} onClose={() => setEditingTeam(false)} title="Editar equipo">
         {editingTeam && <ProjectTeamEditor event={event} project={project} onClose={() => setEditingTeam(false)} />}

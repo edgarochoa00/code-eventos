@@ -905,7 +905,7 @@ function ResultsTab({ event, projects, evaluations }: { event: EventDoc; project
           </h2>
           <p className="mt-1 max-w-lg font-mono text-[11px] text-muted">
             Promedio de los evaluadores por etapa. Al publicar, se cierra la evaluación.
-            Los resultados se consultan desde el panel de organización.
+            Cada equipo podrá consultar su promedio y los comentarios cuando haya al menos dos evaluaciones por etapa.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -962,7 +962,8 @@ function ResultsTab({ event, projects, evaluations }: { event: EventDoc; project
 
       <Modal open={confirm} onClose={() => setConfirm(false)} title="¿Publicar resultados?">
         <p className="font-mono text-xs leading-relaxed text-muted">
-          Se cerrará la evaluación y se bloquearán las calificaciones. Los puntajes y comentarios quedan disponibles para el organizador.
+          Se cerrará la evaluación y se bloquearán las calificaciones. Cada equipo podrá ver su promedio y los comentarios
+          en las etapas que tengan al menos dos evaluadores distintos.
         </p>
         <div className="mt-6 flex justify-end gap-2">
           <Button variant="ghost" onClick={() => setConfirm(false)}>

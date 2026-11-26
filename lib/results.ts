@@ -9,11 +9,12 @@ export function resultRubricColumns(event: EventDoc, projects: ProjectDoc[]) {
 }
 
 export type PhaseStanding = ResultRow & { criteria: Record<string, number>; comments: string[] };
+export type TeamResult = { phase: Phase; score: number; comments: string[] };
 
 export function computeStandings(
   event: EventDoc,
   projects: ProjectDoc[],
-  evaluations: EvaluationDoc[],
+  evaluations: Pick<EvaluationDoc, "projectId" | "phase" | "scores" | "total" | "comment">[],
 ): Record<Phase, PhaseStanding[]> {
   const out: Record<Phase, PhaseStanding[]> = { prototype: [], final: [] };
   for (const phase of ["prototype", "final"] as Phase[]) {

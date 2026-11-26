@@ -147,7 +147,7 @@ export function EvaluationForm({
       </div>
 
       <Field label="Comentarios para el equipo (obligatorio)" htmlFor="comment" error={commentError || undefined}
-        hint="Obligatorio para enviar. Se muestra al equipo cuando se publiquen los resultados (sin tu nombre).">
+        hint="Se comparte de forma anónima al publicar los resultados. Evita firmarlo o incluir datos que te identifiquen.">
         <Textarea id="comment" required aria-required value={comment} disabled={locked || busy || confirming} maxLength={2000}
           onChange={(e) => { setComment(e.target.value); if (e.target.value.trim()) setCommentError(""); }} />
       </Field>
